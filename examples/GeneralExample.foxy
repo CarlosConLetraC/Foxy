@@ -1,0 +1,368 @@
+include("sys/out", "math", "string")
+@ single-line coments will be declared like this.
+@@
+    multiple coments will use 2 or more '@'
+    and close with the same amount of '@'
+    that were used to open the specific
+    multi-line comment.
+@@
+
+@ number is a primitive type to hold int, float, decimal, long, ..., all C numeric types.
+number nums[] = {1, math.pi, (float)2.718281, 20, -12, (long)100, (long long)9223372036854775807LL, (unsigned long long)9223372036854775807ULL}
+                  @ math.pi is a double.
+
+for (int i = 0; i < #nums; i++) {
+    println(nums[i])
+}
+
+@@@
+this loop is also supported:
+for (number n : nums) {
+    println(n)
+}
+
+also this types of for-loops:
+for (int i = 0; i < #nums; i++) println(nums[i])
+for (number n : nums) println(n)
+
+int i = 0
+for (; i < 10; i++); @ important to use ';' close the loop body.
+@@@
+
+printf("example of printf on %s\n", "foxy-lang")
+
+@@@
+unlike most low-level languages like C/C++, foxy can automatically handle array size,
+being dinamically resizable if theres no size parameter on DATATYPE VARNAME[SIZE].
+@@@
+
+dict foxy_dictionary = {
+    name = (string)"David", @ this in foxy is not a string, it's an object instanced from class library "string".
+                            @ with no casting, this makes an array of characters.
+    age = 22,
+    sex = "male" @ THIS is a character array!
+}
+
+foxy_dictionary.foreach((key, value) -> {
+    printf("[%s]: %T", key, value) @ on foxy-lang, %T represents any datatype, useful to cast %d, %s, ..., and %f on one type.
+    @@@
+    On foxy-lang, the key for any dictionary cast an array of characters,
+    avoiding instances from the library "string".
+    @@@
+})
+
+string something = "hello world"
+char thisIsNotAString[] = "not a string"
+
+printf("string object: %s\ncharacter array: %s\n", something, thisIsNotAString)
+@ %s can handle string objects and also character arrays.
+
+enum status {
+    OK,
+    RUNNING,
+    YIELD,
+    ERROR,
+    FINISHED
+}
+
+status result = status.RUNNING @ like Java enums
+
+@@@
+if you want to avoid typing status.* for each enumeration, you can
+use the following types:
+
+1st type:
+export enum status {
+    OK,
+    RUNNING,
+    YIELD,
+    ERROR,
+    FINISHED
+}
+
+status result = YIELD
+
+
+2nd type:
+enum status {
+    OK,
+    RUNNING,
+    YIELD,
+    ERROR,
+    FINISHED
+}
+use status.*
+
+status result = FINISHED
+@@@
+
+
+@@@
+internally, the first type of enum exports the whole enumeration to the environment.
+The second one uses the enumeration only on the current process environment/field.
+
+For example:
+
+enum status {
+    OK,
+    RUNNING,
+    YIELD,
+    ERROR,
+    FINISHED
+}
+
+function foo() {
+    use status.*
+    status result = FINISHED
+    printf("status: %s\n", result == FINISHED ? "FINISHED" : "no idea lol")
+    @ code above works fine
+}
+
+status somethingThatWillThrowException = YIELD
+@ this doesn't work, since use keyword only works on the current process's field.
+@@@
+
+use status.*
+switch(result) {
+    case OK:
+        println("OK")
+        break
+    case RUNNING:
+        println("RUNNING")
+        break
+    case YIELD:
+        println("YIELD")
+        break
+    case ERROR:
+        println("error")
+        break
+    case FINISHED:
+        println("finished")
+        break
+    default:
+        println("Somehow this line executed. . .")
+        break
+}
+
+@ now some functions from foxy-lang. . .
+
+function foo() {
+    print("I'm like println, but I don't use \\n at the end.\n")
+}
+foo()
+
+@ foxy handles parameter types only needing one data-type.
+function simpleAddition(number x, y) { @ same as `function simpleAddition(number x, number y)`.
+    return x + y
+} 
+printf("result: %T\n", simpleAddition(5, 10))
+
+function tupleAddition(number nums...) { 
+    number result = 0
+    for (number n : number[]{...}) @ just like Java anonymous arrays
+        result += n
+    return result
+}
+printf("result: %T\n", tupleAddition(5, 3.141592, 16L, 123))
+
+
+
+
+@ foxy-lang POO:
+
+class Animal {
+    function __new(string name, int age) {
+        self.name = name
+        self.age = age
+    } @ this is a constructor but in lua-style.
+      @ no need to define `public string name` or `public int age` above constructor,
+      @ foxy-lang automatically asigns the variables as public once initialized.
+    
+    @@
+    this is also an alternative for the code from above (logical constructor):
+    function __new(string name, int age); @ the program initialize the object
+                                          @ using the logic from the first constructor.
+    @@
+
+    @@
+    since foxy-lang automatically asigns the variables as public once initialized, we can
+    use the following syntax to define specific variables as private, protected or even public:
+
+    function __new(string name, int age) {
+        (private)self.name = name
+        (private)self.age = age
+    }
+
+    function __new(string name, int age) {
+        (protected)self.name = name
+        (protected)self.age = age
+    }
+    
+    function __new(string name, int age) {
+        (public)self.name = name
+        (public)self.age = age
+    }
+
+    @ or just like the classic style:
+    protected string name
+    protected int age
+
+    function __new(string name, int age) {
+        self.name = name
+        self.age = age
+    }
+
+    @ to use a logical constructor with access modifiers, we must follow this syntax:
+    function __new((private)string name, (private)int age);
+    function __new((protected)string name, (protected)int age);
+    function __new((public)string name, (public)int age); @ default logical constructor used
+    @@
+
+    @ to override function behaviour on foxy-lang, you must use the following syntax:
+    overrule function speak(string message) {
+        printf("animal said: %s\n", message)
+    }
+    @ this allows the program to use the default
+    @ speak function if no new behaviour is defined
+    @ on the inherited class.
+
+    function move() {
+        printf("%s moved.\n", self.name)
+    }
+
+    @@@
+    like lua metatags, foxy does have multiple flagged methods by default if not defined.
+
+    function __tostring(); @ returns a char array (not a string).
+    function __add(DATATYPE value); @ called when the arithmetic operator '+' is used.
+    function __sub(DATATYPE value); @ called when the arithmetic operator '-' is used.
+    function __mul(DATATYPE value); @ called when the arithmetic operator '*' is used.
+    function __div(DATATYPE value); @ called when the arithmetic operator '/' is used.
+    function __pow(DATATYPE value); @ called when the arithmetic operator '**' is used.
+    function __band(DATATYPE value); @ called when the logic operator '&' is used.
+    function __bor(DATATYPE value);  @ called when the logic operator '|' is used.
+    function __bnot(DATATYPE value); @ called when the logic operator '~' is used.
+    function __bxor(DATATYPE value); @ called when the logic operator '^' is used.
+    function __lshift(DATATYPE value); @ called when the logic operator '<<' is used.
+    function __rshift(DATATYPE value); @ called when the logic operator '>>' is used.
+    function __closed() @ called when the foxy-lang's current field is closed (garbage collector).
+    function __len() @ called when the length operator '#' is called.
+
+    to improve performance, foxy-lang doesn't overload all these methods when instanced, the
+    developer is the only one who can create a flagged method.
+
+    for now, string is the only system class that has a few flagged methods defined on C.
+    @@@
+}
+
+class Cat from Animal {
+    function __new(string name, int age) {
+        super(name, age)
+        self.type = "cat"
+    }
+
+    @ now, to override the 'speak' behaviour:
+    function speak(string message) {
+        printf("[%s]%s said: %s\n", self.type, self.name, message)
+    }
+}
+
+class Dog from Animal {
+    function __new(string name, int age); @ uses the superclass constructor by default.
+}
+
+Animal creature = Animal("Creature", 5)
+Cat feline = Cat("Felix", 3)
+Dog canine = Dog("Max", 2)
+
+creature.move()
+feline.move()
+canine.move()
+
+creature.speak("greetings")
+feline.speak("meow")
+canine.speak("woof)
+@ creature and canine have the same behaviour on method 'speak'.
+
+
+@@@
+foxy-lang supports structures like C!, meant to improve performance
+on massive data. Useful to make a List of Nodes.
+@@@
+
+struct Node {
+    int data
+    struct Node next
+}
+
+struct List {
+    Node head
+}
+
+function createNode(int value) {
+    Node newNode = Node()
+    newNode->data = value
+    newNode->next = NULL
+    return newNode
+}
+
+List createList() {
+    List newList = List()
+    list->head = NULL
+    return list
+}
+
+function insertToStart(List l, int value) {
+    Node newNode = createNode(value)
+    newNode->next = l->head
+    l->head = newNode 
+}
+
+function insertToEnd(List l, int value) {
+    Node newNode = createNode(value)
+    if (!l->head) {
+        l->head = newNode
+        return
+    }
+    Node currentNode
+    for (currentNode = l->head; currentNode->next != NULL; currentNode = currentNode->next);
+    currentNode->next = newNode
+}
+
+function insertIntoPosition(List l, int value, number position) {
+    if (position <= 0 || !l->head)
+        return insertToStart(l, value) @ foxy-lang can cast void functions to return nothing.
+    
+    Node currentNode = l->head
+    for (int i = 0; currentNode && i < position-1; ++i)
+        currentNode = currentNode->next
+    
+    if (!currentNode) return
+
+    Node newNode = createNode(value)
+    newNode->next = currentNode->next
+    currentNode->next = newNode
+}
+
+function showList(List l) {
+    for (Node currentNode = l->head; currentNode != NULL; currentNode = currentNode->next)
+        printf("%d%s", currentNode->data, currentNode->next ? " -> " : "\n");
+}
+
+List moreNumbers = createList()
+
+insertToEnd(moreNumbers, 10)
+insertToEnd(moreNumbers, 20)
+showList(moreNumbers)
+
+insertToStart(moreNumbers, 5)
+showList(moreNumbers)
+
+insertIntoPosition(moreNumbers, 15, 2)
+showList(moreNumbers)
+
+insertToEnd(moreNumbers, 30)
+showList(moreNumbers)
+
+
+@ unlike C/C++, C#, Java, Go and Rust: foxy-lang does not need a main function to run.
