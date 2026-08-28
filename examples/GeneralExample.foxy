@@ -37,7 +37,7 @@ being dinamically resizable if theres no size parameter on DATATYPE VARNAME[SIZE
 @@@
 
 dict foxy_dictionary = {
-    name = (string)"David", @ this in foxy is not a string, it's an object instanced from class library "string".
+    name = (string)"David", @ this in foxy doesn't automatically as a string by default, we use the system class "string" to cast it.
                             @ with no casting, this makes an array of characters.
     age = 22,
     sex = "male" @ THIS is a character array!
