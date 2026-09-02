@@ -1,10 +1,42 @@
+#include "f_init.h"
 #include <stdio.h>
-#include "f_vm.h"
 
-int f_sys_println(FoxyVM* vm) {
-    (void)vm;
-    // Aquí más adelante extraeremos el argumento real de la pila de la VM.
-    // Por ahora, ejecutamos la acción nativa de impresión con salto de línea.
-    printf("[Foxy Native] println ejecutado\n");
-    return 0;
+static const char* get_string_from_value(FoxyValue val) {
+    if (val.type == FOXY_VAL_OBJECT && val.as.obj) {
+        return (const char *)val.as.obj;
+    }
+    return NULL;
+}
+
+FOXY_EXPORT FoxyValue f_sys_out_println(int argc, FoxyValue *args) {
+    if (args) {
+        for (int i = 0; i < argc; i++) {
+            FoxyValue val = args[i];
+            switch (val.type) {
+                case FOXY_VAL_OBJECT: {
+                    const char *str = get_string_from_value(val);
+                    if (str) {
+                        printf("%s", str);
+                    } else {
+                        printf("[object]");
+                    }
+                    break;
+                }
+                case FOXY_VAL_INT:
+                    printf("%ld", (long)val.as.ival);
+                    break;
+                case FOXY_VAL_BOOL:
+                    printf("%s", val.as.bval ? "true" : "false");
+                    break;
+                case FOXY_VAL_NULL:
+                default:
+                    printf("nil");
+                    break;
+            }
+        }
+    }
+    
+    printf("\n");
+    fflush(stdout);
+    return FOXY_NULL_VALUE;
 }

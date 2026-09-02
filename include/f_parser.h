@@ -37,6 +37,6 @@
     } ASTNode;
 
     // 4. Funciones principales del análisis sintáctico
-    ASTNode* parser_parse(FoxyLexer* lexer); // Actualizado a FoxyLexer para coherencia
+    ASTNode* f_parser_parse(FoxyLexer* lexer); // Actualizado a FoxyLexer para coherencia
     void free_ast(ASTNode* node);            //[cite: 3]
 #endif // F_PARSER_H

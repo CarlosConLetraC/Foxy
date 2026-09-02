@@ -31,7 +31,7 @@ static void parser_add_child(ASTNode* parent, ASTNode* child) {
     parent->children[parent->child_count++] = child;
 }
 
-ASTNode* parser_parse(FoxyLexer* lexer) {
+ASTNode* f_parser_parse(FoxyLexer* lexer) {
     ASTNode* root = parser_create_node(AST_PROGRAM);
     FoxyToken current_token = f_lexer_next_token(lexer);
 
