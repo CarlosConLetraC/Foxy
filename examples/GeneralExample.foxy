@@ -1,4 +1,7 @@
-include("sys/out", "math", "string")
+include "sys/out"
+include "math"
+include "string"
+
 @ single-line coments will be declared like this.
 @@
     multiple coments will use 2 or more '@'
@@ -8,7 +11,7 @@ include("sys/out", "math", "string")
 @@
 
 @ number is a primitive type to hold int, float, decimal, long, ..., all C numeric types.
-number nums[] = {1, math.pi, (float)2.718281, 20, -12, (long)100, (long long)9223372036854775807LL, (unsigned long long)9223372036854775807ULL}
+number nums[] = {1, math.pi, (float)2.718281, 20, -12, (long)100, (long long)9223372036854775807, (unsigned long long)9223372036854775807}
                   @ math.pi is a double.
 
 for (int i = 0; i < #nums; i++) {
@@ -21,7 +24,7 @@ for (number n : nums) {
     println(n)
 }
 
-also this types of for-loops:
+also these types of for-loops:
 for (int i = 0; i < #nums; i++) println(nums[i])
 for (number n : nums) println(n)
 
@@ -163,7 +166,7 @@ function tupleAddition(number nums...) {
         result += n
     return result
 }
-printf("result: %T\n", tupleAddition(5, 3.141592, 16L, 123))
+printf("result: %T\n", tupleAddition(5, 3.141592, 16, 123))
 
 
 
@@ -281,7 +284,7 @@ canine.move()
 
 creature.speak("greetings")
 feline.speak("meow")
-canine.speak("woof)
+canine.speak("woof")
 @ creature and canine have the same behaviour on method 'speak'.
 
 

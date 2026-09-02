@@ -1,0 +1,125 @@
+bytecode de foxy: se genera un arreglo de caracteres que almacena las instrucciones de foxy para una VM, pero para poder crear múltiples instancias foxy en uno solo, se creará un tipo de hashmap que ayude a apuntar a las instrucciones para ejecutar.
+
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {}
+    processes := {
+        process1 := {}
+        process2 := {}
+        process3 := {}
+    }
+}
+cada proceso dentro del FOXY_HASH_MAP tendrá su propio entorno de ejecución. Ejemplo:
+
+```
+include "sys/process"
+
+@@@
++==================================+
+|    iniciando subprocesos. . .    |
++==================================+
+@@@
+
+Process process1 = popen(function() {
+    @ código. . .
+}, "proceso 1") @ los nombres son opcionales.
+
+Process process2 = popen(function() {
+    @ código. . .
+}, "proceso 2")
+
+Process process3 = popen(function() {
+    @ código. . .
+}, "proceso 3")
+
+@@
+foxy esperará a que todos los processN terminen de ejecutar
+@@
+```
+
+Por defecto, foxy deja un solo process en el FOXY_HASH_MAP de la siguiente manera:
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {}
+    processes := {
+        process1 := {}
+    }
+}
+
+La maquina virtual de foxy utilizará un entorno compartido en cuanto a librerías de sistema
+en el momento que un process la incluya, asi se evita crear duplicación de datos. Pero para
+evitar que se sobrecarguen al instante las librerías, primero se verificará si dicho proceso
+la incluye, sino no se cargará al entorno de ejecución de O(n).
+
+los "loadedlibs" únicamente almacenan librerías de sistema, si el usuario hace su propia librería
+deberá cargarse dentro del processN.
+
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {}
+    processes := {
+        process1 := {
+            locallibs := {}
+        }
+    }
+}
+
+Una ventaja de los processes de foxy es que puede ejecutar todos los processes sin yield, es decir: maneja
+cada instancia foxy en diferentes contenedores, a diferencia de Lua que únicamente crea corutinas para simular
+hilos. Gracias a esto el manejo de datos que requieren de ejecución continua.
+
+En caso de requerir compartir información por cada instancia de processes, se necesita hacer lo siguiente:
+```
+include "sys"  @ se importan todas librerías de sys.
+include "datatypes/string"
+
+SharedEnv env = env.createEnvironment((dict){
+    name = "pruebaEntorno"
+})
+env.data = (dict){
+    status = (string)"waiting",
+    currentInput = KeyCode(0) (caracter ascii nulo, es decir que no se preciona nada)
+}
+
+Process p1 = process.popen({
+    callback = function() {
+        data.status = (string)"running"
+        while (true) {
+            @ algo que renderiza fotogramas. . .
+        }
+        data.status = (string)"closed"
+    },
+    pname = "render",
+    environment = env
+})
+
+Process p2 = process.popen({
+    callback = function() {
+        @ algo que lee el input del usuario. . .
+        while (true) {
+            KeyCode kCode = io.readKeyCode()  @ de parte de sys/io.
+            env.currentInput = kCode
+        }
+    },
+    pname = "input",
+    environment = env
+})
+```
+
+Al final de esto, el hashmap de foxy termina así:
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {
+        pruebaEntorno := {}
+    }
+    processes := {
+        render := {
+            locallibs := {}
+            protocol := pruebaEntorno
+        }
+        input := {
+            locallibs := {}
+            protocol := pruebaEntorno
+        }
+    }
+}

@@ -1,0 +1,29 @@
+@@ 
+    Prueba de funciones matemáticas en foxy-lang
+    Demuestra declaración de funciones, tipos number y operadores avanzados.
+@@
+
+include "sys/out"
+
+@ Función simple para calcular el cuadrado usando el operador de potencia '**'
+function calcular_cuadrado(number x) {
+    return x ** 2
+}
+
+@ Función para calcular la suma de cuadrados (base para hipotenusa)
+function suma_de_cuadrados(number a, number b) {
+    number sq_a = a ** 2
+    number sq_b = b ** 2
+    number total = sq_a + sq_b
+    return total
+}
+
+@ Resultados:
+number base = 3.5
+number altura = 4.0
+
+number res_cuadrado = calcular_cuadrado(base)
+number res_suma = suma_de_cuadrados(base, altura)
+
+println("Resultado del cuadrado:", res_cuadrado)
+println("Resultado de suma de cuadrados:", res_suma)
