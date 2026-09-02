@@ -1,16 +1,18 @@
 # Compilador y banderas
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O3 -Iinclude -Isrc/core
+CFLAGS = -Wall -Wextra -std=c99 -O3 -Iinclude -If_include
 LDFLAGS = -ldl -lm
 
 # Directorios
-SRC_DIR = src/core
+SRC_DIR = src
 BUILD_DIR = build
 
-# Encontrar automáticamente todos los archivos .c en src/core/
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-# Mapear los fuentes a archivos objeto dentro de build/
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+# Encontrar recursivamente todos los archivos .c dentro de src/
+SRCS = $(shell find $(SRC_DIR) -name "*.c")
+
+# Mapear los fuentes a archivos objeto planos en build/ 
+# (asumiendo nombres de archivos únicos en todo src/)
+OBJS = $(patsubst %, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
 
 # Binario final
 TARGET = foxy
@@ -18,7 +20,7 @@ TARGET = foxy
 # Regla principal
 all: $(BUILD_DIR) $(TARGET)
 
-# Crear directorio de compilación si no existe
+# Crear directorio build si no existe
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
@@ -26,11 +28,15 @@ $(BUILD_DIR):
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
-# Regla de compilación genérica para los objetos (.c -> .o)
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+# Regla de compilación genérica: busca el .c en cualquier subdirectorio de src/ y compila en build/
+define compile_rule
+$(BUILD_DIR)/$(notdir $(1)).o: $(1)
+	$$(CC) $$(CFLAGS) -c $$< -o $$@
+endef
 
-# Limpieza de archivos compilados
+$(foreach src, $(SRCS), $(eval $(call compile_rule,$(src))))
+
+# Limpieza
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
 
