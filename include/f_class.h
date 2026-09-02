@@ -1,24 +1,18 @@
 #ifndef FOXY_CLASS_H
     #define FOXY_CLASS_H
 
+    #include "f_settings.h"
     #include <stdint.h>
     #include <stdbool.h>
+    #include <string.h>
     #include "f_vm.h"
+    #include "f_methods.h"
 
     typedef struct FoxyClass FoxyClass;
     typedef struct FoxyObject FoxyObject;
 
     // Puntero a función nativa asociada a un método
     typedef void (*FoxyMethodFunc)(FoxyVM *vm, FoxyObject *self, int argc);
-
-    typedef struct FoxyMethod {
-        const char *name;
-        bool is_native;
-        union {
-            FoxyMethodFunc native_fn;
-            uint32_t bytecode_offset; // Para métodos definidos en código Foxy
-        } as;
-    } FoxyMethod;
 
     struct FoxyClass {
         const char *name;

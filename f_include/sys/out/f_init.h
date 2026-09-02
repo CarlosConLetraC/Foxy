@@ -1,14 +1,14 @@
 #ifndef F_INIT_H
     #define F_INIT_H
 
-    #include "f_settings.h" // Asegura que FOXY_EXPORT esté disponible
+    #include "f_settings.h"
     #include "f_vm.h"
     #include "f_value.h"
 
-    // Firmas actualizadas a la nueva arquitectura
-    FOXY_EXPORT FoxyValue f_sys_out_print(int argc, FoxyValue *args);
-    FOXY_EXPORT FoxyValue f_sys_out_println(int argc, FoxyValue *args);
-    FOXY_EXPORT FoxyValue f_sys_out_printf(int argc, FoxyValue *args);
+    // Firmas alineadas con FoxyMethodFunc
+    FOXY_EXPORT void f_sys_out_print(FoxyVM *vm, FoxyObject *self, int argc);
+    FOXY_EXPORT void f_sys_out_println(FoxyVM *vm, FoxyObject *self, int argc);
+    FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc);
 
     // Punto de entrada global de la librería
     FOXY_EXPORT void foxy_init_module(FoxyVM *vm);

@@ -18,12 +18,12 @@
         FoxyConstant *constants;    // Arreglo de constantes locales de la función
         size_t constants_count;     // Cantidad de constantes registradas
         size_t constants_capacity;  // Capacidad del búfer de constantes    
-        uint8_t *bytecode;
+        uint8_t *bytecode;          // Búfer alternativo/secundario de bytecode (si aplica)
         uint16_t locals_count;      // Cantidad de variables locales que requiere la función
-
     } FoxyFunction;
 
     // Constructor y destructor de la estructura
     FoxyFunction* f_function_create(const char *name, uint8_t arity);
     void f_function_free(FoxyFunction *func);
+    void f_function_add_constant(FoxyFunction *func, FoxyValue value);
 #endif // F_FUNCTION_H

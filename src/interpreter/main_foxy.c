@@ -54,6 +54,11 @@ int main(int argc, char** argv) {
     fseek(file, 0, SEEK_SET);
 
     char* source = (char*)malloc(length + 1);
+    if (!source) {
+        fprintf(stderr, "[Error] Memoria insuficiente para leer el archivo.\n");
+        fclose(file);
+        return 1;
+    }
     fread(source, 1, length, file);
     fclose(file);
     source[length] = '\0';
@@ -85,9 +90,25 @@ int main(int argc, char** argv) {
         printf("=== [DEBUG] CONSTANT POOL (%zu elementos) ===\n", ctx->constants_count);
         for (size_t i = 0; i < ctx->constants_count; i++) {
             switch (ctx->constants[i].type) {
-                case FOXY_VAL_ARRAY:
-                    printf("  [%02zu] STRING: \"%s\"\n", i, (char*)ctx->constants[i].as.array);
+                case FOXY_VAL_ARRAY: {
+                    FoxyArray *arr = ctx->constants[i].as.array;
+                    if (arr) {
+                        if (arr->element_type_id == FOXY_VAL_CHAR && arr->data) {
+                            printf("  [%02zu] CHAR ARRAY (String): \"%s\"\n", i, (const char*)arr->data);
+                        } else {
+                            printf("  [%02zu] GENERIC ARRAY (Elem Type: %d, Length: %zu)\n", 
+                                i, arr->element_type_id, arr->length);
+                        }
+                    } else {
+                        printf("  [%02zu] ARRAY: null\n", i);
+                    }
                     break;
+                }
+                case FOXY_VAL_OBJECT: {
+                    const char *obj_str = ctx->constants[i].as.object ? (const char *)ctx->constants[i].as.object : "null";
+                    printf("  [%02zu] OBJECT/STRING: \"%s\"\n", i, obj_str);
+                    break;
+                }
                 case FOXY_VAL_INT:
                     printf("  [%02zu] INT: %d\n", i, ctx->constants[i].as.ival);
                     break;
@@ -96,7 +117,10 @@ int main(int argc, char** argv) {
                     printf("  [%02zu] DOUBLE: %f\n", i, ctx->constants[i].as.dval);
                     break;
                 case FOXY_VAL_BOOL:
-                    printf("  [%02zu] BOOL: %s\n", i, ctx->constants[i].as.bval ? "true" : "false");
+                    printf("  [%02zu] BOOL: %s\n", i, ctx->constants[i].as.boolean ? "true" : "false");
+                    break;
+                case FOXY_VAL_NULL:
+                    printf("  [%02zu] NULL\n", i);
                     break;
                 default:
                     printf("  [%02zu] UNKNOWN TYPE (%d)\n", i, ctx->constants[i].type);
@@ -108,10 +132,11 @@ int main(int argc, char** argv) {
             printf("%02X ", ctx->code[i]);
             if ((i + 1) % 16 == 0) printf("\n");
         }
-        printf("\n============================================\n\n");
+        if (ctx->code_size % 16 != 0) printf("\n");
+        printf("============================================\n\n");
     }
 
-    // 4. Transferir punteros a la VM antes de liberar ctx
+    // 4. Transferir recursos a la VM antes de liberar ctx
     uint8_t *code_ptr = NULL;
     size_t code_size = 0;
     FoxyConstant *constants_ptr = NULL;
@@ -121,13 +146,17 @@ int main(int argc, char** argv) {
 
     FoxyVM* vm = f_vm_create();
     f_vm_load_process(vm, code_ptr, code_size, filename);
+
+    // Asignar el pool de constantes transferido a la VM
     vm->constants = constants_ptr;
     vm->constants_count = constants_count;
+    vm->constants_capacity = constants_count;
 
-    // Destruir ctx sin riesgo de double free sobre code y constants
+    // Liberar los punteros temporales de código y de la estructura codegen
+    if (code_ptr) free(code_ptr);
     f_codegen_free(ctx);
 
-    // Ejecución y limpieza final
+    // 5. Ejecución y limpieza final
     int exit_code = f_vm_run(vm);
 
     f_vm_free(vm);

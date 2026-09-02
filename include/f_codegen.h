@@ -31,6 +31,7 @@
     // Estructura para variables locales en compilación
     typedef struct {
         char name[64];
+        uint32_t data_type; // Almacena el subtipo o tipo del token (ej. int, char, cualquier otro tipo de dato primitivo)
         uint8_t index;
     } FoxyLocalSymbol;
 
@@ -58,7 +59,7 @@
     void f_codegen_emit_byte(FoxyCodegenContext *ctx, uint8_t byte);
     void f_codegen_visit(FoxyCodegenContext *ctx, ASTNode *node);
     uint8_t f_codegen_add_constant(BytecodeBuffer* buffer, FoxyValueType type, const char* sval);
-    uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name);
+    uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name, uint32_t data_type);
     uint32_t f_codegen_add_constant_string(FoxyCodegenContext* ctx, const char* str);
     size_t f_codegen_add_chararray_const_to_buffer(BytecodeBuffer* buffer, const char* raw_str);
 

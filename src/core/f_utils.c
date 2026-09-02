@@ -73,30 +73,28 @@ void f_utils_print_constant_dynamic(FoxyValue constant) {
             break;
 
         case FOXY_VAL_LONG_LONG:
-            len = snprintf(buffer, sizeof(buffer), "%" PRId64, constant.as.llval);
+            len = snprintf(buffer, sizeof(buffer), "%lld", constant.as.llval);
             if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
             break;
 
         case FOXY_VAL_UNSIGNED_LONG_LONG:
-            len = snprintf(buffer, sizeof(buffer), "%" PRIu64, constant.as.ullval);
+            len = snprintf(buffer, sizeof(buffer), "%llu", constant.as.ullval);
             if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
             break;
 
         case FOXY_VAL_BOOL:
-            if (constant.as.bval) {
+            if (constant.as.bval)
                 f_utils_syswrite(1, "true", 4);
-            } else {
+            else
                 f_utils_syswrite(1, "false", 5);
-            }
             break;
 
         case FOXY_VAL_ARRAY:
-            if (constant.as.array && constant.as.array->data) {
-                // Si el array contiene datos de texto (cadena)
+            // Si el array contiene datos de texto (cadena)
+            if (constant.as.array && constant.as.array->data)
                 f_utils_syswrite(1, (const char*)constant.as.array->data, constant.as.array->length);
-            } else {
+            else
                 f_utils_syswrite(1, "[]", 2);
-            }
             break;
 
         case FOXY_VAL_OBJECT:

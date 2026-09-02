@@ -1,3 +1,4 @@
+#include "f_settings.h"
 #include "f_flagged_methods.h"
 #include <stdlib.h>
 #include <string.h>

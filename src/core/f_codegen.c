@@ -1,3 +1,4 @@
+#include "f_settings.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,7 @@
 #include "f_codegen.h"
 #include "f_foxcode.h"
 
-static void compile_node(ASTNode* node, BytecodeBuffer* buffer);
+// static void compile_node(ASTNode* node, BytecodeBuffer* buffer);
 
 void f_codegen_buffer_init(BytecodeBuffer* buffer) {
     if (!buffer) return;
@@ -88,22 +89,21 @@ void f_codegen_buffer_free(BytecodeBuffer* buffer) {
 uint8_t* f_generate_bytecode(ASTNode* ast_root, size_t* out_size) {
     if (!ast_root) return NULL;
     
-    // 1. Inicializar buffer y compilar el AST
-    BytecodeBuffer buffer;
-    f_codegen_buffer_init(&buffer);
-    compile_node(ast_root, &buffer);
+    // 1. Crear el contexto de generación moderno
+    FoxyCodegenContext *ctx = f_codegen_create();
+    if (!ctx) return NULL;
 
-    // ... recorrido del AST (f_codegen_visit) para llenar buffer.code y buffer.constants ...
+    // 2. Visitar el AST utilizando el sistema de visitantes tipados
+    f_codegen_visit(ctx, ast_root);
 
-    // 2. PASO A: Calcular el tamaño total del blob binario
+    // 3. Serializar las constantes y el bytecode del contexto hacia el blob binario final
     size_t constants_payload_size = 0;
 
-    for (size_t i = 0; i < buffer.constants_count; i++) {
-        switch (buffer.constants[i].type) {
+    for (size_t i = 0; i < ctx->constants_count; i++) {
+        switch (ctx->constants[i].type) {
             case FOXY_VAL_ARRAY: {
-                const char *str = (const char*)buffer.constants[i].as.array;
+                const char *str = (const char*)ctx->constants[i].as.array;
                 if (str) {
-                    // 1 byte (Tag tipo) + 2 bytes (Longitud uint16_t) + N bytes (String)
                     constants_payload_size += 1 + sizeof(uint16_t) + strlen(str);
                 }
                 break;
@@ -124,28 +124,27 @@ uint8_t* f_generate_bytecode(ASTNode* ast_root, size_t* out_size) {
         }
     }
 
-    // Cabecera: Cantidad de constantes (uint16_t) + Código (uint32_t) + Payloads
     size_t total_size = sizeof(uint16_t) + constants_payload_size +
-                        sizeof(uint32_t) + buffer.count;
+                        sizeof(uint32_t) + ctx->code_size;
 
     uint8_t* blob = (uint8_t*)malloc(total_size);
     if (!blob) {
-        f_codegen_buffer_free(&buffer);
+        f_codegen_free(ctx);
         return NULL;
     }
 
     size_t offset = 0;
 
-    // 3. PASO B: Escribir la cantidad de constantes
-    uint16_t const_count = (uint16_t)buffer.constants_count;
+    // Cantidad de constantes
+    uint16_t const_count = (uint16_t)ctx->constants_count;
     memcpy(blob + offset, &const_count, sizeof(uint16_t));
     offset += sizeof(uint16_t);
 
-    // 4. PASO C: Serializar las constantes (Emisión del payload)
-    for (size_t i = 0; i < buffer.constants_count; i++) {
-        switch (buffer.constants[i].type) {
+    // Serializar constantes
+    for (size_t i = 0; i < ctx->constants_count; i++) {
+        switch (ctx->constants[i].type) {
             case FOXY_VAL_ARRAY: {
-                const char *str = (const char*)buffer.constants[i].as.array;
+                const char *str = (const char*)ctx->constants[i].as.array;
                 uint16_t slen = str ? (uint16_t)strlen(str) : 0;
                 
                 blob[offset++] = (uint8_t)FOXY_VAL_ARRAY;
@@ -160,37 +159,38 @@ uint8_t* f_generate_bytecode(ASTNode* ast_root, size_t* out_size) {
             }
             case FOXY_VAL_INT:
                 blob[offset++] = (uint8_t)FOXY_VAL_INT;
-                memcpy(blob + offset, &buffer.constants[i].as.ival, sizeof(int32_t));
+                memcpy(blob + offset, &ctx->constants[i].as.ival, sizeof(int32_t));
                 offset += sizeof(int32_t);
                 break;
             case FOXY_VAL_NUMBER:
             case FOXY_VAL_DOUBLE:
-                blob[offset++] = (uint8_t)buffer.constants[i].type;
-                memcpy(blob + offset, &buffer.constants[i].as.dval, sizeof(double));
+                blob[offset++] = (uint8_t)ctx->constants[i].type;
+                memcpy(blob + offset, &ctx->constants[i].as.dval, sizeof(double));
                 offset += sizeof(double);
                 break;
             case FOXY_VAL_BOOL:
                 blob[offset++] = (uint8_t)FOXY_VAL_BOOL;
-                blob[offset++] = buffer.constants[i].as.bval ? 1 : 0;
+                blob[offset++] = ctx->constants[i].as.bval ? 1 : 0;
                 break;
             default:
                 break;
         }
     }
 
-    // 5. PASO D: Escribir el bloque de instrucciones (instrucciones de la VM)
-    uint32_t code_count = (uint32_t)buffer.count;
+    // Escribir bloque de código/bytecode
+    uint32_t code_count = (uint32_t)ctx->code_size;
     memcpy(blob + offset, &code_count, sizeof(uint32_t));
     offset += sizeof(uint32_t);
 
-    if (buffer.count > 0) {
-        memcpy(blob + offset, buffer.code, buffer.count);
-        offset += buffer.count;
+    if (ctx->code_size > 0) {
+        memcpy(blob + offset, ctx->code, ctx->code_size);
+        offset += ctx->code_size;
     }
 
     if (out_size) *out_size = total_size;
 
-    f_codegen_buffer_free(&buffer);
+    // Liberar el contexto del codegen
+    f_codegen_free(ctx);
     return blob;
 }
 
@@ -261,7 +261,7 @@ void f_codegen_compile_load_lib(BytecodeBuffer* buffer, const char* raw_path_fro
 }
 
 // Función recursiva interna para compilar nodos del AST de forma estricta
-static void compile_node(ASTNode* node, BytecodeBuffer* buffer) {
+/*static void compile_node(ASTNode* node, BytecodeBuffer* buffer) {
     if (!node || buffer->has_error) return;
 
     switch (node->type) {
@@ -330,12 +330,12 @@ static void compile_node(ASTNode* node, BytecodeBuffer* buffer) {
             // Otros nodos se ignoran de forma segura en esta fase base
             break;
     }
-}
+}*/
 
 // Protoboard para llamadas recursivas dentro del módulo
 void f_codegen_emit_byte(FoxyCodegenContext *ctx, uint8_t byte);
 uint32_t f_codegen_add_constant_string(FoxyCodegenContext *ctx, const char *str);
-uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name);
+uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name, uint32_t data_type);
 void f_codegen_visit(FoxyCodegenContext *ctx, ASTNode *node);
 static char* token_to_string(FoxyToken token);
 
@@ -346,33 +346,23 @@ static char* token_to_string(FoxyToken token);
 void f_codegen_free(FoxyCodegenContext *ctx) {
     if (!ctx) return;
 
-    // 1. Liberar el buffer de bytecode
-    if (ctx->code) {
-        free(ctx->code);
-        ctx->code = NULL;
-    }
+    if (ctx->code) free(ctx->code);
 
-    // 2. Liberar el Constant Pool y sus elementos dinámicos
     if (ctx->constants) {
         for (size_t i = 0; i < ctx->constants_count; i++) {
-            if (ctx->constants[i].type == FOXY_VAL_ARRAY) {
-                if (ctx->constants[i].as.array) {
-                    free((void*)ctx->constants[i].as.array);
-                    ctx->constants[i].as.array = NULL;
+            if (ctx->constants[i].type == FOXY_VAL_ARRAY && ctx->constants[i].as.array) {
+                FoxyArray *arr = ctx->constants[i].as.array;
+                if (arr->data) {
+                    free(arr->data);
                 }
+                free(arr);
             }
         }
         free(ctx->constants);
-        ctx->constants = NULL;
     }
 
-    // 3. Liberar la tabla de símbolos de variables locales
-    if (ctx->locals) {
-        free(ctx->locals);
-        ctx->locals = NULL;
-    }
+    if (ctx->locals) free(ctx->locals);
 
-    // 4. Liberar la estructura principal del contexto
     free(ctx);
 }
 
@@ -450,7 +440,7 @@ static char* token_to_string(FoxyToken token) {
     return buf;
 }
 
-uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name) {
+uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name, uint32_t data_type) {
     if (!ctx || !name) return 0;
 
     // 1. Buscar si la variable local ya fue declarada previamente
@@ -470,10 +460,11 @@ uint8_t f_codegen_get_or_add_local(FoxyCodegenContext *ctx, const char *name) {
         ctx->locals = temp;
     }
 
-    // 3. Registrar la nueva variable local
+    // 3. Registrar la nueva variable local asignando su tipo y su índice
     uint8_t index = (uint8_t)ctx->locals_count;
     strncpy(ctx->locals[index].name, name, sizeof(ctx->locals[index].name) - 1);
     ctx->locals[index].name[sizeof(ctx->locals[index].name) - 1] = '\0';
+    ctx->locals[index].data_type = data_type; // <--- Aquí guardamos el tipo explícito
     ctx->locals[index].index = index;
 
     ctx->locals_count++;
@@ -560,38 +551,76 @@ static void f_codegen_visit_expr_call(FoxyCodegenContext *ctx, ASTNode *node) {
 
     // 3. Emitir el opcode de llamada universal
     f_codegen_emit_byte(ctx, FOXCODE_CALL);
+    
+    // ¡CRÍTICO! Emitir el número de argumentos para que la VM los consuma correctamente
+    f_codegen_emit_byte(ctx, (uint8_t)node->child_count);
 }
 
-// AST_VAR_DECL
+// AST_VAR_DECL: Declaración de variables con tipado estricto (ej. char mensaje[] = "hola")
 static void f_codegen_visit_var_decl(FoxyCodegenContext *ctx, ASTNode *node) {
     if (!ctx || !node) return;
 
-    if (node->child_count > 0)
-        f_codegen_visit(ctx, node->children[0]);
-    else
+    // 1. Evaluar y apilar el valor inicial si existe (hijo 1)
+    if (node->child_count > 1 && node->children[1]) {
+        f_codegen_visit(ctx, node->children[1]);
+    } else {
+        // Si no hay valor inicial, cargar valor nulo por defecto
         f_codegen_emit_byte(ctx, FOXCODE_LOAD_NULL);
+    }
 
-    char *var_name = token_to_string(node->token);
-    uint8_t local_idx = f_codegen_get_or_add_local(ctx, var_name);
+    // 2. Extraer el nombre de la variable (hijo 0)
+    char *var_name = token_to_string(node->children[0]->token);
+    
+    // 3. Mapeo estricto del tipo: Si es un char array, se registra directamente como FOXY_VAL_ARRAY
+    uint32_t raw_token_type = (uint32_t)node->token.subtype;
+    uint32_t resolved_type = raw_token_type;
+
+    if (raw_token_type == FOXY_TOKEN_IDENTIFIER_CHAR_ARRAY)
+        resolved_type = FOXY_VAL_ARRAY; 
+
+    // 4. Registrar o recuperar el índice local pasando el tipo resuelto de la lista oficial
+    uint8_t local_idx = f_codegen_get_or_add_local(ctx, var_name, resolved_type);
     free(var_name);
 
+    // 5. Emitir instrucción de almacenamiento local en el bytecode
     f_codegen_emit_byte(ctx, FOXCODE_STORE_LOCAL);
     f_codegen_emit_byte(ctx, local_idx);
 }
 
-// AST_ASSIGNMENT
+int8_t f_codegen_find_local(FoxyCodegenContext *ctx, const char *name) {
+    if (!ctx || !name) return -1;
+
+    for (size_t i = 0; i < ctx->locals_count; i++) {
+        if (strcmp(ctx->locals[i].name, name) == 0)
+            return (int8_t)ctx->locals[i].index;
+    }
+    return -1; // No encontrada
+}
+
+// AST_ASSIGNMENT: Asignación a una variable ya existente (ej. a = 20)
 static void f_codegen_visit_assignment(FoxyCodegenContext *ctx, ASTNode *node) {
     if (!ctx || !node) return;
 
+    // 1. Evaluar y apilar el valor de la derecha que será asignado
     if (node->child_count > 0)
         f_codegen_visit(ctx, node->children[0]);
 
+    // 2. Extraer el nombre de la variable
     char *var_name = token_to_string(node->token);
-    uint8_t local_idx = f_codegen_get_or_add_local(ctx, var_name);
+    
+    // 3. Buscar la variable local en la tabla de símbolos (las asignaciones no declaran tipos nuevos)
+    int8_t local_idx = f_codegen_find_local(ctx, var_name);
+    if (local_idx < 0) {
+        fprintf(stderr, "[Foxy Codegen Error] Variable no declarada '%s' en asignación.\n", var_name);
+        free(var_name);
+        return;
+    }
+    
     free(var_name);
 
+    // 4. Emitir la instrucción para almacenar en la variable local existente
     f_codegen_emit_byte(ctx, FOXCODE_STORE_LOCAL);
-    f_codegen_emit_byte(ctx, local_idx);
+    f_codegen_emit_byte(ctx, (uint8_t)local_idx);
 }
 
 // AST_FUNCTION_DEF: Declaración de funciones Foxy
@@ -683,16 +712,51 @@ void f_codegen_visit(FoxyCodegenContext *ctx, ASTNode *node) {
 }
 
 uint32_t f_codegen_add_constant_string(FoxyCodegenContext* ctx, const char* str) {
+    if (!ctx || !str) return 0;
+
+    size_t str_len = strlen(str);
+
+    // 1. Buscar si la constante ya existe en el pool
     for (size_t i = 0; i < ctx->constants_count; i++) {
         if (ctx->constants[i].type == FOXY_VAL_ARRAY && ctx->constants[i].as.array) {
-            const char* current_str = (const char*)ctx->constants[i].as.array;
-            if (strcmp(current_str, str) == 0)
+            FoxyArray *arr = ctx->constants[i].as.array;
+            if (arr->element_type_id == FOXY_VAL_CHAR && arr->data && strcmp((const char*)arr->data, str) == 0) {
                 return (uint32_t)i;
+            }
         }
     }
 
+    // 2. Redimensionar el pool de constantes si se agotó la capacidad
+    if (ctx->constants_count >= ctx->constants_capacity) {
+        size_t new_cap = ctx->constants_capacity == 0 ? 16 : ctx->constants_capacity * 2;
+        FoxyConstant* temp = (FoxyConstant*)realloc(ctx->constants, sizeof(FoxyConstant) * new_cap);
+        if (!temp) {
+            fprintf(stderr, "[Foxy Codegen Error] Fallo al redimensionar el pool de constantes.\n");
+            return 0;
+        }
+        ctx->constants = temp;
+        ctx->constants_capacity = new_cap;
+    }
+
+    // 3. Crear y configurar la estructura FoxyArray
+    FoxyArray *char_array = (FoxyArray*)calloc(1, sizeof(FoxyArray));
+    if (!char_array) return 0;
+
+    // Configuración del objeto e identidades de tipo
+    char_array->header.ref_count = 1;
+    char_array->header.marked = 0;
+    char_array->header.klass = NULL;
+
+    char_array->element_type_id = FOXY_VAL_CHAR;
+    char_array->element_kind    = FOXY_TYPE_PRIMITIVE;
+    char_array->length          = str_len;
+    char_array->capacity        = str_len + 1;
+    char_array->data            = strdup(str);
+
+    // 4. Registrar en el constant pool
     uint32_t idx = (uint32_t)ctx->constants_count++;
     ctx->constants[idx].type = FOXY_VAL_ARRAY;
-    ctx->constants[idx].as.array = (FoxyArray*)strdup(str);
+    ctx->constants[idx].as.array = char_array;
+
     return idx;
 }

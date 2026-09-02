@@ -32,6 +32,13 @@
         FoxyValue *stack;
         size_t stack_top;
         size_t stack_capacity;
+
+        // Tabla de variables locales del proceso
+        FoxyValue *locals;
+        size_t locals_count;
+        size_t locals_capacity;
+        unsigned int running : 1; // como los demás usan bool, habrá que ajustarlo con un casteo o
+                                  // directamente cambiar los true,false por 0,1
     };
 
     typedef struct {

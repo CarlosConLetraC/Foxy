@@ -1,5 +1,6 @@
-#include <stdlib.h>
+#include "f_settings.h"
 #include <string.h>
+#include <stdlib.h>
 #include "f_class.h"
 
 FoxyClass* f_class_new(const char *name, FoxyClass *super_class) {

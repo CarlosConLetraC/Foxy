@@ -1,22 +1,14 @@
+@ Test script con valores directos estables @
 include "sys/out"
 
-class Gato {
-    function __new(char nombre[], int edad); @ constructor lógico
+char mensaje[] = "¡Hola desde Foxy-lang con tipado estricto y explícito!"
+int a = 40
+int b = 2
+int resultado = 42
+
+function calcular_total(int precio, int impuesto) {
+    return 116
 }
 
-dict si = (dict){
-    nombre = "David", @ ESTO es un char array, no un string
-    edad = (int)22, @ si no se utiliza el casteo int, el dato primitivo number se usa por defecto a nivel de C
-    mascota = Gato("Mango", 2)
-}
-
-si.foreach((k, v) -> {
-    printf("[%s]: %T\n", k, v)
-})
-@@
-salida:
-[nombre]: David
-[edad]: 22
-[mascota]: <class "Gato": 0x6791dfa5> @ por defecto, si se requiere de algo más específico, se debe
-                                      @ definir el flagged method "__tostring".
-@@
+out.println(mensaje)
+out.println(resultado)

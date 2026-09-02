@@ -1,6 +1,7 @@
-#include "f_methods.h"
+#include "f_settings.h"
 #include <stdlib.h>
 #include <string.h>
+#include "f_methods.h"
 
 FoxyMethod* f_method_new_native(const char *name, FoxyMethodFunc func) {
     FoxyMethod *m = (FoxyMethod*)malloc(sizeof(FoxyMethod));

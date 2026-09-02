@@ -1,10 +1,10 @@
 #ifndef F_VALUE_H
     #define F_VALUE_H
 
+    #include "f_settings.h"
     #include <stdint.h>
     #include <stdbool.h>
     #include <stddef.h>
-    #include "f_settings.h"
 
     // 1. Forward Declarations
     typedef struct FoxyObject FoxyObject;
@@ -12,15 +12,7 @@
     typedef struct FoxyFunction FoxyFunction;
     typedef struct FoxyArray FoxyArray;
 
-    // 2. Encabezado genérico de Objetos en Heap (si FoxyArray se hereda/embed)
-    // NOTA: Define aquí FoxyObject si es un struct real, o usa la versión simplificada:
-    struct FoxyObject {
-        uint32_t ref_count;      // Control de referencias
-        uint8_t  marked;         // Flag para Garbage Collector
-        FoxyClass *klass;        // Puntero a la Metaclase/Clase
-    };
-
-    // 3. Lista de tipos unificada en Runtime
+    // 2. Lista de tipos unificada en Runtime
     #define FOXY_VALUE_TYPE_LIST(F) \
         F(FOXY_VAL_NULL,                "null")                \
         F(FOXY_VAL_CHAR,                "char")                \
@@ -51,16 +43,23 @@
         FOXY_TYPE_OBJECT
     } FoxyTypeKind;
 
+    // 3. Estructura Base del Objeto en el Heap (Encabezado común para GC)
+    struct FoxyObject {
+        uint32_t ref_count;      // Control de referencias
+        uint8_t  marked;         // Flag para Garbage Collector
+        FoxyClass *klass;        // Puntero a la Metaclase/Clase
+        struct FoxyField *fields;// Atributos (si aplican a nivel general o de instancia)
+        size_t field_count;
+        size_t field_capacity;
+    };
+    
     // 4. Estructura de un Array genérico en el Heap
     struct FoxyArray {
         FoxyObject header;        /* Encabezado común de objeto (ref count, GC, etc.) */
-        
         uint16_t element_type_id; /* ID del tipo (ej: FOXY_T_INT, FOXY_T_FLOAT, o ID de Class) */
         uint8_t  element_kind;    /* FOXY_TYPE_PRIMITIVE vs FOXY_TYPE_OBJECT */
-        
         size_t   length;          /* Cantidad de elementos */
         size_t   capacity;        /* Capacidad reservada */
-        
         void*    data;            /* Puntero al bloque contiguo de datos */
     };
 
@@ -68,25 +67,29 @@
     typedef struct FoxyValue {
         FoxyValueType type;
         union {
-            char cval;                  // FOXY_VAL_CHAR
-            int32_t ival;               // FOXY_VAL_INT
-            double numval;              // FOXY_VAL_NUMBER (Genérico)
-            float fval;                 // FOXY_VAL_FLOAT
-            double dval;                // FOXY_VAL_DOUBLE
-            long lval;                  // FOXY_VAL_LONG
-            int64_t llval;              // FOXY_VAL_LONG_LONG
-            uint64_t ullval;            // FOXY_VAL_UNSIGNED_LONG_LONG
-            bool bval;                  // FOXY_VAL_BOOL
-            
-            FoxyArray *array;           // FOXY_VAL_ARRAY
-            FoxyObject *obj;            // FOXY_VAL_OBJECT / INSTANCE / DICT / STRUCT
-            FoxyClass *klass;           // FOXY_VAL_CLASS
-            FoxyFunction *func;         // FOXY_VAL_FUNCTION
+            bool boolean;
+            bool bval;           // Alias para booleans
+            char   cval;         // <--- Alias para caracteres (FOXY_VAL_CHAR)
+            double number;
+            double dval;         // Alias para doubles
+            double numval;       // <--- Alias solicitado para números
+            float  fval;         // <--- Alias solicitado para floats
+            int32_t ival;        // Para enteros de 32 bits
+            int64_t lval;        // <--- Alias solicitado para longs
+            long long llval;     // <--- Alias solicitado para long longs
+            unsigned long long ullval; // <--- Alias solicitado para unsigned long longs
+            char *sval;
+            char *string;
+            struct FoxyDict *dict;
+            struct FoxyObject *object;
+            void *obj;
+            FoxyArray *array;
+            struct FoxyFunction *func; // <--- Alias solicitado para funciones
+            struct FoxyClass *klass;   // <--- Alias solicitado para clases
+            void *native_fn;
         } as;
     } FoxyValue;
-
-    #define FOXY_NULL_VALUE ((FoxyValue){ .type = FOXY_VAL_NULL, .as.obj = NULL })
+    #define FOXY_NULL_VALUE ((FoxyValue){ .type = FOXY_VAL_NULL, .as.object = NULL })
     
     const char* f_value_type_to_string(FoxyValueType type);
-
 #endif // F_VALUE_H

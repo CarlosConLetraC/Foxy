@@ -18,6 +18,9 @@
         F(FOXCODE_LOAD_GLOBAL,  "LOAD_GLOBAL") \
         F(FOXCODE_STORE_GLOBAL, "STORE_GLOBAL") \
         F(FOXCODE_LOAD_LIB,     "LOAD_LIB") \
+        /* Propiedades y Objetos / Diccionarios */ \
+        F(FOXCODE_GET_MEMBER,   "GET_MEMBER") \
+        F(FOXCODE_SET_MEMBER,   "SET_MEMBER") \
         \
         /* Aritmética y Lógica */ \
         F(FOXCODE_ADD,          "ADD") \
@@ -39,6 +42,7 @@
         \
         /* Concurrencia y Procesos (Task Manager & Protocols) */ \
         F(FOXCODE_POPEN,        "POPEN")      /* Para spawnear subprocesos */ \
+        F(FOXCODE_ENV,          "ENV")        /* Para registrar el entorno de foxy */ \
         F(FOXCODE_ENV_CREATE,   "ENV_CREATE") /* Para SharedEnv / protocols */ \
         F(FOXCODE_ENV_BIND,     "ENV_BIND")   /* Asociar proceso a un protocol */
 

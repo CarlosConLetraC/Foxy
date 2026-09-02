@@ -16,7 +16,8 @@
         F(AST_EXPR_CALL) \
         F(AST_ASSIGNMENT) \
         F(AST_INCLUDE) \
-        F(AST_LITERAL)
+        F(AST_LITERAL) \
+        F(AST_MEMBER_ACCESS)
 
     // 2. Generación del Enum compacto (__attribute__((__packed__)))
     #define F(name) name,
@@ -37,6 +38,8 @@
     } ASTNode;
 
     // 4. Funciones principales del análisis sintáctico
+    ASTNode* f_parser_create_node(ASTNodeType type, FoxyToken token);
     ASTNode* f_parser_parse(FoxyLexer* lexer); // Actualizado a FoxyLexer para coherencia
     void free_ast(ASTNode* node);            //[cite: 3]
+    void f_parser_add_child(ASTNode* parent, ASTNode* child);
 #endif // F_PARSER_H
