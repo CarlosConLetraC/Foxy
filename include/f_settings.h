@@ -10,9 +10,13 @@
     #endif
 
     // Límites de la Máquina Virtual y Procesos
-    #define FOXY_MAX_FRAMES      256
-    #define FOXY_STACK_MAX       1024
-    #define FOXY_MAX_LOCALS      256
+    #define FOXY_MAX_FRAMES         256
+    #define FOXY_STACK_MAX          1024
+    #define FOXY_NAME_BUFFER_SIZE   1024
+    #define FOXY_MAX_LOCALS         256
+    #define FOXY_MAX_IDENTIFIER_LEN 128
+
+    #define FOXY_NULL_VALUE ((FoxyValue){ .type = FOXY_VAL_NULL, .as.ptr = NULL })
 
     // Configuración por defecto de rutas o entorno
     #ifndef FOXY_DEFAULT_HOME

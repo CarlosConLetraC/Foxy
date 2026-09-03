@@ -18,6 +18,20 @@ FoxyObject* f_object_new(FoxyClass *klass) {
     return obj;
 }
 
+void f_object_free(FoxyObject *obj) {
+    if (!obj) return;
+
+    for (size_t i = 0; i < obj->field_count; i++) {
+        if (obj->fields[i].name) {
+            free(obj->fields[i].name);
+        }
+    }
+    if (obj->fields) {
+        free(obj->fields);
+    }
+    free(obj);
+}
+
 void f_object_set_field(FoxyObject *obj, const char *name, FoxyValue val) {
     if (!obj || !name) return;
 
@@ -61,18 +75,4 @@ bool f_object_get_field(FoxyObject *obj, const char *name, FoxyValue *out_val) {
     }
 
     return false; // Campo no encontrado
-}
-
-void f_object_free(FoxyObject *obj) {
-    if (!obj) return;
-
-    for (size_t i = 0; i < obj->field_count; i++) {
-        if (obj->fields[i].name) {
-            free(obj->fields[i].name);
-        }
-    }
-    if (obj->fields) {
-        free(obj->fields);
-    }
-    free(obj);
 }

@@ -123,3 +123,16 @@ FOXY_HASH_MAP := {
         }
     }
 }
+
+
+OR_LOOP := for (int i = x; i < y; i++) | for(;;) | for(...)
+FOR_LOOP_RAGE_BASED := for (DATATYPE foo : FOXY_VAL_ARRAY) | 
+FOREACH_LOOP_ := jsonValue.foreach(function(k, v) { ... }) | jsonValue.foreach((k, v) -> { ... }) | jsonValue.foreach(println) | forEach(jsonValue, function(k, v) { ... }) | forEach(jsonValue, (k, v) -> { ... }) | forEach(jsonValue, println)
+WHILE_LOOP := while (CONDITION_ES_TRUE)  | while (CONDITION_ES_UN_FOXY_VAL_NUMBER_MAYOR_A_CERO) | while (DECLARATION_IN_CONDITION)
+DO_WHILE_LOOP := do {CUERPO_BUCLE} while (CONDITION_INVERSA_DE_WHILE_LOOP)
+
+sys/ := maneja funciones de sistema que requieran trabajo pesado. (leer input, escribir/leer/mover/eliminar archivos, obtener la variable de entorno en la que está ejecutando foxy, ec)
+sys/out := las típicas funciones de stdout...
+sys/input := las típicas funciones de stdin...
+sys/stderr := las típicas funciones de stderr... (NO CONFUNDIR CON EXCEPTION HANDLING)
+string/ := AQUI SI, clase que se usa para crear tipos de dato "string" en foxy.

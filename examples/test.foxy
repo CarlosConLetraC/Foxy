@@ -1,4 +1,5 @@
 include "sys/out"
 
-println("Otra prueba. . .")
-printf("Hola %s\n", "David")
+for (int i = 0; i < 10; i = i++) {
+    printf("valor de i: %d\n", i)
+}

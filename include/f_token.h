@@ -1,6 +1,8 @@
 #ifndef FOXY_TOKEN_H
     #define FOXY_TOKEN_H
+
     #include <stdint.h>
+    #include "f_foxmode.h"
 
     // 1. Listas maestras (X-Macros)
     #define FOXY_TOKEN_LIST(F) \
@@ -28,6 +30,7 @@
 
     #define FOXY_TOKEN_TYPE_LIST(F) \
         F(FOXY_TOKEN_TYPE_NULL) \
+        F(FOXY_TOKEN_TYPE_VOID) \
         F(FOXY_TOKEN_TYPE_CHAR) \
         F(FOXY_TOKEN_TYPE_INT) \
         F(FOXY_TOKEN_TYPE_NUMBER) \
@@ -62,6 +65,7 @@
         F(FOXY_TOKEN_OPERATOR_MUL) \
         F(FOXY_TOKEN_OPERATOR_DIV) \
         F(FOXY_TOKEN_OPERATOR_POW) \
+        F(FOXY_TOKEN_OPERATOR_INC) \
         /* Operadores Lógicos y de Bits */ \
         F(FOXY_TOKEN_OPERATOR_AND) \
         F(FOXY_TOKEN_OPERATOR_OR)  \
@@ -115,41 +119,52 @@
         F(FOXY_TOKEN_FLAGGED_METHOD_LEN)          /* __len (#) */
 
     #define FOXY_TOKEN_ERROR_LIST(F) \
-        F(FOXY_TOKEN_ERROR_SYNTAX) \
-        F(FOXY_TOKEN_ERROR_RUNTIME) \
-        F(FOXY_TOKEN_ERROR_ARITHMETIC) \
-        F(FOXY_TOKEN_ERROR_CAST)                 /* Fallo de cast (ej: (int)<class object>, (string)float) */ \
-        F(FOXY_TOKEN_ERROR_OUT_OF_RANGE)         /* Arreglos de tamaño fijo o índices fuera de límites */ \
-        F(FOXY_TOKEN_ERROR_VARIABLE_UNDEFINED)   /* Variable fuera de scope o sin definir */ \
-        F(FOXY_TOKEN_ERROR_NULL)                 /* Datos o punteros no inicializados */ \
-        F(FOXY_TOKEN_ERROR_HAS_NO_ATTRIBUTE)     /* Atributo/método inexistente en módulo o clase */
+        F(FOXY_TOKEN_ERROR_SYNTAX,              "SYNTAX")              /* Fallo de sintaxis */ \
+        F(FOXY_TOKEN_ERROR_RUNTIME,             "RUNTIME")             /* Fallo de ejecución */ \
+        F(FOXY_TOKEN_ERROR_ARITHMETIC,          "ARITHMETIC")          /* Error aritmético */ \
+        F(FOXY_TOKEN_ERROR_CAST,                "CAST")                /* Fallo de cast */ \
+        F(FOXY_TOKEN_ERROR_OUT_OF_RANGE,        "OUT_OF_RANGE")        /* Índices fuera de límites */ \
+        F(FOXY_TOKEN_ERROR_VARIABLE_UNDEFINED,  "VARIABLE_UNDEFINED")  /* Variable sin definir */ \
+        F(FOXY_TOKEN_ERROR_NULL,                "NULL")                /* Punteros no inicializados */ \
+        F(FOXY_TOKEN_ERROR_HAS_NO_ATTRIBUTE,    "HAS_NO_ATTRIBUTE")    /* Objeto sin atributo */
 
-    // 2. Generación de Enums compactos (__attribute__((__packed__)) para ahorrar memoria)
-    #define F(name) name,
+    // 2. Generación de Enums compactos (__attribute__((__packed__)))
+
+    #define F(code, name) code,
+    typedef enum __attribute__((__packed__)) {
+        FOXY_TOKEN_ERROR_LIST(F)
+        FOXY_TOKEN_ERROR_COUNT
+    } FoxyErrorType;
+    #undef F
 
     typedef enum __attribute__((__packed__)) {
+        #define F(name) name,
         FOXY_TOKEN_LIST(F)
+        #undef F
     } FOXY_TOKEN;
 
     typedef enum __attribute__((__packed__)) {
+        #define F(name) name,
         FOXY_TOKEN_TYPE_LIST(F)
+        #undef F
     } FOXY_TOKEN_TYPE;
 
     typedef enum __attribute__((__packed__)) {
+        #define F(name) name,
         FOXY_TOKEN_IDENTIFIER_LIST(F)
+        #undef F
     } FOXY_TOKEN_IDENTIFIER;
 
     typedef enum __attribute__((__packed__)) {
+        #define F(name) name,
         FOXY_TOKEN_OPERATOR_LIST(F)
+        #undef F
     } FOXY_TOKEN_OPERATOR;
 
     typedef enum __attribute__((__packed__)) {
+        #define F(name) name,
         FOXY_TOKEN_FLAGGED_METHOD_LIST(F)
+        #undef F
     } FOXY_TOKEN_FLAGGED_METHOD;
 
-    typedef enum __attribute__((__packed__)) {
-        FOXY_TOKEN_ERROR_LIST(F)
-    } FOXY_TOKEN_ERROR;
-
-    #undef F
 #endif // FOXY_TOKEN_H

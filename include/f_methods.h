@@ -2,25 +2,37 @@
     #define FOXY_METHODS_H
 
     #include <stdint.h>
-    #include <stdbool.h>
-    #include "f_vm.h"
+    #include <stddef.h>
 
-    typedef struct FoxyObject FoxyObject;
+    /* Firma para funciones nativas C del runtime */
+    typedef void (*FoxyMethodFunc)(void);
 
-    // Puntero a función nativa asociada a un método
-    typedef void (*FoxyMethodFunc)(FoxyVM *vm, FoxyObject *self, int argc);
+    /* X-Macro para los tipos de métodos */
+    #define FOXY_METHOD_TYPE_LIST(F) \
+        F(FOXY_METHOD_TYPE_NATIVE,   "NATIVE") \
+        F(FOXY_METHOD_TYPE_BYTECODE, "BYTECODE")
+
+    #define F(type, name) type,
+    typedef enum __attribute__((__packed__)) {
+        FOXY_METHOD_TYPE_LIST(F)
+        FOXY_METHOD_TYPE_COUNT
+    } FoxyMethodType;
+    #undef F
 
     typedef struct FoxyMethod {
-        char *name;
-        bool is_native;
+        const char *name;
+        FoxyMethodType type;
         union {
-            FoxyMethodFunc native_fn;
-            uint32_t bytecode_offset; // Para métodos definidos en código Foxy
+            FoxyMethodFunc native_func;
+            uint32_t bytecode_offset;
         } as;
     } FoxyMethod;
 
-    // Constructores y destructores de métodos
-    FoxyMethod* f_method_new_native(const char *name, FoxyMethodFunc func);
-    FoxyMethod* f_method_new_bytecode(const char *name, uint32_t offset);
+    /* Inicializadores y destructores para FoxyMethod */
+    void f_method_init_native(FoxyMethod *method, const char *name, FoxyMethodFunc func);
+    void f_method_init_bytecode(FoxyMethod *method, const char *name, uint32_t offset);
     void f_method_free(FoxyMethod *method);
+
+    /* Prototipo del helper */
+    const char* f_method_type_to_string(FoxyMethodType type);
 #endif // FOXY_METHODS_H

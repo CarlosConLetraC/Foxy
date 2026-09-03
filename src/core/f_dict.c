@@ -1,6 +1,7 @@
-#include "f_dict.h"
+#include "f_settings.h"
 #include <stdlib.h>
 #include <string.h>
+#include "f_dict.h"
 
 FoxyDict* f_dict_new(void) {
     FoxyDict *dict = (FoxyDict*)malloc(sizeof(FoxyDict));

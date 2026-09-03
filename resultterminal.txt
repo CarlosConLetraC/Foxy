@@ -1,0 +1,31 @@
+[pc@cachyos Foxy]$ ./foxy -d examples/test.foxy 
+[DEBUG PARSER] Token actual -> cat: 3, subtype: 9, len: 9, text: '"sys/out"'
+[DEBUG ERROR RPAREN] Token actual encontrado -> cat: 4, subtype: 18
+=== [DEBUG] CONSTANT POOL (10 elementos) ===
+  [00] CHAR ARRAY (String): "sys/out"
+  [01] INT: 0
+  [02] INT: 10
+  [03] NULL
+  [04] INT: 1
+  [05] NULL
+  [06] NULL
+  [07] CHAR ARRAY (String): "valor de i: %d
+"
+  [08] CHAR ARRAY (String): "printf"
+  [09] NULL
+
+=== [DEBUG] BYTECODE GENERADO (22 instrucciones / 88 bytes) ===
+00000002 00000008 00010003 0007001C 00020003 00000007 0002001B 00030003 
+00000007 00000107 00000007 00040003 00000011 00000008 00050003 00060003 
+00070003 00000007 00080003 0000021D 00090003 00000001 
+============================================================
+
+[Foxy Runtime Error -> RUNTIME] Stack Underflow detectado en el proceso (PID 1)
+valor de i: 1
+[pc@cachyos Foxy]$ cat examples/test.foxy 
+include "sys/out"
+
+for (int i = 0; i < 10; i = i++) {
+    printf("valor de i: %d\n", i)
+}
+[pc@cachyos Foxy]$ 

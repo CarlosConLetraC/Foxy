@@ -3,28 +3,34 @@
 #include <string.h>
 #include "f_methods.h"
 
-FoxyMethod* f_method_new_native(const char *name, FoxyMethodFunc func) {
-    FoxyMethod *m = (FoxyMethod*)malloc(sizeof(FoxyMethod));
-    if (!m) return NULL;
-    
-    m->name = strdup(name);
-    m->is_native = true;
-    m->as.native_fn = func;
-    return m;
+void f_method_init_native(FoxyMethod *method, const char *name, FoxyMethodFunc func) {
+    if (!method) return;
+    method->name = name;
+    method->type = FOXY_METHOD_TYPE_NATIVE;
+    method->as.native_func = func;
 }
 
-FoxyMethod* f_method_new_bytecode(const char *name, uint32_t offset) {
-    FoxyMethod *m = (FoxyMethod*)malloc(sizeof(FoxyMethod));
-    if (!m) return NULL;
-    
-    m->name = strdup(name);
-    m->is_native = false;
-    m->as.bytecode_offset = offset;
-    return m;
+void f_method_init_bytecode(FoxyMethod *method, const char *name, uint32_t offset) {
+    if (!method) return;
+    method->name = name;
+    method->type = FOXY_METHOD_TYPE_BYTECODE;
+    method->as.bytecode_offset = offset;
 }
 
 void f_method_free(FoxyMethod *method) {
     if (!method) return;
-    free(method->name);
-    free(method);
+
+    if (method->name) {
+        free((void*) method->name);
+        method->name = NULL;
+    }
+}
+
+const char* f_method_type_to_string(FoxyMethodType type) {
+    switch (type) {
+#define F(t, name) case t: return name;
+        FOXY_METHOD_TYPE_LIST(F)
+#undef F
+        default: return "UNKNOWN";
+    }
 }

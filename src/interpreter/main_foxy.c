@@ -5,6 +5,7 @@
 #include "f_lexer.h"
 #include "f_parser.h"
 #include "f_codegen.h"
+#include "f_ast.h"
 #include "f_vm.h"
 
 static void print_usage(const char* prog_name) {
@@ -66,7 +67,7 @@ int main(int argc, char** argv) {
     // 2. Lexer y Parser
     FoxyLexer lexer;
     f_lexer_init(&lexer, source, filename);
-    ASTNode* ast_root = f_parser_parse(&lexer);
+    FoxyASTNode* ast_root = f_parser_parse(&lexer);
 
     if (!ast_root) {
         fprintf(stderr, "[Error] Fallo al generar el AST.\n");
@@ -75,23 +76,25 @@ int main(int argc, char** argv) {
     }
 
     // 3. Generación de Código (Codegen)
-    FoxyCodegenContext* ctx = f_codegen_create();
-    if (!ctx) {
-        fprintf(stderr, "[Error] No se pudo crear el contexto de codegen.\n");
+    FoxyCodegen cg;
+    f_codegen_init(&cg);
+
+    // Hacer el cast a (FoxyASTNode*) si f_codegen_generate espera ese tipo
+    if (!f_codegen_generate(&cg, (FoxyASTNode*)ast_root)) {
+        fprintf(stderr, "[Error] Fallo durante la generación de bytecode.\n");
+        f_codegen_free(&cg);
+        f_ast_node_free((FoxyASTNode*)ast_root);
         free(source);
         return 1;
     }
 
-    // Poblar el contexto recorriendo el AST
-    f_codegen_visit(ctx, ast_root);
-
     // Banderas de depuración (-d / --debug-bytecode)
     if (debug_mode) {
-        printf("=== [DEBUG] CONSTANT POOL (%zu elementos) ===\n", ctx->constants_count);
-        for (size_t i = 0; i < ctx->constants_count; i++) {
-            switch (ctx->constants[i].type) {
+        printf("=== [DEBUG] CONSTANT POOL (%zu elementos) ===\n", cg.constants_count);
+        for (size_t i = 0; i < cg.constants_count; i++) {
+            switch (cg.constants[i].type) {
                 case FOXY_VAL_ARRAY: {
-                    FoxyArray *arr = ctx->constants[i].as.array;
+                    FoxyArray *arr = cg.constants[i].as.array;
                     if (arr) {
                         if (arr->element_type_id == FOXY_VAL_CHAR && arr->data) {
                             printf("  [%02zu] CHAR ARRAY (String): \"%s\"\n", i, (const char*)arr->data);
@@ -105,61 +108,62 @@ int main(int argc, char** argv) {
                     break;
                 }
                 case FOXY_VAL_OBJECT: {
-                    const char *obj_str = ctx->constants[i].as.object ? (const char *)ctx->constants[i].as.object : "null";
+                    const char *obj_str = cg.constants[i].as.object ? (const char *)cg.constants[i].as.object : "null";
                     printf("  [%02zu] OBJECT/STRING: \"%s\"\n", i, obj_str);
                     break;
                 }
                 case FOXY_VAL_INT:
-                    printf("  [%02zu] INT: %d\n", i, ctx->constants[i].as.ival);
+                    printf("  [%02zu] INT: %ld\n", i, cg.constants[i].as.ival);
                     break;
                 case FOXY_VAL_NUMBER:
                 case FOXY_VAL_DOUBLE:
-                    printf("  [%02zu] DOUBLE: %f\n", i, ctx->constants[i].as.dval);
+                    printf("  [%02zu] DOUBLE: %f\n", i, cg.constants[i].as.dval);
                     break;
                 case FOXY_VAL_BOOL:
-                    printf("  [%02zu] BOOL: %s\n", i, ctx->constants[i].as.boolean ? "true" : "false");
+                    printf("  [%02zu] BOOL: %s\n", i, cg.constants[i].as.boolean ? "true" : "false");
                     break;
                 case FOXY_VAL_NULL:
                     printf("  [%02zu] NULL\n", i);
                     break;
                 default:
-                    printf("  [%02zu] UNKNOWN TYPE (%d)\n", i, ctx->constants[i].type);
+                    printf("  [%02zu] UNKNOWN TYPE (%d)\n", i, cg.constants[i].type);
                     break;
             }
         }
-        printf("\n=== [DEBUG] BYTECODE GENERADO (%zu bytes) ===\n", ctx->code_size);
-        for (size_t i = 0; i < ctx->code_size; i++) {
-            printf("%02X ", ctx->code[i]);
-            if ((i + 1) % 16 == 0) printf("\n");
+        
+        // El bytecode está compuesto por instrucciones de 32 bits (FoxInstruction)
+        printf("\n=== [DEBUG] BYTECODE GENERADO (%zu instrucciones / %zu bytes) ===\n", 
+            cg.code_count, cg.code_count * sizeof(FoxInstruction));
+        for (size_t i = 0; i < cg.code_count; i++) {
+            printf("%08X ", cg.bytecode[i]);
+            if ((i + 1) % 8 == 0) printf("\n");
         }
-        if (ctx->code_size % 16 != 0) printf("\n");
-        printf("============================================\n\n");
+        if (cg.code_count % 8 != 0) printf("\n");
+        printf("============================================================\n\n");
     }
 
-    // 4. Transferir recursos a la VM antes de liberar ctx
-    uint8_t *code_ptr = NULL;
-    size_t code_size = 0;
-    FoxyConstant *constants_ptr = NULL;
-    size_t constants_count = 0;
-
-    f_codegen_steal_resources(ctx, &code_ptr, &code_size, &constants_ptr, &constants_count);
-
-    FoxyVM* vm = f_vm_create();
-    f_vm_load_process(vm, code_ptr, code_size, filename);
+    // 4. Transferir recursos a la VM
+    FoxyVM* vm = f_vm_new();
+    
+    // Cargar el búfer de bytecode de 32 bits en la VM
+    f_vm_load_process(vm, (uint8_t*)cg.bytecode, cg.code_count * sizeof(FoxInstruction), filename);
 
     // Asignar el pool de constantes transferido a la VM
-    vm->constants = constants_ptr;
-    vm->constants_count = constants_count;
-    vm->constants_capacity = constants_count;
+    vm->constants = cg.constants;
+    vm->constants_count = cg.constants_count;
+    vm->constants_capacity = cg.constants_capacity;
 
-    // Liberar los punteros temporales de código y de la estructura codegen
-    if (code_ptr) free(code_ptr);
-    f_codegen_free(ctx);
+    // Invalidar los punteros del codegen para que f_codegen_free no los libere 
+    // ya que ahora la VM asume la propiedad de los búferes.
+    cg.bytecode = NULL;
+    cg.constants = NULL;
+    f_codegen_free(&cg);
 
     // 5. Ejecución y limpieza final
     int exit_code = f_vm_run(vm);
 
     f_vm_free(vm);
+    f_ast_node_free((FoxyASTNode*)ast_root); // <-- Añadir el cast aquí
     free(source);
 
     return exit_code;

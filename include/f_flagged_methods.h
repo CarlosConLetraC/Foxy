@@ -1,6 +1,5 @@
 #ifndef FOXY_FLAGGED_METHODS_H
     #define FOXY_FLAGGED_METHODS_H
-
     #include <stdint.h>
     #include <stdbool.h>
     #include "f_methods.h"
@@ -26,6 +25,7 @@
     // Helpers de validación de modificadores
     bool f_method_is_public(uint8_t flags);
     bool f_method_is_private(uint8_t flags);
+    bool f_method_is_protected(uint8_t flags);
     bool f_method_is_static(uint8_t flags);
     bool f_method_is_final(uint8_t flags);
 #endif // FOXY_FLAGGED_METHODS_H

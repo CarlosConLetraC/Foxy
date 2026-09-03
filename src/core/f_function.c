@@ -27,31 +27,24 @@ FoxyFunction* f_function_create(const char *name, uint8_t arity) {
 void f_function_free(FoxyFunction *func) {
     if (!func) return;
 
-    // Liberar el nombre de la función si existe
     if (func->name) {
         free(func->name);
         func->name = NULL;
     }
 
-    // Liberar el pool de constantes (verificando arreglos de caracteres/arrays)
+    if (func->bytecode) {
+        free(func->bytecode);
+        func->bytecode = NULL;
+    }
+
     if (func->constants) {
         for (size_t i = 0; i < func->constants_count; i++) {
-            if (func->constants[i].type == FOXY_VAL_ARRAY && func->constants[i].as.array) {
-                free(func->constants[i].as.array);
-                func->constants[i].as.array = NULL;
-            }
+            f_value_free_contents(&func->constants[i]);
         }
         free(func->constants);
         func->constants = NULL;
     }
 
-    // Liberar el bytecode / código del proceso
-    if (func->bytecode) {
-        free(func->bytecode);
-        func->bytecode = NULL;
-    }
-    
-    // Finalmente liberar la estructura de la función
     free(func);
 }
 
