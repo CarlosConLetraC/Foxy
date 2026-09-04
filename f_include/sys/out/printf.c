@@ -1,47 +1,55 @@
+#include "f_settings.h"
 #include "f_value.h"
 #include "f_vm.h"
-#include "f_init.h"
 #include "f_utils.h"
+#include "f_init.h"
 #include <stdlib.h>
 
 FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
     (void)self;
-    if (!vm || vm->process_count == 0 || argc < 1) return;
+    FoxyProcess *proc = F_SYS_OUT_GET_CURRENT_PROCESS(vm);
+    if (!proc || argc < 1) return;
 
-    FoxyProcess *p = vm->processes[vm->current_process_index];
+    // El primer argumento (índice 0 de los argumentos) es la cadena de formato
+    // En la pila, si se apilaron en orden, el formato está más abajo o más arriba según tu convención.
+    // Asumiendo que el formato está en el índice 0 de los argumentos pasados:
+    FoxyValue fmt_val = f_vm_peek(proc, argc - 1); // Ajusta el índice según el orden de tu pila
+    const char *fmt = f_utils_get_string_from_constant(*(FoxyConstant*)&fmt_val);
+    if (!fmt) return;
 
-    // 1. Recolectar todos los argumentos de la pila respetando LIFO
-    FoxyValue *args = (FoxyValue *)malloc(sizeof(FoxyValue) * argc);
-    if (!args) return;
+    int arg_index = 1; // Los valores para %T o %s empiezan a partir del siguiente argumento
+    size_t i = 0;
+    size_t fmt_len = strlen(fmt);
 
-    for (int i = argc - 1; i >= 0; i--) {
-        args[i] = f_vm_pop(p);
-    }
+    while (i < fmt_len) {
+        if (fmt[i] == '%' && i + 1 < fmt_len) {
+            i++;
+            char specifier = fmt[i];
 
-    // 2. El primer argumento (args[0]) es la cadena de formato
-    const char *fmt = f_utils_get_string_from_constant(args[0]);
-    if (!fmt) {
-        f_utils_print_constant_dynamic(args[0]);
-        free(args);
-        return;
-    }
+            if (arg_index < argc) {
+                // Obtener el argumento actual de la pila
+                // (Calculando la posición relativa según argc y arg_index)
+                FoxyValue arg_val = f_vm_peek(proc, argc - 1 - arg_index);
 
-    // 3. Procesar las marcas de formato y consumir args[1], args[2] en orden
-    int arg_idx = 1;
-    for (const char *ptr = fmt; *ptr != '\0'; ptr++) {
-        if (*ptr == '%' && *(ptr + 1) != '\0') {
-            ptr++; // Saltar el '%'
-            
-            if (arg_idx < argc) {
-                f_utils_print_constant_dynamic(args[arg_idx]);
-                arg_idx++;
+                switch (specifier) {
+                    case 'T': {
+                        f_utils_print_constant_dynamic(*(FoxyConstant*)&arg_val);
+                        break;
+                    }
+                    case 's':
+                    default:
+                        f_utils_syswrite(1, "%", 1);
+                        f_utils_syswrite(1, &specifier, 1);
+                        break;
+                }
+                arg_index++;
             } else {
-                f_utils_syswrite(1, "(null)", 6);
+                f_utils_syswrite(1, "%", 1);
+                f_utils_syswrite(1, &specifier, 1);
             }
         } else {
-            f_utils_syswrite(1, ptr, 1);
+            f_utils_syswrite(1, &fmt[i], 1);
         }
+        i++;
     }
-
-    free(args);
 }

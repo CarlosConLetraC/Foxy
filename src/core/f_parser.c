@@ -188,12 +188,12 @@ static FoxyASTNode* parse_include(FoxyParser *parser) {
     f_parser_advance(parser); // Consumir 'include'
 
     // --- DEPURACIÓN TEMPORAL ---
-    fprintf(stderr, "[DEBUG PARSER] Token actual -> cat: %u, subtype: %u, len: %u, text: '%.*s'\n",
+    /* fprintf(stderr, "[DEBUG PARSER] Token actual -> cat: %u, subtype: %u, len: %u, text: '%.*s'\n",
             parser->current_token.type_category,
             parser->current_token.subtype,
             parser->current_token.length,
             (int)parser->current_token.length,
-            parser->current_token.start ? parser->current_token.start : "NULL");
+            parser->current_token.start ? parser->current_token.start : "NULL"); */
     // ---------------------------
 
     char first_char = (parser->current_token.start != NULL && parser->current_token.length > 0) 

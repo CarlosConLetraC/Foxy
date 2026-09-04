@@ -1,13 +1,12 @@
+// f_lib.h
 #ifndef F_LIB_H
     #define F_LIB_H
 
     #include "uthash.h"
-    #include "f_scope.h"
 
     typedef struct FoxyLib {
         const void *ptr_id;     // Clave por puntero/nombre de la librería
         void *handle;           // Manejador si es .so (dlopen)
-        FoxyScope *exports;     // Símbolos/funciones exportadas
         UT_hash_handle hh;
     } FoxyLib;
 

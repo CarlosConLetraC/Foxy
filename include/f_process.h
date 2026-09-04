@@ -1,16 +1,17 @@
 #ifndef F_PROCESS_H
     #define F_PROCESS_H
+
     #include <stdint.h>
     #include <stdbool.h>
     #include <stddef.h>
     #include <pthread.h>
     #include "uthash.h"
     #include "f_value.h"
-    #include "f_lib.h"     // <--- 1. Incluir el header de la librería
+    #include "f_lib.h"     
+    #include "f_runtime.h"
 
     typedef struct FoxyRuntime FoxyRuntime;
     typedef struct FoxyProtocol FoxyProtocol;
-    typedef struct FoxyScope FoxyScope;
     typedef struct FoxyVM FoxyVM;
 
     #define FOXY_PROCESS_STATE_LIST(F) \
@@ -42,7 +43,7 @@
 
         // Evaluation Stack
         FoxyValue *stack;
-        size_t stack_top;      // <--- 2. Asegurarte de usar stack_top
+        size_t stack_top;      
         size_t stack_capacity;
 
         // Local Variables
@@ -51,8 +52,7 @@
         size_t locals_capacity;
 
         // Process Isolation / Environments
-        FoxyScope *local_scope;
-        FoxyLib *locallibs;    // <--- 3. Cambiado de void* a FoxyLib* (con esto uthash compilará perfecto)
+        FoxyLib *locallibs;    
         FoxyProtocol *protocol;
 
         int running;

@@ -1,5 +1,12 @@
 include "sys/out"
 
-for (int i = 0; i < 10; i = i++) {
-    printf("valor de i: %d\n", i)
-}
+@ printf("sys test: %T\n", sys)
+@ printf("out test: %T\n", out)
+@ printf("printf test: %T\n", printf)
+
+printf("%T\n", 123)
+printf("%T\n", "Casa")
+printf("%T\n", 5.5)
+
+int num = 5
+printf("%T\n", num)

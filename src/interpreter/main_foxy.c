@@ -7,6 +7,7 @@
 #include "f_codegen.h"
 #include "f_ast.h"
 #include "f_vm.h"
+#include "f_utils.h"
 
 static void print_usage(const char* prog_name) {
     printf("Uso: %s [opciones] <archivo.foxy>\n", prog_name);
@@ -44,25 +45,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // 1. Carga de archivo
-    FILE* file = fopen(filename, "rb");
-    if (!file) {
-        fprintf(stderr, "[Error] No se pudo abrir el archivo: %s\n", filename);
-        return 1;
-    }
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char* source = (char*)malloc(length + 1);
-    if (!source) {
-        fprintf(stderr, "[Error] Memoria insuficiente para leer el archivo.\n");
-        fclose(file);
-        return 1;
-    }
-    fread(source, 1, length, file);
-    fclose(file);
-    source[length] = '\0';
+    // 1. Carga de archivo utilizando f_utils_read_file
+    char* source = f_utils_read_file(filename);
+    if (!source) return 1;
 
     // 2. Lexer y Parser
     FoxyLexer lexer;
@@ -163,7 +148,7 @@ int main(int argc, char** argv) {
     int exit_code = f_vm_run(vm);
 
     f_vm_free(vm);
-    f_ast_node_free((FoxyASTNode*)ast_root); // <-- Añadir el cast aquí
+    f_ast_node_free((FoxyASTNode*)ast_root);
     free(source);
 
     return exit_code;

@@ -1,7 +1,7 @@
 # Compilador y banderas
 CC = gcc
 ###################### -std=c11 flag viejo. . .
-CFLAGS = -Wall -Wextra -std=c99 -O3 -Iinclude -If_include -fPIC
+CFLAGS = -Wall -Wextra -g -std=c99 -O3 -Iinclude -If_include -fPIC
 # Se corrige LDFLAGS: -rdynamic exporta símbolos globales; -Wl,-rpath,. busca librerías en el directorio actual
 LDFLAGS = -rdynamic -ldl -lm -Wl,-rpath,.
 

@@ -23,8 +23,8 @@
         F(FOXY_VAL_FLOAT,               "float")    \
         F(FOXY_VAL_DOUBLE,              "double")   \
         F(FOXY_VAL_LONG,                "long")     \
-        F(FOXY_VAL_LONG_LONG,           "long_long") \
-        F(FOXY_VAL_UNSIGNED_LONG_LONG,  "unsigned_long_long") \
+        F(FOXY_VAL_LONG_LONG,           "llong") \
+        F(FOXY_VAL_UNSIGNED_LONG_LONG,  "ullong") \
         F(FOXY_VAL_STRING,              "string")   \
         F(FOXY_VAL_ARRAY,               "array")    \
         F(FOXY_VAL_DICT,                "dict")     \

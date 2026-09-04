@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+#include "f_settings.h"
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,9 +96,8 @@ void f_utils_load_native_lib(FoxyVM* vm, const char* lib_name) {
 // --- Operaciones sobre FoxyConstant ---
 
 const char* f_utils_get_string_from_constant(FoxyConstant constant) {
-    if (constant.type == FOXY_VAL_ARRAY && constant.as.array && constant.as.array->data) {
+    if (constant.type == FOXY_VAL_ARRAY && constant.as.array && constant.as.array->data)
         return (const char *)constant.as.array->data;
-    }
     return NULL;
 }
 
@@ -124,7 +123,7 @@ void f_utils_print_constant_dynamic(FoxyConstant constant) {
 
     switch (constant.type) {
         case FOXY_VAL_NULL:
-            f_utils_syswrite(1, "null", 4);
+            f_utils_syswrite(1, "papu", 4);
             break;
 
         case FOXY_VAL_CHAR:
@@ -205,7 +204,6 @@ void f_utils_print_constant_dynamic(FoxyConstant constant) {
 }
 
 // --- Utilidades del Sistema y Archivos ---
-
 char* f_utils_read_file(const char* filepath) {
     FILE* file = fopen(filepath, "rb");
     if (!file) {

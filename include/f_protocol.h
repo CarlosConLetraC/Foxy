@@ -1,13 +1,14 @@
+// f_protocol.h
 #ifndef F_PROTOCOL_H
     #define F_PROTOCOL_H
 
     #include <pthread.h>
     #include "uthash.h"
-    #include "f_scope.h"
+    #include "f_symtable.h"
 
     typedef struct FoxyProtocol {
         char name[64];           // Clave del protocolo (ej. "pruebaEntorno")
-        FoxyScope *shared_scope; // Scope con las variables compartidas
+        FoxySymbolTable *symtable;  // Tabla relacional de símbolos compartidos
         pthread_mutex_t lock;    // Mutex para lectura/escritura segura entre threads
         UT_hash_handle hh;
     } FoxyProtocol;

@@ -70,18 +70,18 @@ hilos. Gracias a esto el manejo de datos que requieren de ejecución continua.
 
 En caso de requerir compartir información por cada instancia de processes, se necesita hacer lo siguiente:
 ```
-include "sys"  @ se importan todas librerías de sys.
-include "datatypes/string"
+include "sys"  @ se importan todas librerías de sys (sys/out, sys/process, sys/io, sys/input).
+include "string"
 
 SharedEnv env = env.createEnvironment((dict){
     name = "pruebaEntorno"
 })
 env.data = (dict){
     status = (string)"waiting",
-    currentInput = KeyCode(0) (caracter ascii nulo, es decir que no se preciona nada)
+    currentInput = KeyCode(0) @ (de parte de sys/input), caracter ascii nulo, es decir que no se preciona nada
 }
 
-Process p1 = process.popen({
+Process p1 = popen({ @ de parte de sys/process.
     callback = function() {
         data.status = (string)"running"
         while (true) {
@@ -93,11 +93,11 @@ Process p1 = process.popen({
     environment = env
 })
 
-Process p2 = process.popen({
+Process p2 = popen({ @ de parte de sys/process.
     callback = function() {
         @ algo que lee el input del usuario. . .
         while (true) {
-            KeyCode kCode = io.readKeyCode()  @ de parte de sys/io.
+            KeyCode kCode = readKeyCode()  @ de parte de sys/io.
             env.currentInput = kCode
         }
     },

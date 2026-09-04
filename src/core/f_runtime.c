@@ -3,7 +3,7 @@
 #include <string.h>
 #include <pthread.h>
 #include "f_runtime.h"
-#include "f_scope.h"
+#include "f_symtable.h"
 #include "f_utils.h"
 #include "f_process.h"  
 #include "f_protocol.h"
@@ -44,13 +44,10 @@ void f_runtime_free(FoxyRuntime *rt) {
             pthread_join(curr_proc->thread_id, NULL);
         }
 
-        f_scope_free(curr_proc->local_scope);
-        
         // Liberar librerías locales
         FoxyLib *curr_llib, *tmp_llib;
         HASH_ITER(hh, curr_proc->locallibs, curr_llib, tmp_llib) {
             HASH_DEL(curr_proc->locallibs, curr_llib);
-            f_scope_free(curr_llib->exports);
             free(curr_llib);
         }
 
@@ -61,7 +58,9 @@ void f_runtime_free(FoxyRuntime *rt) {
     FoxyProtocol *curr_prot, *tmp_prot;
     HASH_ITER(hh, rt->protocols, curr_prot, tmp_prot) {
         HASH_DEL(rt->protocols, curr_prot);
-        f_scope_free(curr_prot->shared_scope);
+        if (curr_prot->symtable) {
+            f_symtable_free(curr_prot->symtable);
+        }
         pthread_mutex_destroy(&curr_prot->lock);
         free(curr_prot);
     }
@@ -73,7 +72,6 @@ void f_runtime_free(FoxyRuntime *rt) {
         if (curr_glib->handle) {
             // dlclose(curr_glib->handle); // Descomentar si se usa dlfcn.h
         }
-        f_scope_free(curr_glib->exports);
         free(curr_glib);
     }
 
@@ -111,8 +109,7 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, const uint8_t 
     proc->pid = pid_counter++;
     proc->state = FOXY_PROCESS_READY;
 
-    // Entornos aislados
-    proc->local_scope = f_scope_new(NULL);
+    // Entornos aislados y dependencias
     proc->locallibs = NULL;
     proc->protocol = protocol; // Enlace al SharedEnv (puede ser NULL)
 
@@ -138,8 +135,6 @@ static void* f_vm_process_worker(void *arg) {
     while (proc->state == FOXY_PROCESS_RUNNING && proc->bytecode != NULL) {
         uint8_t opcode = proc->bytecode[proc->ip++];
 
-        // TODO: f_vm_execute_instruction(proc, opcode);
-        
         // Simulación: detener al llegar a un opcode de fin (0x00 / OP_HALT)
         if (opcode == 0x00) {
             break;
@@ -181,7 +176,9 @@ FoxyProtocol* f_protocol_get_or_create(FoxyRuntime *rt, const char *name) {
 
         strncpy(prot->name, name, sizeof(prot->name) - 1);
         prot->name[sizeof(prot->name) - 1] = '\0';
-        prot->shared_scope = f_scope_new(NULL);
+        
+        // Inicializar la tabla relacional de símbolos compartidos para el protocolo
+        prot->symtable = f_symtable_new();
         pthread_mutex_init(&prot->lock, NULL);
 
         HASH_ADD_STR(rt->protocols, name, prot);
