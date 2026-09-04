@@ -236,6 +236,131 @@ void f_vm_load_module(FoxyVM *vm, const char *raw_module_path) {
     // fprintf(stderr, "[Foxy DEBUG] Módulo '%s' registrado exitosamente en el runtime.\n", raw_module_path);
 }
 
+static const char * const FOXCODE_SYMBOLS[FOXCODE_COUNT] = {
+    #define F(fcode, name, symbol) [fcode] = symbol,
+    FOXY_FOXCODE_LIST(F)
+    #undef F
+};
+
+static inline const char *f_vm_foxcode_to_symbol(FOXY_FOXCODE fcode) {
+    if (fcode < 0 || fcode >= FOXCODE_COUNT) return "UNKNOWN";
+    const char *sym = FOXY_OPCODE_SYMBOLS[fcode];
+    return sym ? sym : "?";
+}
+
+static bool f_vm_eval_binary_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValue b, FoxyValue *out_res) {
+    if (!f_value_is_numeric(&a) || !f_value_is_numeric(&b)) {
+        fprintf(stderr, "[Foxy VM Error] Operandos no numéricos para el operador '%s': %s y %s\n",
+                f_vm_foxcode_to_symbol(fcode),
+                f_value_type_to_char_array(a.type),
+                f_value_type_to_char_array(b.type));
+        return false;
+    }
+
+    // Aritmética
+    switch (fcode) {
+        case FOXCODE_ADD:
+            out_res->type = FOXY_VAL_INT;
+            out_res->as.ival = a.as.ival + b.as.ival;
+            return true;
+        case FOXCODE_SUB:
+            out_res->type = FOXY_VAL_INT;
+            out_res->as.ival = a.as.ival - b.as.ival;
+            return true;
+        case FOXCODE_MUL:
+            out_res->type = FOXY_VAL_INT;
+            out_res->as.ival = a.as.ival * b.as.ival;
+            return true;
+        case FOXCODE_DIV:
+            if (b.as.ival == 0) {
+                fprintf(stderr, "[Foxy VM Error] División por cero con el operador '%s'\n",
+                        f_vm_foxcode_to_symbol(fcode));
+                return false;
+            }
+            out_res->type = FOXY_VAL_INT;
+            out_res->as.ival = a.as.ival / b.as.ival;
+            return true;
+        case FOXCODE_LT:
+            out_res->type = FOXY_VAL_BOOL;
+            out_res->as.boolean = (a.as.ival < b.as.ival);
+            return true;
+        case FOXCODE_GT:
+            out_res->type = FOXY_VAL_BOOL;
+            out_res->as.boolean = (a.as.ival > b.as.ival);
+            return true;
+        case FOXCODE_LE:
+            out_res->type = FOXY_VAL_BOOL;
+            out_res->as.boolean = (a.as.ival <= b.as.ival);
+            return true;
+        case FOXCODE_GE:
+            out_res->type = FOXY_VAL_BOOL;
+            out_res->as.boolean = (a.as.ival >= b.as.ival);
+            return true;
+        default:
+            return false;
+    }
+}
+
+/* Evaluador para operaciones bitwise UNARIAS (consumen 1 operando) */
+static bool f_vm_eval_unary_bitwise_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValue *out_res) {
+    if (!f_value_is_pure_integer(&a)) {
+        fprintf(stderr, "[Foxy VM Error] Operando no entero para el operador unario '%s': %s\n",
+                f_opcode_to_symbol(fcode), 
+                f_value_type_to_char_array(a.type));
+        return false;
+    }
+
+    switch (fcode) {
+        case FOXCODE_BIT_NOT:
+            out_res->type = FOXY_VAL_INT;
+            out_res->as.ival = ~a.as.ival;
+            return true;
+
+        default:
+            fprintf(stderr, "[Foxy VM Internal Error] Opcode unario bitwise no reconocido: %d\n", fcode);
+            return false;
+    }
+}
+
+/* Evaluador para operaciones bitwise BINARIAS (consumen 2 operandos) */
+static bool f_vm_eval_bitwise_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValue b, FoxyValue *out_res) {
+    if (!f_value_is_pure_integer(&a) || !f_value_is_pure_integer(&b)) {
+        fprintf(stderr, "[Foxy VM Error] Operandos no enteros para el operador bitwise '%s': %s y %s\n",
+                f_opcode_to_symbol(fcode),
+                f_value_type_to_char_array(a.type),
+                f_value_type_to_char_array(b.type));
+        return false;
+    }
+
+    out_res->type = FOXY_VAL_INT;
+
+    switch (fcode) {
+        case FOXCODE_BIT_AND:
+            out_res->as.ival = a.as.ival & b.as.ival;
+            return true;
+
+        case FOXCODE_BIT_OR:
+            out_res->as.ival = a.as.ival | b.as.ival;
+            return true;
+
+        case FOXCODE_BIT_XOR:
+            out_res->as.ival = a.as.ival ^ b.as.ival;
+            return true;
+
+        case FOXCODE_SHL:
+            out_res->as.ival = a.as.ival << b.as.ival;
+            return true;
+
+        case FOXCODE_SHR:
+            out_res->as.ival = a.as.ival >> b.as.ival;
+            return true;
+
+        default:
+            fprintf(stderr, "[Foxy VM Internal Error] Opcode binario bitwise no reconocido: %d\n", fcode);
+            return false;
+    }
+}
+
 FoxyStatus f_vm_run(FoxyVM *vm) {
     if (!vm || vm->process_count == 0) return FOXY_STATUS_SUCCESS;
 
@@ -350,33 +475,47 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         size_t local_idx = (size_t)GETARG_A(inst);
         FoxyValue val = f_vm_pop(proc);
 
+        // Reasignación dinámica si excede la capacidad del marco actual
         if (local_idx >= proc->locals_capacity) {
             size_t old_cap = proc->locals_capacity;
             size_t new_cap = old_cap == 0 ? 16 : old_cap * 2;
-            while (local_idx >= new_cap) new_cap *= 2;
+            while (local_idx >= new_cap) {
+                new_cap *= 2;
+            }
             
             FoxyValue *new_locals = (FoxyValue *)realloc(proc->locals, sizeof(FoxyValue) * new_cap);
             if (!new_locals) {
-                fprintf(stderr, "[Foxy VM Error] Out of memory allocating local variables\n");
-                vm->running = false;
+                fprintf(stderr, "[Foxy VM Error] Out of memory allocating local variables for process %d\n", proc->id);
+                proc->running = 0;
+                proc->state = FOXY_PROCESS_DEAD;
                 goto lbl_FOXCODE_HALT;
             }
 
-            // Inicializar a cero / NULL el nuevo bloque asignado
+            // Inicialización limpia a cero/NULL del nuevo espacio asignado
             for (size_t i = old_cap; i < new_cap; ++i) {
-                new_locals[i] = (FoxyValue){ .type = FOXY_VAL_NULL, .as.ptr = NULL };
+                FoxyValue cap = {0};
+                cap.type = FOXY_VAL_NULL;
+                cap.as.ptr = NULL;
+                new_locals[i] = cap;
             }
 
             proc->locals = new_locals;
             proc->locals_capacity = new_cap;
         }
 
-        proc->locals[local_idx] = val;
+        // Si se salta índices dentro de la capacidad existente, asegurar la inicialización limpia de los huecos intermediarios
         if (local_idx >= proc->locals_count) {
+            for (size_t i = proc->locals_count; i < local_idx; ++i) {
+                if (proc->locals[i].type == 0 && proc->locals[i].as.ptr == NULL) {
+                    proc->locals[i].type = FOXY_VAL_NULL;
+                }
+            }
             proc->locals_count = local_idx + 1;
         }
 
-        // fprintf(stdout, "[Foxy VM Debug] procesando FOXCODE_STORE_LOCAL en index %zu (tipo: %d, ptr: %p). . .\n", local_idx, val.type, val.as.ptr);
+        // Asignar valor a la variable local
+        proc->locals[local_idx] = val;
+
         DISPATCH();
     }
 
@@ -393,16 +532,18 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         FoxyValue constant_val = vm->constants[global_idx];
         const char *sym_name = NULL;
 
+        // Extracción segura del nombre del símbolo
         if (constant_val.type == FOXY_VAL_ARRAY || constant_val.type == FOXY_VAL_OBJECT) {
             sym_name = f_value_get_char_array_data(&constant_val);
-        } else if (constant_val.type == FOXY_VAL_CHAR) {
-            sym_name = constant_val.as.sval ? constant_val.as.sval : constant_val.as.string;
+        } else if (constant_val.as.sval != NULL) {
+            // Manejo directo de punteros a cadena (sval / string / ptr)
+            sym_name = constant_val.as.sval;
         }
 
-        FoxyValue result_val = FOXY_NULL_VALUE;
+        FoxyValue result_val = { .type = FOXY_VAL_NULL, .as.ival = 0 };
 
-        if (sym_name) {
-            // 1. Intentar buscar en la tabla relacional unificada (f_symtable)
+        if (sym_name && sym_name[0] != '\0') {
+            // 1. Buscar en la tabla de símbolos unificada (f_symtable)
             if (vm->symtable) {
                 FoxySymbolRow *row = f_symtable_find_by_name(vm->symtable, sym_name);
                 if (row) {
@@ -410,7 +551,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
                 }
             }
 
-            // 2. Si no se encontró en la tabla relacional, verificar el arreglo de globales vm->globals
+            // 2. Fallback al arreglo denso de globales (si aplica)
             if (result_val.type == FOXY_VAL_NULL && (size_t)global_idx < vm->globals_count) {
                 if (vm->globals[global_idx].type != FOXY_VAL_NULL) {
                     result_val = vm->globals[global_idx];
@@ -426,10 +567,12 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
                 }
             }
 
-            // Debug log opcional para verificar la resolución
+            // Warning si no se pudo resolver el símbolo
             if (result_val.type == FOXY_VAL_NULL) {
                 fprintf(stderr, "[Foxy VM Warning] No se pudo resolver el símbolo global: '%s'\n", sym_name);
             }
+        } else {
+            fprintf(stderr, "[Foxy VM Error] LOAD_GLOBAL recibió un nombre de símbolo no válido en el índice constante [%d]\n", global_idx);
         }
 
         f_vm_push(proc, result_val);
@@ -491,14 +634,18 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         int member_idx = GETARG_Bx(inst);
         const char *member_name = NULL;
 
-        if (member_idx < (int)vm->constants_count) {
+        if (member_idx >= 0 && member_idx < (int)vm->constants_count) {
             FoxyValue c = vm->constants[member_idx];
-            if (c.type == FOXY_VAL_ARRAY && c.as.array && c.as.array->data) {
-                member_name = (const char *)c.as.array->data;
+            
+            // Reutilización segura del extractor de cadenas de f_value
+            if (c.type == FOXY_VAL_ARRAY || c.type == FOXY_VAL_OBJECT) {
+                member_name = f_value_get_char_array_data(&c);
+            } else if (c.as.sval != NULL) {
+                member_name = c.as.sval;
             }
         }
 
-        if (!member_name) {
+        if (!member_name || member_name[0] == '\0') {
             fprintf(stderr, "[Foxy VM Error] Índice de constante %d inválido para GET_MEMBER\n", member_idx);
             proc->running = 0;
             proc->state = FOXY_PROCESS_DEAD;
@@ -506,7 +653,8 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         }
 
         FoxyValue target = f_vm_pop(proc);
-        FoxyValue result = { .type = FOXY_VAL_NULL };
+        FoxyValue result = {0};
+        result.type = FOXY_VAL_NULL;
 
         if (target.type == FOXY_VAL_DICT && target.as.dict) {
             if (!f_dict_get(target.as.dict, member_name, &result)) {
@@ -516,8 +664,16 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
                 goto lbl_FOXCODE_HALT;
             }
         } else if (target.type == FOXY_VAL_OBJECT && target.as.obj) {
-            if (!f_object_get_field(target.as.obj, member_name, &result)) {
-                fprintf(stderr, "[Foxy VM Error] El atributo '%s' no existe en el objeto\n", member_name);
+            // 1. Intentar obtener campo/propiedad de la instancia
+            bool found = f_object_get_field(target.as.obj, member_name, &result);
+            
+            // 2. Fallback: Buscar método en la clase o prototipo asociado
+            if (!found && target.as.obj->klass) {
+                found = f_class_get_method(target.as.obj->klass, member_name, &result);
+            }
+
+            if (!found) {
+                fprintf(stderr, "[Foxy VM Error] El atributo o método '%s' no existe en el objeto\n", member_name);
                 proc->running = 0;
                 proc->state = FOXY_PROCESS_DEAD;
                 goto lbl_FOXCODE_HALT;
@@ -538,14 +694,18 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         int member_idx = GETARG_Bx(inst);
         const char *member_name = NULL;
 
-        if (member_idx < (int)vm->constants_count) {
+        if (member_idx >= 0 && member_idx < (int)vm->constants_count) {
             FoxyValue c = vm->constants[member_idx];
-            if (c.type == FOXY_VAL_ARRAY && c.as.array && c.as.array->data) {
-                member_name = (const char *)c.as.array->data;
+            
+            // Extracción polimórfica del nombre usando la interfaz unificada de f_value
+            if (c.type == FOXY_VAL_ARRAY || c.type == FOXY_VAL_OBJECT) {
+                member_name = f_value_get_char_array_data(&c);
+            } else if (c.as.sval != NULL) {
+                member_name = c.as.sval;
             }
         }
 
-        if (!member_name) {
+        if (!member_name || member_name[0] == '\0') {
             fprintf(stderr, "[Foxy VM Error] Índice de constante %d inválido para SET_MEMBER\n", member_idx);
             proc->running = 0;
             proc->state = FOXY_PROCESS_DEAD;
@@ -556,9 +716,19 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         FoxyValue target = f_vm_pop(proc);
 
         if (target.type == FOXY_VAL_DICT && target.as.dict) {
-            f_dict_set(target.as.dict, member_name, val_to_assign);
+            if (!f_dict_set(target.as.dict, member_name, val_to_assign)) {
+                fprintf(stderr, "[Foxy VM Error] No se pudo asignar la clave '%s' en el diccionario\n", member_name);
+                proc->running = 0;
+                proc->state = FOXY_PROCESS_DEAD;
+                goto lbl_FOXCODE_HALT;
+            }
         } else if (target.type == FOXY_VAL_OBJECT && target.as.obj) {
-            f_object_set_field(target.as.obj, member_name, val_to_assign);
+            if (!f_object_set_field(target.as.obj, member_name, val_to_assign)) {
+                fprintf(stderr, "[Foxy VM Error] No se pudo asignar la propiedad '%s' en el objeto\n", member_name);
+                proc->running = 0;
+                proc->state = FOXY_PROCESS_DEAD;
+                goto lbl_FOXCODE_HALT;
+            }
         } else {
             fprintf(stderr, "[Foxy VM Error] Intento de escribir el miembro '%s' en un tipo no mutable (%s)\n",
                     member_name, f_value_type_to_char_array(target.type));
@@ -566,13 +736,25 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
             proc->state = FOXY_PROCESS_DEAD;
             goto lbl_FOXCODE_HALT;
         }
+
         DISPATCH();
     }
+
+    /* ========================================================================= */
+    /* OPERADORES ARITMÉTICOS (+, -, *, /)                                       */
+    /* ========================================================================= */
 
     lbl_FOXCODE_ADD: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_INT, .as.ival = a.as.ival + b.as.ival };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_ADD, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -580,7 +762,14 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_SUB: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_INT, .as.ival = a.as.ival - b.as.ival };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_SUB, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -588,7 +777,14 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_MUL: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_INT, .as.ival = a.as.ival * b.as.ival };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_MUL, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -596,20 +792,26 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_DIV: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        if (b.as.ival == 0) {
-            fprintf(stderr, "[Foxy VM Error] Division by zero\n");
-            vm->running = false;
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_DIV, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
             goto lbl_FOXCODE_HALT;
         }
-        FoxyValue res = { .type = FOXY_VAL_INT, .as.ival = a.as.ival / b.as.ival };
+
         f_vm_push(proc, res);
         DISPATCH();
     }
 
+    /* ========================================================================= */
+    /* OPERADORES DE COMPARACIÓN (==, !=, <, >, <=, >=)                         */
+    /* ========================================================================= */
+
     lbl_FOXCODE_EQ: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = (a.as.ival == b.as.ival) };
+        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = f_value_equals(&a, &b) };
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -617,7 +819,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_NEQ: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = (a.as.ival != b.as.ival) };
+        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = !f_value_equals(&a, &b) };
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -625,7 +827,14 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_LT: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = (a.as.ival < b.as.ival) };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_LT, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -633,7 +842,14 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_GT: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = (a.as.ival > b.as.ival) };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_GT, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -641,7 +857,14 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_LE: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = (a.as.ival <= b.as.ival) };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_LE, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }
@@ -649,7 +872,107 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     lbl_FOXCODE_GE: {
         FoxyValue b = f_vm_pop(proc);
         FoxyValue a = f_vm_pop(proc);
-        FoxyValue res = { .type = FOXY_VAL_BOOL, .as.boolean = (a.as.ival >= b.as.ival) };
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_binary_op(FOXCODE_GE, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
+        f_vm_push(proc, res);
+        DISPATCH();
+    }
+
+    /* ========================================================================= */
+    /* OPERADORES BITWISE Y LÓGICOS DE BAJO NIVEL (&, |, ^, ~, <<, >>)           */
+    /* ========================================================================= */
+
+    lbl_FOXCODE_BIT_AND: {
+        FoxyValue b = f_vm_pop(proc);
+        FoxyValue a = f_vm_pop(proc);
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_bitwise_op(FOXCODE_BIT_AND, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
+        f_vm_push(proc, res);
+        DISPATCH();
+    }
+
+    lbl_FOXCODE_BIT_OR: {
+        FoxyValue b = f_vm_pop(proc);
+        FoxyValue a = f_vm_pop(proc);
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_bitwise_op(FOXCODE_BIT_OR, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
+        f_vm_push(proc, res);
+        DISPATCH();
+    }
+
+    lbl_FOXCODE_BIT_XOR: {
+        FoxyValue b = f_vm_pop(proc);
+        FoxyValue a = f_vm_pop(proc);
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_bitwise_op(FOXCODE_BIT_XOR, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
+        f_vm_push(proc, res);
+        DISPATCH();
+    }
+
+    lbl_FOXCODE_BIT_NOT: {
+        FoxyValue a = f_vm_pop(proc);
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_unary_bitwise_op(FOXCODE_BIT_NOT, a, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
+        f_vm_push(proc, res);
+        DISPATCH();
+    }
+
+    lbl_FOXCODE_SHL: {
+        FoxyValue b = f_vm_pop(proc);
+        FoxyValue a = f_vm_pop(proc);
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_bitwise_op(FOXCODE_SHL, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
+        f_vm_push(proc, res);
+        DISPATCH();
+    }
+
+    lbl_FOXCODE_SHR: {
+        FoxyValue b = f_vm_pop(proc);
+        FoxyValue a = f_vm_pop(proc);
+        FoxyValue res = {0};
+
+        if (!f_vm_eval_bitwise_op(FOXCODE_SHR, a, b, &res)) {
+            proc->running = 0;
+            proc->state = FOXY_PROCESS_DEAD;
+            goto lbl_FOXCODE_HALT;
+        }
+
         f_vm_push(proc, res);
         DISPATCH();
     }

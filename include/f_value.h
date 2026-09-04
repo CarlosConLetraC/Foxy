@@ -80,4 +80,9 @@
     FoxyValue f_value_create_char_array(const char *str, size_t len);
     const char* f_value_get_char_array_data(const FoxyValue *val);
     void f_value_free_contents(FoxyValue *val);
+
+    // Prototipos para extracción y verificación de tipos numéricos
+    bool f_value_is_numeric(const FoxyValue *val);
+    bool f_value_is_pure_integer(const FoxyValue *val);
+    double f_value_as_double(const FoxyValue *val);
 #endif // F_VALUE_H

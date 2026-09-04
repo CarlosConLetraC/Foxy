@@ -17,7 +17,7 @@
     },
     {
       "name": "storage.type.foxy",
-      "match": "\\b(int|float|double|char|bool|long|void)\\b"
+      "match": "\\b(number|int|float|double|char|bool|long|void|function)\\b"
     },
     {
       "name": "constant.language.foxy",

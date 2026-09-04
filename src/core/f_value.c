@@ -98,3 +98,49 @@ void f_value_free_contents(FoxyValue *val) {
             break;
     }
 }
+
+bool f_value_is_numeric(const FoxyValue *val) {
+    if (!val) return false;
+    switch (val->type) {
+        case FOXY_VAL_INT:
+        case FOXY_VAL_NUMBER:
+        case FOXY_VAL_FLOAT:
+        case FOXY_VAL_DOUBLE:
+        case FOXY_VAL_LONG:
+        case FOXY_VAL_LONG_LONG:
+        case FOXY_VAL_UNSIGNED_LONG_LONG:
+        case FOXY_VAL_CHAR:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool f_value_is_pure_integer(const FoxyValue *val) {
+    if (!val) return false;
+    return (val->type == FOXY_VAL_INT || 
+            val->type == FOXY_VAL_LONG || 
+            val->type == FOXY_VAL_LONG_LONG || 
+            val->type == FOXY_VAL_UNSIGNED_LONG_LONG || 
+            val->type == FOXY_VAL_CHAR);
+}
+
+double f_value_as_double(const FoxyValue *val) {
+    if (!val) return 0.0;
+    switch (val->type) {
+        case FOXY_VAL_INT:
+        case FOXY_VAL_LONG:
+        case FOXY_VAL_LONG_LONG:
+            return (double)val->as.ival;
+        case FOXY_VAL_UNSIGNED_LONG_LONG:
+            return (double)((uint64_t)val->as.ival);
+        case FOXY_VAL_FLOAT:
+        case FOXY_VAL_DOUBLE:
+        case FOXY_VAL_NUMBER:
+            return val->as.dval;
+        case FOXY_VAL_CHAR:
+            return (double)val->as.cval;
+        default:
+            return 0.0;
+    }
+}
