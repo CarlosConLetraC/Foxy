@@ -4,52 +4,176 @@
 #include "f_utils.h"
 #include "f_init.h"
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <inttypes.h>
 
 FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
     (void)self;
-    FoxyProcess *proc = F_SYS_OUT_GET_CURRENT_PROCESS(vm);
-    if (!proc || argc < 1) return;
 
-    // El primer argumento (índice 0 de los argumentos) es la cadena de formato
-    // En la pila, si se apilaron en orden, el formato está más abajo o más arriba según tu convención.
-    // Asumiendo que el formato está en el índice 0 de los argumentos pasados:
-    FoxyValue fmt_val = f_vm_peek(proc, argc - 1); // Ajusta el índice según el orden de tu pila
-    const char *fmt = f_utils_get_string_from_constant(*(FoxyConstant*)&fmt_val);
-    if (!fmt) return;
+    if (argc < 1 || vm->process_count == 0) {
+        return;
+    }
 
-    int arg_index = 1; // Los valores para %T o %s empiezan a partir del siguiente argumento
-    size_t i = 0;
-    size_t fmt_len = strlen(fmt);
+    FoxyProcess *p = vm->processes[vm->current_process_index];
 
-    while (i < fmt_len) {
-        if (fmt[i] == '%' && i + 1 < fmt_len) {
-            i++;
-            char specifier = fmt[i];
+    // El argumento 0 de la llamada es el format string
+    FoxyValue fmt_val = f_vm_peek(p, (size_t)(argc - 1));
+    if (fmt_val.type != FOXY_VAL_ARRAY) {
+        return;
+    }
 
-            if (arg_index < argc) {
-                // Obtener el argumento actual de la pila
-                // (Calculando la posición relativa según argc y arg_index)
-                FoxyValue arg_val = f_vm_peek(proc, argc - 1 - arg_index);
+    const char *format = f_value_get_char_array_data(&fmt_val);
+    if (!format) {
+        return;
+    }
 
-                switch (specifier) {
-                    case 'T': {
-                        f_utils_print_constant_dynamic(*(FoxyConstant*)&arg_val);
-                        break;
-                    }
-                    case 's':
-                    default:
-                        f_utils_syswrite(1, "%", 1);
-                        f_utils_syswrite(1, &specifier, 1);
-                        break;
-                }
-                arg_index++;
-            } else {
+    int arg_index = 1; 
+    const char *ptr = format;
+    char buffer[256];
+    int len = 0;
+
+    while (*ptr != '\0') {
+        if (*ptr == '%') {
+            ptr++;
+
+            // Secuencia '%%': Imprimir '%' literal vía syswrite
+            if (*ptr == '%') {
                 f_utils_syswrite(1, "%", 1);
-                f_utils_syswrite(1, &specifier, 1);
+                ptr++;
+                continue;
+            }
+
+            // Si se acabaron los argumentos pasados al printf
+            if (arg_index >= argc) {
+                f_utils_syswrite(1, "%", 1);
+                if (*ptr != '\0') {
+                    f_utils_syswrite(1, ptr, 1);
+                    ptr++;
+                }
+                continue;
+            }
+
+            // Parsear precisión flotante (ej. %.2f)
+            int precision = -1;
+            if (*ptr == '.') {
+                ptr++;
+                precision = 0;
+                while (*ptr >= '0' && *ptr <= '9') {
+                    precision = precision * 10 + (*ptr - '0');
+                    ptr++;
+                }
+                if (precision > 99) precision = 99;
+            }
+
+            // Obtener el valor de la pila de la VM
+            size_t distance = (size_t)(argc - 1 - arg_index);
+            FoxyConstant val = f_vm_peek(p, distance);
+
+            // Manejo por cada especificador de formato
+            switch (*ptr) {
+                case 'T': {
+                    // %T: Comodín universal / ToString dinámico usando f_utils
+                    f_utils_print_constant_dynamic(val, precision);
+                    break;
+                }
+                case 'd':
+                case 'i': {
+                    int64_t num = 0;
+                    switch (val.type) {
+                        case FOXY_VAL_INT:
+                        case FOXY_VAL_LONG:
+                            num = val.as.ival;
+                            break;
+                        case FOXY_VAL_FLOAT:
+                            num = (int64_t)val.as.fval; // Conversión implícita estilo Lua
+                            break;
+                        case FOXY_VAL_DOUBLE:
+                        case FOXY_VAL_NUMBER:
+                            num = (int64_t)val.as.dval; // Conversión implícita de double
+                            break;
+                        default:
+                            num = val.as.ival;
+                            break;
+                    }
+                    len = snprintf(buffer, sizeof(buffer), "%" PRId64, num);
+                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
+                    break;
+                }
+                case 'u': {
+                    uint64_t num = (uint64_t)val.as.ival;
+                    len = snprintf(buffer, sizeof(buffer), "%" PRIu64, num);
+                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
+                    break;
+                }
+                case 'x': {
+                    uint64_t num = (uint64_t)val.as.ival;
+                    len = snprintf(buffer, sizeof(buffer), "%" PRIx64, num);
+                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
+                    break;
+                }
+                case 'X': {
+                    uint64_t num = (uint64_t)val.as.ival;
+                    len = snprintf(buffer, sizeof(buffer), "%" PRIX64, num);
+                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
+                    break;
+                }
+                case 'b': {
+                    bool b = (val.type == FOXY_VAL_BOOL) ? val.as.boolean : (val.as.ival != 0);
+                    if (b) {
+                        f_utils_syswrite(1, "true", 4);
+                    } else {
+                        f_utils_syswrite(1, "false", 5);
+                    }
+                    break;
+                }
+                case 'f': {
+                    double num = (val.type == FOXY_VAL_INT || val.type == FOXY_VAL_LONG) 
+                                 ? (double)val.as.ival 
+                                 : val.as.fval;
+                    if (precision >= 0) {
+                        len = snprintf(buffer, sizeof(buffer), "%.*f", precision, num);
+                    } else {
+                        len = snprintf(buffer, sizeof(buffer), "%f", num);
+                    }
+                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
+                    break;
+                }
+                case 'c': {
+                    char c = (char)val.as.ival;
+                    f_utils_syswrite(1, &c, 1);
+                    break;
+                }
+                case 's': {
+                    const char *str = f_utils_get_string_from_constant(val);
+                    if (str) {
+                        f_utils_syswrite(1, str, strlen(str));
+                    } else if (val.as.object) {
+                        f_utils_syswrite(1, (const char*)val.as.object, strlen((const char*)val.as.object));
+                    } else {
+                        f_utils_syswrite(1, "(null)", 6);
+                    }
+                    break;
+                }
+                default: {
+                    f_utils_syswrite(1, "%", 1);
+                    if (*ptr != '\0') {
+                        f_utils_syswrite(1, ptr, 1);
+                    }
+                    break;
+                }
+            }
+
+            arg_index++;
+            if (*ptr != '\0') {
+                ptr++;
             }
         } else {
-            f_utils_syswrite(1, &fmt[i], 1);
+            f_utils_syswrite(1, ptr, 1);
+            ptr++;
         }
-        i++;
     }
+
+    fflush(stdout);
 }

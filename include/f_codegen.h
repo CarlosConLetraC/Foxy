@@ -30,7 +30,12 @@
     int f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val);
 
     bool f_codegen_visit(FoxyCodegen *cg, FoxyASTNode *node);
+    
+    // Auxiliares de emisión
+    void f_codegen_emit_null(FoxyCodegen *cg);
     void f_codegen_emit_env(FoxyCodegen *cg);
+    
+    // Visitantes de concurrencia y entornos
     void f_codegen_visit_env_create(FoxyCodegen *cg, FoxyASTNode *node);
     void f_codegen_visit_env_bind(FoxyCodegen *cg, FoxyASTNode *node);
     void f_codegen_visit_popen(FoxyCodegen *cg, FoxyASTNode *node);

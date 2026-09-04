@@ -1,32 +1,42 @@
 #ifndef FOXY_TOKEN_H
     #define FOXY_TOKEN_H
 
+    #include <stddef.h>
     #include <stdint.h>
     #include "f_foxmode.h"
 
+    // Categorías principales de Tokens
+    #define FOXY_TOKEN_CAT_KEYWORD     1
+    #define FOXY_TOKEN_CAT_TYPE        2
+    #define FOXY_TOKEN_CAT_IDENTIFIER  3
+    #define FOXY_TOKEN_CAT_OPERATOR    4
+    #define FOXY_TOKEN_CAT_METHOD      5
+    #define FOXY_TOKEN_CAT_LITERAL     6
+    #define FOXY_TOKEN_CAT_ERROR       7
+
     // 1. Listas maestras (X-Macros)
     #define FOXY_TOKEN_LIST(F) \
-        F(FOXY_TOKEN_FUNCTION) \
-        F(FOXY_TOKEN_CLASS) \
-        F(FOXY_TOKEN_FROM) \
-        F(FOXY_TOKEN_STRUCT) \
-        F(FOXY_TOKEN_ENUM) \
-        F(FOXY_TOKEN_EXPORT) \
-        F(FOXY_TOKEN_USE) \
-        F(FOXY_TOKEN_OVERRULE) \
-        F(FOXY_TOKEN_SUPER) \
-        F(FOXY_TOKEN_SELF) \
-        F(FOXY_TOKEN_FOR) \
-        F(FOXY_TOKEN_IF) \
-        F(FOXY_TOKEN_SWITCH) \
-        F(FOXY_TOKEN_CASE) \
-        F(FOXY_TOKEN_DEFAULT) \
-        F(FOXY_TOKEN_BREAK) \
-        F(FOXY_TOKEN_RETURN) \
-        F(FOXY_TOKEN_INCLUDE) \
-        F(FOXY_TOKEN_PRIVATE) \
-        F(FOXY_TOKEN_PROTECTED) \
-        F(FOXY_TOKEN_PUBLIC)
+        F(FOXY_TOKEN_LIST_FUNCTION) \
+        F(FOXY_TOKEN_LIST_CLASS) \
+        F(FOXY_TOKEN_LIST_FROM) \
+        F(FOXY_TOKEN_LIST_STRUCT) \
+        F(FOXY_TOKEN_LIST_ENUM) \
+        F(FOXY_TOKEN_LIST_EXPORT) \
+        F(FOXY_TOKEN_LIST_USE) \
+        F(FOXY_TOKEN_LIST_OVERRULE) \
+        F(FOXY_TOKEN_LIST_SUPER) \
+        F(FOXY_TOKEN_LIST_SELF) \
+        F(FOXY_TOKEN_LIST_FOR) \
+        F(FOXY_TOKEN_LIST_IF) \
+        F(FOXY_TOKEN_LIST_SWITCH) \
+        F(FOXY_TOKEN_LIST_CASE) \
+        F(FOXY_TOKEN_LIST_DEFAULT) \
+        F(FOXY_TOKEN_LIST_BREAK) \
+        F(FOXY_TOKEN_LIST_RETURN) \
+        F(FOXY_TOKEN_LIST_INCLUDE) \
+        F(FOXY_TOKEN_LIST_PRIVATE) \
+        F(FOXY_TOKEN_LIST_PROTECTED) \
+        F(FOXY_TOKEN_LIST_PUBLIC)
 
     #define FOXY_TOKEN_TYPE_LIST(F) \
         F(FOXY_TOKEN_TYPE_NULL) \
@@ -64,8 +74,11 @@
         F(FOXY_TOKEN_OPERATOR_SUB) \
         F(FOXY_TOKEN_OPERATOR_MUL) \
         F(FOXY_TOKEN_OPERATOR_DIV) \
+        F(FOXY_TOKEN_OPERATOR_MOD) \
         F(FOXY_TOKEN_OPERATOR_POW) \
         F(FOXY_TOKEN_OPERATOR_INC) \
+        F(FOXY_TOKEN_OPERATOR_DEC) /*NUEVO: decremento (i--, --i)*/\
+        F(FOXY_TOKEN_OPERATOR_NEG) \
         /* Operadores Lógicos y de Bits */ \
         F(FOXY_TOKEN_OPERATOR_AND) \
         F(FOXY_TOKEN_OPERATOR_OR)  \
@@ -167,4 +180,68 @@
         #undef F
     } FOXY_TOKEN_FLAGGED_METHOD;
 
+    typedef struct {
+        const char* start;              // Puntero al lexema en el fuente
+        uint32_t length;                // Longitud del lexema
+        uint16_t line;                  // Línea de origen
+        uint16_t column;                // Columna de origen
+        unsigned int type_category : 4; // Categoría principal (0-15)
+        unsigned int subtype : 12;      // Subtipo del enum correspondiente (0-4095)
+        
+        // Unión para almacenar valores evaluados directamente en el lexer
+        union {
+            int64_t int_val;
+            double float_val;
+            void* custom_data;
+        } as;
+    } FoxyToken;
+
+    typedef struct {
+        const char* text;            // Nombre de la palabra reservada
+        unsigned int category : 4;   // Categoría (1: Keyword, 2: Primitive Type)
+        unsigned int subtype : 12;    // Valor enum asignado
+    } FoxyKeywordMap;
+
+    // TODO: Renombrar KEYWORD_TABLE a FOXY_KEYWORD_TABLE para futuras anotaciones. . .
+    static const FoxyKeywordMap KEYWORD_TABLE[] = {
+        // Categoría 1: Keywords de Estructura y Control (FOXY_TOKEN)
+        { "function",  FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_FUNCTION },
+        { "class",     FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_CLASS },
+        { "from",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_FROM },
+        { "struct",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_STRUCT },
+        { "enum",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_ENUM },
+        { "export",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_EXPORT },
+        { "use",       FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_USE },
+        { "overrule",  FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_OVERRULE },
+        { "super",     FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_SUPER },
+        { "self",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_SELF },
+        { "for",       FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_FOR },
+        { "if",        FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_IF },
+        { "switch",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_SWITCH },
+        { "case",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_CASE },
+        { "default",   FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_DEFAULT },
+        { "break",     FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_BREAK },
+        { "return",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_RETURN },
+        { "include",   FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_INCLUDE },
+        { "private",   FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_PRIVATE },
+        { "protected", FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_PROTECTED },
+        { "public",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_PUBLIC },
+
+        // Categoría 2: Tipos de datos primitivos (FOXY_TOKEN_TYPE)
+        { "char",      FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_CHAR },
+        { "int",       FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_INT },
+        { "number",    FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_NUMBER },
+        { "float",     FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_FLOAT },
+        { "double",    FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_DOUBLE },
+        { "long",      FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_LONG },
+        { "bool",      FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_BOOL },
+        { "object",    FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_OBJECT },
+        { "dict",      FOXY_TOKEN_CAT_TYPE,    FOXY_TOKEN_TYPE_DICT },
+
+        // Literales Booleanos
+        { "true",      FOXY_TOKEN_CAT_LITERAL, FOXY_TOKEN_TYPE_BOOL },
+        { "false",     FOXY_TOKEN_CAT_LITERAL, FOXY_TOKEN_TYPE_BOOL }
+    };
+
+    static const size_t KEYWORD_TABLE_SIZE = sizeof(KEYWORD_TABLE) / sizeof(FoxyKeywordMap);
 #endif // FOXY_TOKEN_H

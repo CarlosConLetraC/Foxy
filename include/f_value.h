@@ -25,7 +25,6 @@
         F(FOXY_VAL_LONG,                "long")     \
         F(FOXY_VAL_LONG_LONG,           "llong") \
         F(FOXY_VAL_UNSIGNED_LONG_LONG,  "ullong") \
-        F(FOXY_VAL_STRING,              "string")   \
         F(FOXY_VAL_ARRAY,               "array")    \
         F(FOXY_VAL_DICT,                "dict")     \
         F(FOXY_VAL_OBJECT,              "object")   \
@@ -77,7 +76,7 @@
 
     // Prototipos
     extern const char * const FOXY_VALUE_TYPE_STRINGS[];
-    const char* f_value_type_to_string(FoxyValueType type);
+    const char* f_value_type_to_char_array(FoxyValueType type);
     FoxyValue f_value_create_char_array(const char *str, size_t len);
     const char* f_value_get_char_array_data(const FoxyValue *val);
     void f_value_free_contents(FoxyValue *val);

@@ -42,6 +42,7 @@
         /* Control de Flujo */ \
         F(FOXCODE_JUMP,          "JUMP") \
         F(FOXCODE_JUMP_IF_FALSE, "JUMP_IF_FALSE") \
+        F(FOXCODE_POP,           "FOXCODE_POP") \
         F(FOXCODE_CALL,          "CALL") \
         F(FOXCODE_RET,           "RET") \
         \

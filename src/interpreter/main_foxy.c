@@ -75,56 +75,8 @@ int main(int argc, char** argv) {
 
     // Banderas de depuración (-d / --debug-bytecode)
     if (debug_mode) {
-        printf("=== [DEBUG] CONSTANT POOL (%zu elementos) ===\n", cg.constants_count);
-        for (size_t i = 0; i < cg.constants_count; i++) {
-            switch (cg.constants[i].type) {
-                case FOXY_VAL_ARRAY: {
-                    FoxyArray *arr = cg.constants[i].as.array;
-                    if (arr) {
-                        if (arr->element_type_id == FOXY_VAL_CHAR && arr->data) {
-                            printf("  [%02zu] CHAR ARRAY (String): \"%s\"\n", i, (const char*)arr->data);
-                        } else {
-                            printf("  [%02zu] GENERIC ARRAY (Elem Type: %d, Length: %zu)\n", 
-                                i, arr->element_type_id, arr->length);
-                        }
-                    } else {
-                        printf("  [%02zu] ARRAY: null\n", i);
-                    }
-                    break;
-                }
-                case FOXY_VAL_OBJECT: {
-                    const char *obj_str = cg.constants[i].as.object ? (const char *)cg.constants[i].as.object : "null";
-                    printf("  [%02zu] OBJECT/STRING: \"%s\"\n", i, obj_str);
-                    break;
-                }
-                case FOXY_VAL_INT:
-                    printf("  [%02zu] INT: %ld\n", i, cg.constants[i].as.ival);
-                    break;
-                case FOXY_VAL_NUMBER:
-                case FOXY_VAL_DOUBLE:
-                    printf("  [%02zu] DOUBLE: %f\n", i, cg.constants[i].as.dval);
-                    break;
-                case FOXY_VAL_BOOL:
-                    printf("  [%02zu] BOOL: %s\n", i, cg.constants[i].as.boolean ? "true" : "false");
-                    break;
-                case FOXY_VAL_NULL:
-                    printf("  [%02zu] NULL\n", i);
-                    break;
-                default:
-                    printf("  [%02zu] UNKNOWN TYPE (%d)\n", i, cg.constants[i].type);
-                    break;
-            }
-        }
-        
-        // El bytecode está compuesto por instrucciones de 32 bits (FoxInstruction)
-        printf("\n=== [DEBUG] BYTECODE GENERADO (%zu instrucciones / %zu bytes) ===\n", 
-            cg.code_count, cg.code_count * sizeof(FoxInstruction));
-        for (size_t i = 0; i < cg.code_count; i++) {
-            printf("%08X ", cg.bytecode[i]);
-            if ((i + 1) % 8 == 0) printf("\n");
-        }
-        if (cg.code_count % 8 != 0) printf("\n");
-        printf("============================================================\n\n");
+        f_utils_dump_constant_pool(cg.constants, cg.constants_count);
+        f_utils_dump_bytecode(cg.bytecode, cg.code_count);
     }
 
     // 4. Transferir recursos a la VM

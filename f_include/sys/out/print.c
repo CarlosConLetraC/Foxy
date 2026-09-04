@@ -10,8 +10,9 @@ FOXY_EXPORT void f_sys_out_print(FoxyVM *vm, FoxyObject *self, int argc) {
     FoxyProcess *proc = F_SYS_OUT_GET_CURRENT_PROCESS(vm);
     if (!proc || argc < 1) return;
 
-    // El primer argumento está en la pila del proceso
-    // Dependiendo del orden de tu pila, f_vm_peek te permite leerlo:
-    FoxyValue val = f_vm_peek(proc, argc - 1); // o la distancia correspondiente
-    f_utils_print_constant_dynamic(*(FoxyConstant*)&val);
+    // Si se pasan múltiples argumentos a print(), los imprimimos en orden
+    for (int i = 0; i < argc; i++) {
+        FoxyValue val = f_vm_peek(proc, argc - 1 - i);
+        f_utils_print_constant_dynamic(*(FoxyConstant*)&val, -1);
+    }
 }

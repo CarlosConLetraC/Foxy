@@ -117,17 +117,59 @@ double f_utils_get_double_from_constant(FoxyConstant constant) {
     return 0.0;
 }
 
-void f_utils_print_constant_dynamic(FoxyConstant constant) {
-    char buffer[64];
+void f_utils_print_constant_type(FoxyConstant constant) {
+    switch (constant.type) {
+        case FOXY_VAL_NULL:
+            f_utils_syswrite(1, "Null", 4);
+            break;
+
+        case FOXY_VAL_CHAR:
+            f_utils_syswrite(1, "Char", 4);
+            break;
+
+        case FOXY_VAL_INT:
+            f_utils_syswrite(1, "Int", 3);
+            break;
+
+        case FOXY_VAL_FLOAT:
+            f_utils_syswrite(1, "Float", 5);
+            break;
+
+        case FOXY_VAL_DOUBLE:
+        case FOXY_VAL_NUMBER:
+            f_utils_syswrite(1, "Double", 6);
+            break;
+
+        case FOXY_VAL_BOOL:
+            f_utils_syswrite(1, "Bool", 4);
+            break;
+
+        case FOXY_VAL_ARRAY:
+            if (constant.as.array && constant.as.array->element_type_id == FOXY_VAL_CHAR) {
+                // Si es un arreglo de caracteres, devolvemos el tipo "String" (o "Char[]")
+                f_utils_syswrite(1, "String", 6);
+            } else {
+                f_utils_syswrite(1, "Array", 5);
+            }
+            break;
+
+        default:
+            f_utils_syswrite(1, "Unknown", 7);
+            break;
+    }
+}
+
+void f_utils_print_constant_dynamic(FoxyConstant constant, int precision) {
+    char buffer[256];
     int len = 0;
 
     switch (constant.type) {
         case FOXY_VAL_NULL:
-            f_utils_syswrite(1, "papu", 4);
+            f_utils_syswrite(1, "null", 4);
             break;
 
         case FOXY_VAL_CHAR:
-            buffer[0] = constant.as.cval;
+            buffer[0] = (char)constant.as.ival;
             f_utils_syswrite(1, buffer, 1);
             break;
 
@@ -136,70 +178,93 @@ void f_utils_print_constant_dynamic(FoxyConstant constant) {
             if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
             break;
 
-        case FOXY_VAL_FLOAT:
-            len = snprintf(buffer, sizeof(buffer), "%f", (double)constant.as.fval);
+        case FOXY_VAL_FLOAT: {
+            double val = (double)constant.as.fval;
+            if (precision >= 0 && precision <= 99) {
+                len = snprintf(buffer, sizeof(buffer), "%.*f", precision, val);
+            } else {
+                len = snprintf(buffer, sizeof(buffer), "%f", val);
+            }
             if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
             break;
+        }
 
         case FOXY_VAL_DOUBLE:
-            len = snprintf(buffer, sizeof(buffer), "%lf", constant.as.dval);
+        case FOXY_VAL_NUMBER: {
+            double val = constant.as.dval;
+            if (precision >= 0 && precision <= 99) {
+                len = snprintf(buffer, sizeof(buffer), "%.*f", precision, val);
+            } else {
+                len = snprintf(buffer, sizeof(buffer), "%.6f", val);
+            }
             if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
             break;
-
-        case FOXY_VAL_LONG:
-            len = snprintf(buffer, sizeof(buffer), "%ld", constant.as.lval);
-            if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
-            break;
+        }
 
         case FOXY_VAL_BOOL:
-            if (constant.as.bval)
+            if (constant.as.boolean)
                 f_utils_syswrite(1, "true", 4);
             else
                 f_utils_syswrite(1, "false", 5);
             break;
 
         case FOXY_VAL_ARRAY:
-            if (constant.as.array && constant.as.array->data)
-                f_utils_syswrite(1, (const char*)constant.as.array->data, constant.as.array->length);
-            else
+            if (constant.as.array && constant.as.array->data) {
+                if (constant.as.array->element_type_id == FOXY_VAL_CHAR) {
+                    f_utils_syswrite(1, (const char*)constant.as.array->data, constant.as.array->length);
+                } else {
+                    f_utils_syswrite(1, "[array]", 7);
+                }
+            } else {
                 f_utils_syswrite(1, "[]", 2);
-            break;
-
-        case FOXY_VAL_OBJECT:
-        case FOXY_VAL_DICT:
-        case FOXY_VAL_STRUCT: {
-            if (constant.as.obj) {
-                const char *type_name = f_value_type_to_string(constant.type);
-                int l = snprintf(buffer, sizeof(buffer), "<%s %p>", type_name, (void*)constant.as.obj);
-                if (l > 0) f_utils_syswrite(1, buffer, (size_t)l);
-            } else {
-                f_utils_syswrite(1, "null", 4);
             }
             break;
-        }
-        
-        case FOXY_VAL_FUNCTION: {
-            void *fn_ptr = constant.as.func ? (void*)constant.as.func : (void*)constant.as.native_fn;
-            const char *type_name = f_value_type_to_string(constant.type);
-            int l = snprintf(buffer, sizeof(buffer), "<%s %p>", type_name, fn_ptr);
-            if (l > 0) f_utils_syswrite(1, buffer, (size_t)l);
-            break;
-        }
-
-        case FOXY_VAL_CLASS: {
-            if (constant.as.klass) {
-                const char *type_name = f_value_type_to_string(constant.type);
-                int l = snprintf(buffer, sizeof(buffer), "<%s %p>", type_name, (void*)constant.as.klass);
-                if (l > 0) f_utils_syswrite(1, buffer, (size_t)l);
-            } else {
-                f_utils_syswrite(1, "<class null>", 12);
-            }
-            break;
-        }
 
         default:
             f_utils_syswrite(1, "<unknown>", 9);
             break;
+    }
+}
+
+void f_utils_printf_format(const char *fmt, FoxyConstant *args, size_t arg_count) {
+    if (!fmt) return;
+
+    size_t arg_idx = 0;
+    const char *p = fmt;
+
+    while (*p != '\0') {
+        if (*p == '%' && *(p + 1) != '\0') {
+            p++; // Omitir '%'
+
+            // Caso '%%'
+            if (*p == '%') {
+                f_utils_syswrite(1, "%", 1);
+                p++;
+                continue;
+            }
+
+            int precision = -1; // -1 indica que se usa la precisión por defecto
+
+            // Extracción de precisión: %.0f hasta %.99f
+            if (*p == '.') {
+                p++;
+                precision = 0;
+                while (*p >= '0' && *p <= '9') {
+                    precision = precision * 10 + (*p - '0');
+                    p++;
+                }
+                if (precision > 99) precision = 99;
+            }
+
+            // Consumir el especificador de formato (ej. 'f', 'T', 'd', 's')
+            if (arg_idx < arg_count) {
+                f_utils_print_constant_dynamic(args[arg_idx++], precision);
+            }
+            p++;
+        } else {
+            f_utils_syswrite(1, p, 1);
+            p++;
+        }
     }
 }
 
@@ -247,15 +312,19 @@ int f_utils_int_to_ascii(long num, char *buf, unsigned long buffer_size) {
         return 1;
     }
 
+    // Usar unsigned long para prevenir desbordamiento en LONG_MIN (-num)
+    unsigned long u_num;
     if (num < 0) {
         is_negative = 1;
-        num = -num;
+        u_num = (unsigned long)(-(num + 1)) + 1; // Manejo seguro para LONG_MIN
+    } else {
+        u_num = (unsigned long)num;
     }
 
-    while (num > 0) {
+    while (u_num > 0) {
         if (i >= buffer_size - 1) return -1;
-        buf[i++] = (char)((num % 10) + '0');
-        num /= 10;
+        buf[i++] = (char)((u_num % 10) + '0');
+        u_num /= 10;
     }
 
     if (is_negative) {
@@ -265,6 +334,7 @@ int f_utils_int_to_ascii(long num, char *buf, unsigned long buffer_size) {
 
     buf[i] = '\0';
 
+    // Inversión in-place
     for (size_t j = 0; j < i / 2; j++) {
         char temp = buf[j];
         buf[j] = buf[i - 1 - j];
@@ -276,20 +346,86 @@ int f_utils_int_to_ascii(long num, char *buf, unsigned long buffer_size) {
 
 long f_utils_syswrite(int fd, const char *buf, unsigned long count) {
     #if defined(__linux__) && defined(__x86_64__)
-    register long rax __asm__("rax") = 1;
-    register long rdi __asm__("rdi") = fd;
-    register long rsi __asm__("rsi") = (long)buf;
-    register long rdx __asm__("rdx") = count;
+    long rax = 1; // SYS_write
+    long ret;
 
     __asm__ __volatile__ (
         "syscall"
-        : "+r" (rax)
-        : "r" (rdi), "r" (rsi), "r" (rdx)
-        : "memory", "cc", "r11", "rcx"
+        : "=a" (ret)
+        : "a" (rax),
+          "D" ((long)fd),     // rdi
+          "S" ((long)buf),    // rsi
+          "d" ((long)count)   // rdx
+        : "memory", "rcx", "r11"
     );
-    return rax;
+
+    return ret;
     #else
-    // Fallback estándar si se compila fuera de Linux x86_64
     return (long)fwrite(buf, 1, count, fd == 1 ? stdout : stderr);
     #endif
+}
+
+void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count) {
+    printf("=== [DEBUG] CONSTANT POOL (%zu elementos) ===\n", count);
+    for (size_t i = 0; i < count; i++) {
+        switch (constants[i].type) {
+            case FOXY_VAL_CHAR:
+                // Si el caracter es imprimible lo mostramos como char, de lo contrario mostramos su valor ASCII
+                if (constants[i].as.ival >= 32 && constants[i].as.ival <= 126) {
+                    printf("  [%02zu] CHAR: '%c' (%ld)\n", i, (char)constants[i].as.ival, constants[i].as.ival);
+                } else {
+                    printf("  [%02zu] CHAR: '\\x%02X' (%ld)\n", i, (unsigned char)constants[i].as.ival, constants[i].as.ival);
+                }
+                break;
+            case FOXY_VAL_ARRAY: {
+                FoxyArray *arr = constants[i].as.array;
+                if (arr) {
+                    if (arr->element_type_id == FOXY_VAL_CHAR && arr->data) {
+                        printf("  [%02zu] CHAR ARRAY (String): \"%s\"\n", i, (const char*)arr->data);
+                    } else {
+                        printf("  [%02zu] GENERIC ARRAY (Elem Type: %d, Length: %zu)\n", 
+                               i, arr->element_type_id, arr->length);
+                    }
+                } else {
+                    printf("  [%02zu] ARRAY: null\n", i);
+                }
+                break;
+            }
+            case FOXY_VAL_OBJECT: {
+                const char *obj_str = constants[i].as.object ? (const char *)constants[i].as.object : "null";
+                printf("  [%02zu] OBJECT/STRING: \"%s\"\n", i, obj_str);
+                break;
+            }
+            case FOXY_VAL_INT:
+                printf("  [%02zu] INT: %ld\n", i, constants[i].as.ival);
+                break;
+            case FOXY_VAL_FLOAT:
+                printf("  [%02zu] FLOAT: %f\n", i, constants[i].as.fval);
+                break;
+            case FOXY_VAL_NUMBER:
+            case FOXY_VAL_DOUBLE:
+                printf("  [%02zu] DOUBLE: %f\n", i, constants[i].as.dval);
+                break;
+            case FOXY_VAL_BOOL:
+                printf("  [%02zu] BOOL: %s\n", i, constants[i].as.boolean ? "true" : "false");
+                break;
+            case FOXY_VAL_NULL:
+                printf("  [%02zu] NULL\n", i);
+                break;
+            default:
+                printf("  [%02zu] UNKNOWN TYPE (%d)\n", i, constants[i].type);
+                break;
+        }
+    }
+}
+
+void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count) {
+    printf("\n=== [DEBUG] BYTECODE GENERADO (%zu instrucciones / %zu bytes) ===\n", 
+           count, count * sizeof(FoxInstruction));
+    for (size_t i = 0; i < count; i++) {
+        printf("%08X ", bytecode[i]);
+        if ((i + 1) % 8 == 0) printf("\n");
+    }
+    if (count % 8 != 0) printf("\n");
+    printf("============================================================\n\n");
 }

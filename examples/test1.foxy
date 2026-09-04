@@ -1,0 +1,19 @@
+include "sys/out"
+
+int num = 5
+printf("num: %T\n", num)
+
+@@ en foxy no existe el tipo de dato "string". @@
+char texto[] = "Hola foxy"
+printf("char texto[]: %T\n", texto)
+
+char letra = 'a'
+printf("char letra: %T\n", letra)
+
+printf("123: %T\n", 123)
+printf("\"Casa\": %T\n", "Casa")
+printf("5.5f: %T\n", 5.5f)
+
+@ printf("sys test: %T\n", sys)
+@ printf("out test: %T\n", out)
+@ printf("printf test: %T\n", printf)

@@ -9,7 +9,7 @@ const char * const FOXY_VALUE_TYPE_STRINGS[] = {
     #undef X
 };
 
-const char* f_value_type_to_string(FoxyValueType type) {
+const char* f_value_type_to_char_array(FoxyValueType type) {
     if ((unsigned int)type >= FOXY_VAL_COUNT) return "unknown";
     return FOXY_VALUE_TYPE_STRINGS[type];
 }
@@ -94,7 +94,7 @@ void f_value_free_contents(FoxyValue *val) {
             break;
 
         default:
-            // Tipos primitivos y escalares (int, float, bool, nil)
+            // Tipos primitivos y escalares (int, float, bool, null)
             break;
     }
 }

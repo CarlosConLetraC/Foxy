@@ -72,6 +72,41 @@
                 size_t capacity;
             } program_node;
 
+            // --- Nodo de Declaración de Variable (ej. int i = 0) ---
+            struct {
+                char *name;
+                FoxyASTNode *initializer;
+            } var_decl_node;
+
+            // --- Nodo de Asignación de Variable (ej. i = 5) ---
+            struct {
+                char *name;
+                FoxyASTNode *value;
+            } assign_node;
+
+            // --- Nodos de Control de Flujo ---
+            struct {
+                FoxyASTNode *condition;
+                FoxyASTNode *then_branch;
+                FoxyASTNode *else_branch;
+            } if_node;
+
+            struct {
+                FoxyASTNode *condition;
+                FoxyASTNode *body;
+            } while_node;
+
+            struct {
+                FoxyASTNode *init;
+                FoxyASTNode *condition;
+                FoxyASTNode *increment;
+                FoxyASTNode *body;
+            } for_node;
+
+            struct {
+                FoxyASTNode *value;
+            } return_node;
+
             // --- Nodos de Concurrencia y SharedEnv ---
             struct {
                 FoxyASTNode *name_expr;
@@ -87,19 +122,6 @@
                 FoxyASTNode *name_expr;
                 FoxyASTNode *env_expr;
             } popen_node;
-
-            struct {
-                FoxyASTNode *init;
-                FoxyASTNode *condition;
-                FoxyASTNode *increment;
-                FoxyASTNode *body;
-            } for_node;
-
-            // --- Nodo de Declaración de Variable (ej. int i = 0) ---
-            struct {
-                char *name;
-                FoxyASTNode *initializer;
-            } var_decl_node;
 
             struct {
                 FoxyASTNode *expression;
@@ -118,10 +140,16 @@
     FoxyASTNode* f_ast_create_call(const char *callee);
     void f_ast_call_add_arg(FoxyASTNode *call_node, FoxyASTNode *arg);
     FoxyASTNode* f_ast_create_literal(FoxyValue val);
-    FoxyASTNode* f_ast_create_for(FoxyASTNode *init, FoxyASTNode *condition, FoxyASTNode *increment, FoxyASTNode *body);
+    FoxyASTNode* f_ast_create_identifier(const char *name);
+    FoxyASTNode* f_ast_create_binary_op(int op_token, FoxyASTNode *left, FoxyASTNode *right);
     FoxyASTNode* f_ast_create_var_decl(const char *name, FoxyASTNode *initializer);
+    FoxyASTNode* f_ast_create_assign(FoxyASTNode *left, FoxyASTNode *right);
+    FoxyASTNode* f_ast_create_if(FoxyASTNode *condition, FoxyASTNode *then_branch, FoxyASTNode *else_branch);
+    FoxyASTNode* f_ast_create_while(FoxyASTNode *condition, FoxyASTNode *body);
+    FoxyASTNode* f_ast_create_for(FoxyASTNode *init, FoxyASTNode *condition, FoxyASTNode *increment, FoxyASTNode *body);
+    FoxyASTNode* f_ast_create_return(FoxyASTNode *value);
     FoxyASTNode* f_ast_create_expr_stmt(FoxyASTNode *expr);
-    
+
     // Constructores para Concurrencia / SharedEnv
     FoxyASTNode* f_ast_create_env(void);
     FoxyASTNode* f_ast_create_env_create(FoxyASTNode *name_expr);
@@ -130,5 +158,4 @@
 
     // Función auxiliar generada por X-macro para depuración
     const char* f_ast_node_type_to_string(FoxyASTNodeType type);
-
 #endif // F_AST_H

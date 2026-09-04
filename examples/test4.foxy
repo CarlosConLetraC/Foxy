@@ -1,0 +1,48 @@
+include "sys/out"
+
+@@ --- Test 1: Caracteres de Escape y Literales CHAR --- @@
+char c_char = 'A'
+
+printf("=== TEST 1: CHAR & ESCAPES ===\n")
+printf("Caracter A: %c (ASCII: %d)\n", c_char, c_char)
+printf("Formateo con comodin %%T: %T\n", c_char)
+
+
+@@ --- Test 2: Precisiones en Flotantes (%.0f <-> %.99f) --- @@
+float f_num = 5.5f
+double d_num = 3.141592653589793
+
+printf("\n=== TEST 2: FLOAT PRECISION ===\n")
+printf("Sin precision especificada: %f\n", f_num)
+printf("Precision .0f: %.0f\n", f_num)
+printf("Precision .2f: %.2f\n", f_num)
+printf("Precision .5f: %.5f\n", f_num)
+printf("Double .10f: %.10f\n", d_num)
+
+@@ --- Test 3: Formatos Numéricos (Signed, Unsigned, Hexadecimal) --- @@
+int entero_pos = 12345
+int entero_neg = -9876
+
+printf("\n=== TEST 3: SPECIFIERS NUMERICOS ===\n")
+printf("Decimal %%d: %d | %%i: %i\n", entero_pos, entero_neg)
+printf("Unsigned %%u: %u\n", entero_pos)
+printf("Hexadecimal minuscula %%x: %x\n", entero_pos)
+printf("Hexadecimal mayuscula %%X: %X\n", entero_pos)
+
+
+@@ --- Test 4: Cadenas (CHAR ARRAY) y Booleanos --- @@
+char texto[] = "Hola Foxy Engine"
+bool activo = true
+bool inactivo = false
+
+printf("\n=== TEST 4: STRINGS & BOOLEANS ===\n")
+printf("String %%s: %s\n", texto)
+printf("Bool %%b: %b | %b\n", activo, inactivo)
+
+
+@@ --- Test 5: Comodín Genérico %T y Escapes de Formato --- @@
+printf("\n=== TEST 5: GENERIC %T & ESCAPES ===\n")
+printf("Deteccion de Int: %T\n", entero_pos)
+printf("Deteccion de Float: %T\n", f_num)
+printf("Deteccion de Array: %T\n", texto)
+printf("Literal porcentaje: 100%%\n")

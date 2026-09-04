@@ -214,7 +214,54 @@ static FoxyASTNode* parse_include(FoxyParser *parser) {
     return f_ast_create_include(path);
 }
 
+static const char escape_lookup_table[256] = {
+    ['a']  = '\a', // 0x07 (Alert / Bell)
+    ['b']  = '\b', // 0x08 (Backspace)
+    ['f']  = '\f', // 0x0C (Form Feed)
+    ['n']  = '\n', // 0x0A (Line Feed)
+    ['r']  = '\r', // 0x0D (Carriage Return)
+    ['t']  = '\t', // 0x09 (Horizontal Tab)
+    ['v']  = '\v', // 0x0B (Vertical Tab)
+    ['\\'] = '\\', // 0x5C (Backslash)
+    ['\''] = '\'', // 0x27 (Single Quote)
+    ['\"'] = '\"', // 0x22 (Double Quote)
+    ['0']  = '\0'  // 0x00 (Null Terminated)
+};
+
+static FoxyASTNode* parse_char_literal(FoxyParser *parser) {
+    FoxyValue val;
+    val.type = FOXY_VAL_CHAR;
+    
+    const char *start = parser->current_token.start;
+    size_t len = parser->current_token.length;
+
+    if (len >= 3 && start[0] == '\'') {
+        if (start[1] == '\\' && len >= 4) {
+            unsigned char c = (unsigned char)start[2];
+
+            // Si es un dígito octal ('0' a '7'), procesamos el número octal
+            if (c >= '0' && c <= '7') {
+                char *endptr;
+                // Parsea la Secuencia Octal empezando en start + 2
+                val.as.ival = (int64_t)(char)strtol(start + 2, &endptr, 8);
+            } else {
+                // Para letras de escape estándar usa la tabla O(1)
+                char translated = escape_lookup_table[c];
+                val.as.ival = (int64_t)(char)(translated != 0 ? translated : c);
+            }
+        } else {
+            val.as.ival = (int64_t)(char)start[1];
+        }
+    } else {
+        val.as.ival = 0;
+    }
+
+    f_parser_advance(parser);
+    return f_ast_create_literal(val);
+}
+
 static FoxyASTNode* parse_primary(FoxyParser *parser) {
+    // 1. Literales de Enteros y Números Genéricos
     if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_INT || 
         parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_NUMBER) {
         
@@ -222,7 +269,7 @@ static FoxyASTNode* parse_primary(FoxyParser *parser) {
         val.type = FOXY_VAL_INT;
         
         char *num_str = token_to_string(&parser->current_token);
-        val.as.ival = (int)strtol(num_str, NULL, 10);
+        val.as.ival = (int64_t)strtoll(num_str, NULL, 10);
         free(num_str);
         
         FoxyASTNode *lit_node = f_ast_create_literal(val);
@@ -230,6 +277,34 @@ static FoxyASTNode* parse_primary(FoxyParser *parser) {
         return lit_node;
     }
 
+    // 2. Literales de Carácter (Nuevo manejo para comillas simples)
+    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_CHAR) {
+        return parse_char_literal(parser);
+    }
+
+    // 3. Literales de Punto Flotante (float / double)
+    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_FLOAT || 
+        parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_DOUBLE) {
+        
+        FoxyValue val = {0};
+        char *num_str = token_to_string(&parser->current_token);
+
+        if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_FLOAT) {
+            val.type = FOXY_VAL_FLOAT;
+            val.as.fval = strtof(num_str, NULL);
+        } else {
+            val.type = FOXY_VAL_DOUBLE;
+            val.as.dval = strtod(num_str, NULL);
+        }
+
+        free(num_str);
+        
+        FoxyASTNode *lit_node = f_ast_create_literal(val);
+        f_parser_advance(parser);
+        return lit_node;
+    }
+
+    // 4. Literales de Cadenas de Caracteres / Arreglos
     if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_CHAR_ARRAY) {
         char *raw_str = token_to_string(&parser->current_token);
         size_t len = strlen(raw_str);
@@ -266,29 +341,13 @@ static FoxyASTNode* parse_primary(FoxyParser *parser) {
         return lit_node;
     }
 
+    // 5. Identificadores, Comandos del Entorno y Llamadas a Funciones
     if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_NAME) {
         char *name = token_to_string(&parser->current_token);
-        
-        // Enrutamiento dinámico para comandos de concurrencia y entornos
-        if (strcmp(name, "env") == 0) {
-            free(name);
-            return f_parser_parse_env(parser);
-        }
-        if (strcmp(name, "env_create") == 0) {
-            free(name);
-            return f_parser_parse_env_create(parser);
-        }
-        if (strcmp(name, "env_bind") == 0) {
-            free(name);
-            return f_parser_parse_env_bind(parser);
-        }
-        if (strcmp(name, "popen") == 0) {
-            free(name);
-            return f_parser_parse_popen(parser);
-        }
 
         f_parser_advance(parser);
 
+        // Llamada a función: nombre(...)
         if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_LPAREN) {
             FoxyASTNode *call_node = f_ast_create_call(name);
             f_parser_advance(parser); // consumir '('
@@ -318,11 +377,13 @@ static FoxyASTNode* parse_primary(FoxyParser *parser) {
             return call_node;
         }
 
+        // Variable o identificador simple
         FoxyASTNode *id_node = f_ast_node_new(FOXY_AST_NODE_IDENTIFIER);
         id_node->as.identifier_node.name = name;
         return id_node;
     }
 
+    // Fallback: Si se recibe un token desconocido o inesperado
     FoxyValue null_val = {0};
     null_val.type = FOXY_VAL_NULL;
     FoxyASTNode *fallback = f_ast_create_literal(null_val);
@@ -520,56 +581,56 @@ static FoxyASTNode* parse_expression_statement(FoxyParser *parser) {
 }
 
 static FoxyASTNode* parse_var_decl(FoxyParser *parser) {
-    // 1. Validar y consumir el tipo de dato (ej. 'int')
+    // 1. Consumir Tipo
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_TYPE) {
-        fprintf(stderr, "[Foxy Parser Error] Se esperaba un tipo de dato en la declaración\n");
-        parser->had_error = true;
         return NULL;
     }
-    f_parser_advance(parser); // Consumir el tipo (ej. 'int')
+    f_parser_advance(parser);
 
-    // 2. Validar que el siguiente token sea un identificador
+    // 2. Consumir Identificador
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_IDENTIFIER) {
-        fprintf(stderr, "[Foxy Parser Error] Se esperaba un identificador tras el tipo\n");
-        parser->had_error = true;
         return NULL;
     }
-
     const char *var_name = strndup(parser->current_token.start, parser->current_token.length);
-    f_parser_advance(parser); // Consumir el identificador (ej. 'i')
+    f_parser_advance(parser);
 
-    // 3. Verificar si hay una expresión inicializadora (ej. '= 0')
+    // 3. Manejo de corchetes '[]'
+    if (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
+        parser->current_token.subtype == FOXY_TOKEN_OPERATOR_LBRACKET) {
+        f_parser_advance(parser);
+        if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
+              parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RBRACKET)) {
+            parse_expression(parser);
+        }
+        f_parser_advance(parser); // Consumir ']'
+    }
+
+    // 4. Inicializador: Comparación directa por lexema para no depender del enum exacto
     FoxyASTNode *initializer = NULL;
-    if (parser->current_token.subtype == '=') { 
+    if (parser->current_token.length == 1 && parser->current_token.start[0] == '=') {
         f_parser_advance(parser); // Consumir '='
         initializer = parse_expression(parser);
-        if (!initializer) {
-            fprintf(stderr, "[Foxy Parser Error] Expresión de inicialización inválida para la variable '%s'\n", var_name);
-            free((void*)var_name);
-            return NULL;
-        }
     }
 
-    // Nota: NO consumimos el ';' aquí para que el 'for' pueda controlarlo con su propio delimitador.
     return f_ast_create_var_decl(var_name, initializer);
 }
 
 static FoxyASTNode* parse_statement(FoxyParser *parser) {
     // 1. Verificar si es un 'include'
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_KEYWORD && 
-        parser->current_token.subtype == FOXY_TOKEN_INCLUDE) { // O tu condición para 'include'
+        parser->current_token.subtype == FOXY_TOKEN_LIST_INCLUDE) {
         return parse_include(parser);
     }
 
     // 2. Verificar si es un bucle 'for'
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_KEYWORD && 
-        parser->current_token.subtype == FOXY_TOKEN_FOR) { // O tu condición para 'for'
+        parser->current_token.subtype == FOXY_TOKEN_LIST_FOR) { 
         return parse_for(parser);
     }
 
     // 3. Declaraciones con tipo (int i = 0), expresiones, etc.
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_TYPE) {
-        return parse_var_decl(parser); // O la función que maneja int i = 0
+        return parse_var_decl(parser);
     }
 
     return parse_expression_statement(parser);

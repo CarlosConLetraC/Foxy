@@ -1,0 +1,66 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Foxy",
+  "patterns": [
+    {
+      "name": "comment.block.at.foxy",
+      "begin": "@@",
+      "end": "@@"
+    },
+    {
+      "name": "comment.line.at.foxy",
+      "match": "@.*$"
+    },
+    {
+      "name": "keyword.other.include.foxy",
+      "match": "\\b(include)\\b"
+    },
+    {
+      "name": "storage.type.foxy",
+      "match": "\\b(int|float|double|char|bool|long|void)\\b"
+    },
+    {
+      "name": "constant.language.foxy",
+      "match": "\\b(true|false|null)\\b"
+    },
+    {
+      "name": "string.quoted.double.foxy",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.other.placeholder.foxy",
+          "match": "%(\\.[0-9]+)?[a-zA-Z%]"
+        },
+        {
+          "name": "constant.character.escape.foxy",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.foxy",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.foxy",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "constant.numeric.float.foxy",
+      "match": "\\b[0-9]+\\.[0-9]+f?\\b"
+    },
+    {
+      "name": "constant.numeric.integer.foxy",
+      "match": "\\b[0-9]+\\b"
+    },
+    {
+      "name": "support.function.foxy",
+      "match": "\\b(printf|print|println)\\b"
+    }
+  ],
+  "scopeName": "source.foxy"
+}

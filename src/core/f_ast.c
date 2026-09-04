@@ -14,133 +14,119 @@ FoxyASTNode* f_ast_node_new(FoxyASTNodeType type) {
     return node;
 }
 
-/**
- * Crea un nodo AST para inicializar la semilla de un entorno (FOXCODE_ENV).
- */
-FoxyASTNode* f_ast_create_env(void) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ENV);
-    if (!node) return NULL;
-    return node;
-}
-
-/**
- * Crea un nodo AST para instanciar e insertar un SharedEnv/Protocolo en el runtime.
- * 
- * @param name_expr Expresión que evalúa al nombre del protocolo (cadena).
- */
-FoxyASTNode* f_ast_create_env_create(FoxyASTNode *name_expr) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ENV_CREATE);
-    if (!node) return NULL;
-
-    node->as.env_create_node.name_expr = name_expr;
-    return node;
-}
-
-/**
- * Crea un nodo AST para vincular un SharedEnv a un proceso en ejecución.
- * 
- * @param proc_expr Expresión del objeto Proceso objetivo.
- * @param env_expr Expresión del objeto SharedEnv/Protocolo.
- */
-FoxyASTNode* f_ast_create_env_bind(FoxyASTNode *proc_expr, FoxyASTNode *env_expr) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ENV_BIND);
-    if (!node) return NULL;
-
-    node->as.env_bind_node.process_expr = proc_expr;
-    node->as.env_bind_node.env_expr     = env_expr;
-    return node;
-}
-
-/**
- * Crea un nodo AST para la instanciación y arranque de un subproceso asíncrono (popen).
- * 
- * @param callback_expr Expresión ejecutable o función callback que correrá en el hilo.
- * @param name_expr Expresión opcional con el nombre identificador del subproceso (puede ser NULL).
- * @param env_expr Expresión opcional del SharedEnv/Protocolo asociado (puede ser NULL).
- */
-FoxyASTNode* f_ast_create_popen(FoxyASTNode *callback_expr, FoxyASTNode *name_expr, FoxyASTNode *env_expr) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_POPEN);
-    if (!node) return NULL;
-
-    node->as.popen_node.callback_expr = callback_expr;
-    node->as.popen_node.name_expr     = name_expr;
-    node->as.popen_node.env_expr      = env_expr;
-    return node;
-}
-
 void f_ast_node_free(FoxyASTNode *node) {
     if (!node) return;
 
-    switch (node->type) {
-        case FOXY_AST_NODE_PROGRAM: {
-            if (node->as.program_node.statements) {
-                for (size_t i = 0; i < node->as.program_node.count; i++)
-                    f_ast_node_free(node->as.program_node.statements[i]);
-                free(node->as.program_node.statements);
-            }
-            break;
-        }
+    #define BUILD_DISPATCH_TABLE(node_type, name_str) [node_type] = &&lbl_##node_type,
+    static void *dispatch_table[] = {
+        FOXY_AST_NODE_LIST(BUILD_DISPATCH_TABLE)
+    };
+    #undef BUILD_DISPATCH_TABLE
 
-        case FOXY_AST_NODE_INCLUDE:
-            if (node->as.include_node.path)
-                free(node->as.include_node.path);
-            break;
-
-        case FOXY_AST_NODE_CALL:
-            if (node->as.call_node.callee_name)
-                free(node->as.call_node.callee_name);
-            if (node->as.call_node.arguments) {
-                for (size_t i = 0; i < node->as.call_node.arg_count; i++)
-                    f_ast_node_free(node->as.call_node.arguments[i]);
-                free(node->as.call_node.arguments);
-            }
-            break;
-
-        case FOXY_AST_NODE_IDENTIFIER:
-            if (node->as.identifier_node.name)
-                free(node->as.identifier_node.name);
-            break;
-
-        case FOXY_AST_NODE_BINARY_OP:
-        case FOXY_AST_NODE_ASSIGN:
-            f_ast_node_free(node->as.binary_node.left);
-            f_ast_node_free(node->as.binary_node.right);
-            break;
-
-        case FOXY_AST_NODE_LITERAL:
-            // Si FoxyValue contiene memoria dinámica (como strings) se libera aquí
-            break;
-
-        // =========================================================================
-        // Integración de nodos de Concurrencia y SharedEnv
-        // =========================================================================
-        case FOXY_AST_NODE_ENV:
-            // No contiene nodos hijos para liberar
-            break;
-
-        case FOXY_AST_NODE_ENV_CREATE:
-            f_ast_node_free(node->as.env_create_node.name_expr);
-            break;
-
-        case FOXY_AST_NODE_ENV_BIND:
-            f_ast_node_free(node->as.env_bind_node.process_expr);
-            f_ast_node_free(node->as.env_bind_node.env_expr);
-            break;
-
-        case FOXY_AST_NODE_POPEN:
-            f_ast_node_free(node->as.popen_node.callback_expr);
-            if (node->as.popen_node.name_expr)
-                f_ast_node_free(node->as.popen_node.name_expr);
-            if (node->as.popen_node.env_expr)
-                f_ast_node_free(node->as.popen_node.env_expr);
-            break;
-
-        default:
-            break;
+    if (node->type >= AST_NODE_COUNT) {
+        goto lbl_cleanup;
     }
 
-    // Finalmente se libera el contenedor del nodo
-    free(node);
+    goto *dispatch_table[node->type];
+
+    lbl_FOXY_AST_NODE_PROGRAM: {
+        if (node->as.program_node.statements) {
+            for (size_t i = 0; i < node->as.program_node.count; i++)
+                f_ast_node_free(node->as.program_node.statements[i]);
+            free(node->as.program_node.statements);
+        }
+        goto lbl_cleanup;
+    }
+
+    lbl_FOXY_AST_NODE_INCLUDE:
+        if (node->as.include_node.path)
+            free(node->as.include_node.path);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_EXPR_STMT:
+        f_ast_node_free(node->as.expr_stmt_node.expression);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_CALL:
+        if (node->as.call_node.callee_name)
+            free(node->as.call_node.callee_name);
+        if (node->as.call_node.arguments) {
+            for (size_t i = 0; i < node->as.call_node.arg_count; i++)
+                f_ast_node_free(node->as.call_node.arguments[i]);
+            free(node->as.call_node.arguments);
+        }
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_LITERAL:
+        // Si FoxyValue requiere liberación dinámica, se procesa aquí
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_IDENTIFIER:
+        if (node->as.identifier_node.name)
+            free(node->as.identifier_node.name);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_BINARY_OP:
+        f_ast_node_free(node->as.binary_node.left);
+        f_ast_node_free(node->as.binary_node.right);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_VAR_DECL:
+        if (node->as.var_decl_node.name)
+            free(node->as.var_decl_node.name);
+        f_ast_node_free(node->as.var_decl_node.initializer);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_ASSIGN:
+        if (node->as.assign_node.name)
+            free(node->as.assign_node.name);
+        f_ast_node_free(node->as.assign_node.value);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_IF:
+        f_ast_node_free(node->as.if_node.condition);
+        f_ast_node_free(node->as.if_node.then_branch);
+        f_ast_node_free(node->as.if_node.else_branch);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_WHILE:
+        f_ast_node_free(node->as.while_node.condition);
+        f_ast_node_free(node->as.while_node.body);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_RETURN:
+        f_ast_node_free(node->as.return_node.value);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_FOR:
+        f_ast_node_free(node->as.for_node.init);
+        f_ast_node_free(node->as.for_node.condition);
+        f_ast_node_free(node->as.for_node.increment);
+        f_ast_node_free(node->as.for_node.body);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_ENV:
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_ENV_CREATE:
+        f_ast_node_free(node->as.env_create_node.name_expr);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_ENV_BIND:
+        f_ast_node_free(node->as.env_bind_node.process_expr);
+        f_ast_node_free(node->as.env_bind_node.env_expr);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_POPEN:
+        f_ast_node_free(node->as.popen_node.callback_expr);
+        if (node->as.popen_node.name_expr)
+            f_ast_node_free(node->as.popen_node.name_expr);
+        if (node->as.popen_node.env_expr)
+            f_ast_node_free(node->as.popen_node.env_expr);
+        goto lbl_cleanup;
+
+    lbl_cleanup:
+        free(node);
 }
 
 FoxyASTNode* f_ast_create_program(void) {
@@ -177,6 +163,25 @@ FoxyASTNode* f_ast_create_call(const char *callee) {
     return node;
 }
 
+void f_ast_call_add_arg(FoxyASTNode *call_node, FoxyASTNode *arg) {
+    if (!call_node || !arg || call_node->type != FOXY_AST_NODE_CALL) return;
+
+    if (call_node->as.call_node.arg_count >= call_node->as.call_node.arg_capacity) {
+        call_node->as.call_node.arg_capacity *= 2;
+        call_node->as.call_node.arguments = realloc(
+            call_node->as.call_node.arguments, 
+            sizeof(FoxyASTNode*) * call_node->as.call_node.arg_capacity
+        );
+    }
+    call_node->as.call_node.arguments[call_node->as.call_node.arg_count++] = arg;
+}
+
+FoxyASTNode* f_ast_create_literal(FoxyValue val) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_LITERAL);
+    node->as.literal_node.value = val;
+    return node;
+}
+
 FoxyASTNode* f_ast_create_identifier(const char *name) {
     FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_IDENTIFIER);
     if (!node) return NULL;
@@ -193,26 +198,62 @@ FoxyASTNode* f_ast_create_binary_op(int op_token, FoxyASTNode *left, FoxyASTNode
     return node;
 }
 
-FoxyASTNode* f_ast_create_assign(FoxyASTNode *left, FoxyASTNode *right) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ASSIGN);
+FoxyASTNode* f_ast_create_var_decl(const char *name, FoxyASTNode *initializer) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_VAR_DECL);
     if (!node) return NULL;
-    node->as.binary_node.left = left;
-    node->as.binary_node.right = right;
-    node->as.binary_node.op_token = '=';
+    node->as.var_decl_node.name = strdup(name);
+    node->as.var_decl_node.initializer = initializer;
     return node;
 }
 
-void f_ast_call_add_arg(FoxyASTNode *call_node, FoxyASTNode *arg) {
-    if (!call_node || !arg || call_node->type != FOXY_AST_NODE_CALL) return;
-
-    if (call_node->as.call_node.arg_count >= call_node->as.call_node.arg_capacity) {
-        call_node->as.call_node.arg_capacity *= 2;
-        call_node->as.call_node.arguments = realloc(
-            call_node->as.call_node.arguments, 
-            sizeof(FoxyASTNode*) * call_node->as.call_node.arg_capacity
-        );
+FoxyASTNode* f_ast_create_assign(FoxyASTNode *left, FoxyASTNode *right) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ASSIGN);
+    if (!node) return NULL;
+    
+    // Si 'left' es un nodo identificador, extraemos su nombre para assign_node,
+    // o puedes adaptar assign_node en el AST si prefieres guardar un puntero al nodo directamente.
+    if (left && left->type == FOXY_AST_NODE_IDENTIFIER) {
+        node->as.assign_node.name = strdup(left->as.identifier_node.name);
+        // Opcional: limpiar el nodo left si ya no se usa de forma independiente
+        f_ast_node_free(left);
     }
-    call_node->as.call_node.arguments[call_node->as.call_node.arg_count++] = arg;
+    
+    node->as.assign_node.value = right;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_if(FoxyASTNode *condition, FoxyASTNode *then_branch, FoxyASTNode *else_branch) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_IF);
+    if (!node) return NULL;
+    node->as.if_node.condition = condition;
+    node->as.if_node.then_branch = then_branch;
+    node->as.if_node.else_branch = else_branch;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_while(FoxyASTNode *condition, FoxyASTNode *body) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_WHILE);
+    if (!node) return NULL;
+    node->as.while_node.condition = condition;
+    node->as.while_node.body = body;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_for(FoxyASTNode *init, FoxyASTNode *condition, FoxyASTNode *increment, FoxyASTNode *body) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_FOR);
+    if (!node) return NULL;
+    node->as.for_node.init = init;
+    node->as.for_node.condition = condition;
+    node->as.for_node.increment = increment;
+    node->as.for_node.body = body;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_return(FoxyASTNode *value) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_RETURN);
+    if (!node) return NULL;
+    node->as.return_node.value = value;
+    return node;
 }
 
 FoxyASTNode* f_ast_create_expr_stmt(FoxyASTNode *expr) {
@@ -222,21 +263,33 @@ FoxyASTNode* f_ast_create_expr_stmt(FoxyASTNode *expr) {
     return node;
 }
 
-FoxyASTNode* f_ast_create_literal(FoxyValue val) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_LITERAL);
-    node->as.literal_node.value = val;
+FoxyASTNode* f_ast_create_env(void) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ENV);
+    if (!node) return NULL;
     return node;
 }
 
-FoxyASTNode* f_ast_create_for(FoxyASTNode *init, FoxyASTNode *condition, FoxyASTNode *increment, FoxyASTNode *body) {
-    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_FOR);
+FoxyASTNode* f_ast_create_env_create(FoxyASTNode *name_expr) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ENV_CREATE);
     if (!node) return NULL;
-    
-    node->as.for_node.init = init;
-    node->as.for_node.condition = condition;
-    node->as.for_node.increment = increment;
-    node->as.for_node.body = body;
-    
+    node->as.env_create_node.name_expr = name_expr;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_env_bind(FoxyASTNode *proc_expr, FoxyASTNode *env_expr) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ENV_BIND);
+    if (!node) return NULL;
+    node->as.env_bind_node.process_expr = proc_expr;
+    node->as.env_bind_node.env_expr     = env_expr;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_popen(FoxyASTNode *callback_expr, FoxyASTNode *name_expr, FoxyASTNode *env_expr) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_POPEN);
+    if (!node) return NULL;
+    node->as.popen_node.callback_expr = callback_expr;
+    node->as.popen_node.name_expr     = name_expr;
+    node->as.popen_node.env_expr      = env_expr;
     return node;
 }
 

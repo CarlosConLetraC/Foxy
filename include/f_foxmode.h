@@ -56,13 +56,12 @@
     /* Macros de Empaquetado para el Codegen adaptadas a Foxy-lang */
     #define CREATE_ABC(fox, a, b, c) \
         ((((uint32_t)(fox)) & MASK_FOX) << POS_FOX) | \
-        ((((uint32_t)(a))  & MASK_A)  << POS_A)  | \
-        ((((uint32_t)(b))  & MASK_B)  << POS_B)  | \
-        ((((uint32_t)(c))  & MASK_C)  << POS_C)
+        ((((uint32_t)(a))  & MASK_A)    << POS_A)   | \
+        ((((uint32_t)(b))  & MASK_B)    << POS_B)   | \
+        ((((uint32_t)(c))  & MASK_C)    << POS_C)
 
     #define CREATE_ABx(fox, a, bx) \
         ((((uint32_t)(fox)) & MASK_FOX) << POS_FOX) | \
-        ((((uint32_t)(a))  & MASK_A)  << POS_A)  | \
-        ((((uint32_t)(bx)) & MASK_BX) << POS_BX)
-
+        ((((uint32_t)(a))   & MASK_A)   << POS_A)   | \
+        ((((uint32_t)(bx))  & MASK_BX)  << POS_BX)
 #endif // F_FOXMODE_H
