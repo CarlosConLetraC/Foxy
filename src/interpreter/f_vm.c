@@ -18,6 +18,7 @@
 #include "f_symtable.h"
 #include "f_runtime.h"
 #include "f_status.h"
+#include "f_methods.h"
 #include "f_lib.h"
 
 extern void foxy_init_module(FoxyVM *vm);
@@ -243,8 +244,8 @@ static const char * const FOXCODE_SYMBOLS[FOXCODE_COUNT] = {
 };
 
 static inline const char *f_vm_foxcode_to_symbol(FOXY_FOXCODE fcode) {
-    if (fcode < 0 || fcode >= FOXCODE_COUNT) return "UNKNOWN";
-    const char *sym = FOXY_OPCODE_SYMBOLS[fcode];
+    if (fcode >= FOXCODE_COUNT) return "UNKNOWN";
+    const char *sym = FOXCODE_SYMBOLS[fcode];
     return sym ? sym : "?";
 }
 
@@ -305,7 +306,7 @@ static bool f_vm_eval_binary_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValue b, Fo
 static bool f_vm_eval_unary_bitwise_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValue *out_res) {
     if (!f_value_is_pure_integer(&a)) {
         fprintf(stderr, "[Foxy VM Error] Operando no entero para el operador unario '%s': %s\n",
-                f_opcode_to_symbol(fcode), 
+                f_vm_foxcode_to_symbol(fcode), 
                 f_value_type_to_char_array(a.type));
         return false;
     }
@@ -326,7 +327,7 @@ static bool f_vm_eval_unary_bitwise_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValu
 static bool f_vm_eval_bitwise_op(FOXY_FOXCODE fcode, FoxyValue a, FoxyValue b, FoxyValue *out_res) {
     if (!f_value_is_pure_integer(&a) || !f_value_is_pure_integer(&b)) {
         fprintf(stderr, "[Foxy VM Error] Operandos no enteros para el operador bitwise '%s': %s y %s\n",
-                f_opcode_to_symbol(fcode),
+                f_vm_foxcode_to_symbol(fcode),
                 f_value_type_to_char_array(a.type),
                 f_value_type_to_char_array(b.type));
         return false;
@@ -368,7 +369,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     FoxyProcess *proc = vm->processes[vm->current_process_index];
     proc->state = FOXY_PROCESS_RUNNING;
 
-    #define BUILD_DISPATCH_TABLE(code, name) [code] = &&lbl_##code,
+    #define BUILD_DISPATCH_TABLE(code, name, str) [code] = &&lbl_##code,
     static void* dispatch_table[] = {
         FOXY_FOXCODE_LIST(BUILD_DISPATCH_TABLE)
     };
@@ -443,18 +444,20 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     }
 
     lbl_FOXCODE_LOAD_TRUE: {
-        FoxyValue val = {0}; // Limpia todos los 8 bytes de la unión a 0
-        val.type = FOXY_VAL_BOOL;
-        val.as.boolean = true;
-        f_vm_push(proc, val);
+        // FoxyValue true_val = { .type = FOXY_VAL_BOOL, .as.boolean = true };
+        FoxyValue true_val = {0};
+        true_val.type = FOXY_VAL_BOOL;
+        true_val.as.boolean = true;
+        f_vm_push(proc, true_val);
         DISPATCH();
     }
 
     lbl_FOXCODE_LOAD_FALSE: {
-        FoxyValue val = {0}; // Limpia todos los 8 bytes de la unión a 0
-        val.type = FOXY_VAL_BOOL;
-        val.as.boolean = false;
-        f_vm_push(proc, val);
+        // FoxyValue false_val = { .type = FOXY_VAL_BOOL, .as.boolean = false };
+        FoxyValue false_val = {0};
+        false_val.type = FOXY_VAL_BOOL;
+        false_val.as.boolean = false;
+        f_vm_push(proc, false_val);
         DISPATCH();
     }
 
@@ -485,7 +488,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
             
             FoxyValue *new_locals = (FoxyValue *)realloc(proc->locals, sizeof(FoxyValue) * new_cap);
             if (!new_locals) {
-                fprintf(stderr, "[Foxy VM Error] Out of memory allocating local variables for process %d\n", proc->id);
+                fprintf(stderr, "[Foxy VM Error] Out of memory allocating local variables for process %d\n", proc->pid);
                 proc->running = 0;
                 proc->state = FOXY_PROCESS_DEAD;
                 goto lbl_FOXCODE_HALT;
@@ -629,7 +632,8 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         }
         DISPATCH();
     }
-
+    
+    lbl_FOXCODE_GET_MEMBER_PTR:
     lbl_FOXCODE_GET_MEMBER: {
         int member_idx = GETARG_Bx(inst);
         const char *member_name = NULL;
@@ -655,6 +659,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         FoxyValue target = f_vm_pop(proc);
         FoxyValue result = {0};
         result.type = FOXY_VAL_NULL;
+        bool found = false;
 
         if (target.type == FOXY_VAL_DICT && target.as.dict) {
             if (!f_dict_get(target.as.dict, member_name, &result)) {
@@ -665,11 +670,16 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
             }
         } else if (target.type == FOXY_VAL_OBJECT && target.as.obj) {
             // 1. Intentar obtener campo/propiedad de la instancia
-            bool found = f_object_get_field(target.as.obj, member_name, &result);
+            found = f_object_get_field(target.as.obj, member_name, &result);
             
-            // 2. Fallback: Buscar método en la clase o prototipo asociado
+            // 2. Fallback: Buscar método en la clase asociada
             if (!found && target.as.obj->klass) {
-                found = f_class_get_method(target.as.obj->klass, member_name, &result);
+                FoxyMethod *method = f_class_find_method(target.as.obj->klass, member_name);
+                if (method != NULL) {
+                    result.type = FOXY_VAL_FUNCTION;
+                    result.as.ptr = method;
+                    found = true;
+                }
             }
 
             if (!found) {
@@ -690,6 +700,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         DISPATCH();
     }
 
+    lbl_FOXCODE_SET_MEMBER_PTR:
     lbl_FOXCODE_SET_MEMBER: {
         int member_idx = GETARG_Bx(inst);
         const char *member_name = NULL;
@@ -716,19 +727,9 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
         FoxyValue target = f_vm_pop(proc);
 
         if (target.type == FOXY_VAL_DICT && target.as.dict) {
-            if (!f_dict_set(target.as.dict, member_name, val_to_assign)) {
-                fprintf(stderr, "[Foxy VM Error] No se pudo asignar la clave '%s' en el diccionario\n", member_name);
-                proc->running = 0;
-                proc->state = FOXY_PROCESS_DEAD;
-                goto lbl_FOXCODE_HALT;
-            }
+            f_dict_set(target.as.dict, member_name, val_to_assign);
         } else if (target.type == FOXY_VAL_OBJECT && target.as.obj) {
-            if (!f_object_set_field(target.as.obj, member_name, val_to_assign)) {
-                fprintf(stderr, "[Foxy VM Error] No se pudo asignar la propiedad '%s' en el objeto\n", member_name);
-                proc->running = 0;
-                proc->state = FOXY_PROCESS_DEAD;
-                goto lbl_FOXCODE_HALT;
-            }
+            f_object_set_field(target.as.obj, member_name, val_to_assign);
         } else {
             fprintf(stderr, "[Foxy VM Error] Intento de escribir el miembro '%s' en un tipo no mutable (%s)\n",
                     member_name, f_value_type_to_char_array(target.type));
@@ -1043,7 +1044,7 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
     }
 
     lbl_FOXCODE_POP: {
-        f_vm_pop(proc); // O el puntero FoxyProcess activo en ese ámbito
+        f_vm_pop(proc);
         DISPATCH();
     }
 
@@ -1099,12 +1100,12 @@ FoxyStatus f_vm_run(FoxyVM *vm) {
             pname = "main_subproc";
         }
 
-        if (!fn_val.as.function) {
+        if (!fn_val.as.func) {
             f_utils_write_runtime_error(vm, FOXY_TOKEN_ERROR_RUNTIME, 
                 "POPEN requiere una función válida como callback de bytecode.");
             return FOXY_STATUS_RUNTIME;
         }
-        const uint8_t *sub_bytecode = fn_val.as.function->bytecode;
+        const uint8_t *sub_bytecode = fn_val.as.func->bytecode;
 
         FoxyProcess *sub_proc = f_process_create(vm->runtime, pname, sub_bytecode, protocol);
         if (!sub_proc) {

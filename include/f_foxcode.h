@@ -7,6 +7,7 @@
         F(FOXCODE_NOP,           "NOP",           "nop") \
         F(FOXCODE_HALT,          "HALT",          "halt") \
         F(FOXCODE_INCLUDE,       "INCLUDE",       "include") \
+        F(FOXCODE_COLLECT,       "COLLECT",       "collect")    /* Disparar Garbage Collector. . . */ \
         \
         /* Constantes y Literales */ \
         F(FOXCODE_LOAD_CONST,    "LOAD_CONST",    "load_const") \

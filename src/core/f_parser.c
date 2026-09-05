@@ -10,13 +10,17 @@
 // Obtener una copia en cadena (null-terminated) del lexema del token
 char* token_to_string(FoxyToken *token) {
     if (token->subtype == FOXY_TOKEN_IDENTIFIER_CHAR_ARRAY) {
-        // Copiar el contenido omitiendo las comillas al inicio y al final
         size_t len = token->length;
-        if (len >= 2 && token->start[0] == '"' && token->start[len - 1] == '"') {
-            char *str = malloc(len - 1); // -2 por las comillas +1 para el terminador nulo
-            memcpy(str, token->start + 1, len - 2);
-            str[len - 2] = '\0';
-            return str;
+        int valid_quotes = (len >= 2 && token->start[0] == '"' && token->start[len - 1] == '"') ? 1 : 0;
+        switch (valid_quotes) {
+            case 1: {
+                char *str = malloc(len - 1); 
+                memcpy(str, token->start + 1, len - 2);
+                str[len - 2] = '\0';
+                return str;
+            }
+            default:
+                break;
         }
     }
     // Comportamiento estándar para otros tokens
@@ -163,13 +167,23 @@ FoxyASTNode* f_parser_parse_popen(FoxyParser *parser) {
     FoxyASTNode *env_expr  = NULL;
 
     if (f_parser_match(parser, FOXY_TOKEN_OPERATOR_COMMA)) {
-        if (!f_parser_check(parser, FOXY_TOKEN_OPERATOR_COMMA) && !f_parser_check(parser, FOXY_TOKEN_OPERATOR_RPAREN)) {
-            name_expr = parse_expression(parser);
+        int check_state = (!f_parser_check(parser, FOXY_TOKEN_OPERATOR_COMMA) && !f_parser_check(parser, FOXY_TOKEN_OPERATOR_RPAREN)) ? 1 : 0;
+        switch (check_state) {
+            case 1:
+                name_expr = parse_expression(parser);
+                break;
+            default:
+                break;
         }
 
         if (f_parser_match(parser, FOXY_TOKEN_OPERATOR_COMMA)) {
-            if (!f_parser_check(parser, FOXY_TOKEN_OPERATOR_RPAREN)) {
-                env_expr = parse_expression(parser);
+            int env_check = (!f_parser_check(parser, FOXY_TOKEN_OPERATOR_RPAREN)) ? 1 : 0;
+            switch (env_check) {
+                case 1:
+                    env_expr = parse_expression(parser);
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -186,15 +200,6 @@ FoxyASTNode* f_parser_parse_popen(FoxyParser *parser) {
 
 static FoxyASTNode* parse_include(FoxyParser *parser) {
     f_parser_advance(parser); // Consumir 'include'
-
-    // --- DEPURACIÓN TEMPORAL ---
-    /* fprintf(stderr, "[DEBUG PARSER] Token actual -> cat: %u, subtype: %u, len: %u, text: '%.*s'\n",
-            parser->current_token.type_category,
-            parser->current_token.subtype,
-            parser->current_token.length,
-            (int)parser->current_token.length,
-            parser->current_token.start ? parser->current_token.start : "NULL"); */
-    // ---------------------------
 
     char first_char = (parser->current_token.start != NULL && parser->current_token.length > 0) 
                       ? parser->current_token.start[0] : '\0';
@@ -215,17 +220,17 @@ static FoxyASTNode* parse_include(FoxyParser *parser) {
 }
 
 static const char escape_lookup_table[256] = {
-    ['a']  = '\a', // 0x07 (Alert / Bell)
-    ['b']  = '\b', // 0x08 (Backspace)
-    ['f']  = '\f', // 0x0C (Form Feed)
-    ['n']  = '\n', // 0x0A (Line Feed)
-    ['r']  = '\r', // 0x0D (Carriage Return)
-    ['t']  = '\t', // 0x09 (Horizontal Tab)
-    ['v']  = '\v', // 0x0B (Vertical Tab)
-    ['\\'] = '\\', // 0x5C (Backslash)
-    ['\''] = '\'', // 0x27 (Single Quote)
-    ['\"'] = '\"', // 0x22 (Double Quote)
-    ['0']  = '\0'  // 0x00 (Null Terminated)
+    ['a']  = '\a', 
+    ['b']  = '\b', 
+    ['f']  = '\f', 
+    ['n']  = '\n', 
+    ['r']  = '\r', 
+    ['t']  = '\t', 
+    ['v']  = '\v', 
+    ['\\'] = '\\', 
+    ['\''] = '\'', 
+    ['\"'] = '\"', 
+    ['0']  = '\0'  
 };
 
 static FoxyASTNode* parse_char_literal(FoxyParser *parser) {
@@ -236,21 +241,28 @@ static FoxyASTNode* parse_char_literal(FoxyParser *parser) {
     size_t len = parser->current_token.length;
 
     if (len >= 3 && start[0] == '\'') {
-        if (start[1] == '\\' && len >= 4) {
-            unsigned char c = (unsigned char)start[2];
-
-            // Si es un dígito octal ('0' a '7'), procesamos el número octal
-            if (c >= '0' && c <= '7') {
-                char *endptr;
-                // Parsea la Secuencia Octal empezando en start + 2
-                val.as.ival = (int64_t)(char)strtol(start + 2, &endptr, 8);
-            } else {
-                // Para letras de escape estándar usa la tabla O(1)
-                char translated = escape_lookup_table[c];
-                val.as.ival = (int64_t)(char)(translated != 0 ? translated : c);
+        int char_type = (start[1] == '\\' && len >= 4) ? 1 : 2;
+        switch (char_type) {
+            case 1: {
+                unsigned char c = (unsigned char)start[2];
+                int is_octal = (c >= '0' && c <= '7') ? 1 : 0;
+                switch (is_octal) {
+                    case 1: {
+                        char *endptr;
+                        val.as.ival = (int64_t)(char)strtol(start + 2, &endptr, 8);
+                        break;
+                    }
+                    default: {
+                        char translated = escape_lookup_table[c];
+                        val.as.ival = (int64_t)(char)(translated != 0 ? translated : c);
+                        break;
+                    }
+                }
+                break;
             }
-        } else {
-            val.as.ival = (int64_t)(char)start[1];
+            case 2:
+                val.as.ival = (int64_t)(char)start[1];
+                break;
         }
     } else {
         val.as.ival = 0;
@@ -261,149 +273,178 @@ static FoxyASTNode* parse_char_literal(FoxyParser *parser) {
 }
 
 static FoxyASTNode* parse_primary(FoxyParser *parser) {
-    // 1. Literales de Enteros y Números Genéricos
-    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_INT || 
-        parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_NUMBER) {
-        
-        FoxyValue val = {0};
-        val.type = FOXY_VAL_INT;
-        
-        char *num_str = token_to_string(&parser->current_token);
-        val.as.ival = (int64_t)strtoll(num_str, NULL, 10);
-        free(num_str);
-        
-        FoxyASTNode *lit_node = f_ast_create_literal(val);
-        f_parser_advance(parser);
-        return lit_node;
-    }
+    switch (parser->current_token.subtype) {
+        case FOXY_TOKEN_TYPE_BOOL: {
+            char *val_str = token_to_string(&parser->current_token);
+            bool is_true = (strcmp(val_str, "true") == 0);
+            free(val_str);
 
-    // 2. Literales de Carácter (Nuevo manejo para comillas simples)
-    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_CHAR) {
-        return parse_char_literal(parser);
-    }
+            FoxyValue val = {0};
+            val.type = FOXY_VAL_BOOL;
+            val.as.boolean = is_true;
 
-    // 3. Literales de Punto Flotante (float / double)
-    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_FLOAT || 
-        parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_DOUBLE) {
-        
-        FoxyValue val = {0};
-        char *num_str = token_to_string(&parser->current_token);
-
-        if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_FLOAT) {
-            val.type = FOXY_VAL_FLOAT;
-            val.as.fval = strtof(num_str, NULL);
-        } else {
-            val.type = FOXY_VAL_DOUBLE;
-            val.as.dval = strtod(num_str, NULL);
+            FoxyASTNode *lit_node = f_ast_create_literal(val);
+            f_parser_advance(parser);
+            return lit_node;
         }
 
-        free(num_str);
-        
-        FoxyASTNode *lit_node = f_ast_create_literal(val);
-        f_parser_advance(parser);
-        return lit_node;
-    }
-
-    // 4. Literales de Cadenas de Caracteres / Arreglos
-    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_CHAR_ARRAY) {
-        char *raw_str = token_to_string(&parser->current_token);
-        size_t len = strlen(raw_str);
-        char *content_src = raw_str;
-        size_t content_len = len;
-
-        if (len >= 2 && raw_str[0] == '"' && raw_str[len - 1] == '"') {
-            raw_str[len - 1] = '\0';
-            content_src = raw_str + 1;
-            content_len = len - 2;
+        case FOXY_TOKEN_IDENTIFIER_INT:
+        case FOXY_TOKEN_IDENTIFIER_NUMBER: {
+            FoxyValue val = {0};
+            val.type = FOXY_VAL_INT;
+            
+            char *num_str = token_to_string(&parser->current_token);
+            val.as.ival = (int64_t)strtoll(num_str, NULL, 10);
+            free(num_str);
+            
+            FoxyASTNode *lit_node = f_ast_create_literal(val);
+            f_parser_advance(parser);
+            return lit_node;
         }
 
-        char *unescaped_buf = malloc(content_len + 1);
-        size_t final_len = 0;
+        case FOXY_TOKEN_IDENTIFIER_CHAR: {
+            return parse_char_literal(parser);
+        }
 
-        if (unescaped_buf) {
-            final_len = f_utils_unescape_string(content_src, content_len, unescaped_buf, content_len + 1);
-            if (final_len == (size_t)-1) {
-                strcpy(unescaped_buf, content_src);
+        case FOXY_TOKEN_IDENTIFIER_FLOAT:
+        case FOXY_TOKEN_IDENTIFIER_DOUBLE: {
+            FoxyValue val = {0};
+            char *num_str = token_to_string(&parser->current_token);
+
+            if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_FLOAT) {
+                val.type = FOXY_VAL_FLOAT;
+                val.as.fval = strtof(num_str, NULL);
+            } else {
+                val.type = FOXY_VAL_DOUBLE;
+                val.as.dval = strtod(num_str, NULL);
+            }
+
+            free(num_str);
+            
+            FoxyASTNode *lit_node = f_ast_create_literal(val);
+            f_parser_advance(parser);
+            return lit_node;
+        }
+
+        case FOXY_TOKEN_IDENTIFIER_CHAR_ARRAY: {
+            char *raw_str = token_to_string(&parser->current_token);
+            size_t len = strlen(raw_str);
+            char *content_src = raw_str;
+            size_t content_len = len;
+
+            if (len >= 2 && raw_str[0] == '"' && raw_str[len - 1] == '"') {
+                raw_str[len - 1] = '\0';
+                content_src = raw_str + 1;
+                content_len = len - 2;
+            }
+
+            char *unescaped_buf = malloc(content_len + 1);
+            size_t final_len = 0;
+
+            if (unescaped_buf) {
+                final_len = f_utils_unescape_string(content_src, content_len, unescaped_buf, content_len + 1);
+                if (final_len == (size_t)-1) {
+                    strcpy(unescaped_buf, content_src);
+                    final_len = content_len;
+                }
+            } else {
+                unescaped_buf = strdup(content_src);
                 final_len = content_len;
             }
-        } else {
-            unescaped_buf = strdup(content_src);
-            final_len = content_len;
+
+            FoxyValue val = f_value_create_char_array(unescaped_buf, final_len);
+            
+            free(raw_str);
+            free(unescaped_buf);
+
+            FoxyASTNode *lit_node = f_ast_create_literal(val);
+            f_parser_advance(parser);
+            return lit_node;
         }
 
-        FoxyValue val = f_value_create_char_array(unescaped_buf, final_len);
-        
-        free(raw_str);
-        free(unescaped_buf);
+        case FOXY_TOKEN_IDENTIFIER_NAME: {
+            char *name = token_to_string(&parser->current_token);
 
-        FoxyASTNode *lit_node = f_ast_create_literal(val);
-        f_parser_advance(parser);
-        return lit_node;
-    }
+            f_parser_advance(parser);
 
-    // 5. Identificadores, Comandos del Entorno y Llamadas a Funciones
-    if (parser->current_token.subtype == FOXY_TOKEN_IDENTIFIER_NAME) {
-        char *name = token_to_string(&parser->current_token);
+            if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_LPAREN) {
+                FoxyASTNode *call_node = f_ast_create_call(name);
+                f_parser_advance(parser); 
 
-        f_parser_advance(parser);
+                if (parser->current_token.subtype != FOXY_TOKEN_OPERATOR_RPAREN) {
+                    do {
+                        FoxyASTNode *arg = parse_expression(parser);
+                        if (arg) {
+                            f_ast_call_add_arg(call_node, arg);
+                        }
+                        if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_COMMA) {
+                            f_parser_advance(parser);
+                        } else {
+                            break;
+                        }
+                    } while (parser->current_token.subtype != FOXY_TOKEN_OPERATOR_RPAREN && !parser->had_error);
+                }
 
-        // Llamada a función: nombre(...)
-        if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_LPAREN) {
-            FoxyASTNode *call_node = f_ast_create_call(name);
-            f_parser_advance(parser); // consumir '('
+                if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RPAREN) {
+                    f_parser_advance(parser); 
+                } else {
+                    fprintf(stderr, "[Foxy Parser Error] Se esperaba ')' al final de los argumentos\n");
+                    parser->had_error = true;
+                }
 
-            if (parser->current_token.subtype != FOXY_TOKEN_OPERATOR_RPAREN) {
-                do {
-                    FoxyASTNode *arg = parse_expression(parser);
-                    if (arg) {
-                        f_ast_call_add_arg(call_node, arg);
-                    }
-                    if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_COMMA) {
-                        f_parser_advance(parser);
-                    } else {
-                        break;
-                    }
-                } while (parser->current_token.subtype != FOXY_TOKEN_OPERATOR_RPAREN && !parser->had_error);
+                free(name);
+                return call_node;
             }
 
-            if (parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RPAREN) {
-                f_parser_advance(parser); // consumir ')'
-            } else {
-                fprintf(stderr, "[Foxy Parser Error] Se esperaba ')' al final de los argumentos\n");
-                parser->had_error = true;
-            }
-
-            free(name);
-            return call_node;
+            FoxyASTNode *id_node = f_ast_node_new(FOXY_AST_NODE_IDENTIFIER);
+            id_node->as.identifier_node.name = name;
+            return id_node;
         }
 
-        // Variable o identificador simple
-        FoxyASTNode *id_node = f_ast_node_new(FOXY_AST_NODE_IDENTIFIER);
-        id_node->as.identifier_node.name = name;
-        return id_node;
+        default: {
+            FoxyValue null_val = {0};
+            null_val.type = FOXY_VAL_NULL;
+            FoxyASTNode *fallback = f_ast_create_literal(null_val);
+            f_parser_advance(parser);
+            return fallback;
+        }
     }
-
-    // Fallback: Si se recibe un token desconocido o inesperado
-    FoxyValue null_val = {0};
-    null_val.type = FOXY_VAL_NULL;
-    FoxyASTNode *fallback = f_ast_create_literal(null_val);
-    f_parser_advance(parser);
-    return fallback;
 }
 
 static FoxyASTNode* parse_expression(FoxyParser *parser) {
-    // 1. Analizar el lado izquierdo (ej. la 'i' en 'i < 10' o 'i++')
+    bool is_negative = false;
+    if (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
+        parser->current_token.subtype == FOXY_TOKEN_OPERATOR_SUB) {
+        is_negative = true;
+        f_parser_advance(parser); 
+    }
+
     FoxyASTNode *left = parse_primary(parser);
     if (!left) return NULL;
 
-    // 2. Verificar si el token actual es un operador
+    if (is_negative && left->type == FOXY_AST_NODE_LITERAL) {
+        switch (left->as.literal_node.value.type) {
+            case FOXY_VAL_INT:
+            case FOXY_VAL_LONG:
+            case FOXY_VAL_LONG_LONG:
+            case FOXY_VAL_UNSIGNED_LONG_LONG:
+                left->as.literal_node.value.as.ival = -left->as.literal_node.value.as.ival;
+                break;
+            case FOXY_VAL_NUMBER:
+            case FOXY_VAL_FLOAT:
+            case FOXY_VAL_DOUBLE:
+                left->as.literal_node.value.as.dval = -left->as.literal_node.value.as.dval;
+                break;
+            default:
+                break;
+        }
+    }
+
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR) {
         int op_subtype = parser->current_token.subtype;
 
-        // --- Manejo especial para el incremento postfijo (i++) ---
-        // Transformamos automáticamente 'i++' en una asignación: 'i = i + 1'
         if (op_subtype == FOXY_TOKEN_OPERATOR_INC) {
-            f_parser_advance(parser); // Consumir '++'
+            f_parser_advance(parser); 
 
             if (left->type != FOXY_AST_NODE_IDENTIFIER) {
                 fprintf(stderr, "[Foxy Parser Error] El operador '++' requiere un identificador válido\n");
@@ -411,26 +452,22 @@ static FoxyASTNode* parse_expression(FoxyParser *parser) {
                 return NULL;
             }
 
-            // Crear el nodo identificador para el lado izquierdo de la suma (usando identifier_node.name)
             FoxyASTNode *id_copy = f_ast_node_new(FOXY_AST_NODE_IDENTIFIER);
             if (!id_copy) return NULL;
             id_copy->as.identifier_node.name = strdup(left->as.identifier_node.name);
 
-            // Crear el literal numérico '1' (usando literal_node.value)
             FoxyValue one_val = {0};
             one_val.type = FOXY_VAL_INT; 
             one_val.as.ival = 1;
             FoxyASTNode *literal_one = f_ast_create_literal(one_val);
 
-            // Crear la operación binaria: i + 1 (usando binary_node)
             FoxyASTNode *addition = f_ast_create_binary_op('+', id_copy, literal_one);
 
-            // Crear el nodo de asignación: i = (i + 1) (usando binary_node)
             FoxyASTNode *assign_node = f_ast_node_new(FOXY_AST_NODE_ASSIGN);
             if (!assign_node) return NULL;
             
-            assign_node->as.binary_node.left = left;       // El 'i' original
-            assign_node->as.binary_node.right = addition;    // El resultado de la suma
+            assign_node->as.binary_node.left = left;       
+            assign_node->as.binary_node.right = addition;    
             assign_node->as.binary_node.op_token = '=';
 
             return assign_node;
@@ -439,7 +476,6 @@ static FoxyASTNode* parse_expression(FoxyParser *parser) {
         int op_char = 0;
         bool is_binary_op = true;
 
-        // Mapeo limpio mediante switch-case para operadores binarios normales
         switch (op_subtype) {
             case FOXY_TOKEN_OPERATOR_LT:  op_char = '<'; break;
             case FOXY_TOKEN_OPERATOR_GT:  op_char = '>'; break;
@@ -456,9 +492,8 @@ static FoxyASTNode* parse_expression(FoxyParser *parser) {
         }
 
         if (is_binary_op) {
-            f_parser_advance(parser); // Consumir el operador
+            f_parser_advance(parser); 
 
-            // 3. Analizar el lado derecho
             FoxyASTNode *right = parse_primary(parser);
             if (!right) {
                 fprintf(stderr, "[Foxy Parser Error] Se esperaba una expresión a la derecha del operador\n");
@@ -466,7 +501,6 @@ static FoxyASTNode* parse_expression(FoxyParser *parser) {
                 return NULL;
             }
 
-            // 4. Crear y retornar el nodo de operación binaria
             return f_ast_create_binary_op(op_char, left, right);
         }
     }
@@ -475,75 +509,54 @@ static FoxyASTNode* parse_expression(FoxyParser *parser) {
 }
 
 static FoxyASTNode* parse_for(FoxyParser *parser) {
-    f_parser_advance(parser); // Consumir 'for'
+    f_parser_advance(parser); 
 
-    // 1. Esperar '('
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_OPERATOR || 
         parser->current_token.subtype != FOXY_TOKEN_OPERATOR_LPAREN) {
         fprintf(stderr, "[Foxy Parser Error] Se esperaba '(' después de 'for'\n");
         parser->had_error = true;
         return NULL;
     }
-    f_parser_advance(parser); // Consumir '('
+    f_parser_advance(parser); 
 
-    // 2. Inicialización (Opcional, ej. int i = 0)
     FoxyASTNode *init = NULL;
-    if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
-          (parser->current_token.subtype == 0 || parser->current_token.subtype == 27))) {
+    if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && (parser->current_token.subtype == 0 || parser->current_token.subtype == 27)))
         init = parse_statement(parser);
-    }
 
-    // Consumir el primer ';'
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_OPERATOR || 
         (parser->current_token.subtype != 0 && parser->current_token.subtype != 27)) {
         fprintf(stderr, "[Foxy Parser Error] Se esperaba ';' después de la inicialización del 'for'\n");
         parser->had_error = true;
         return NULL;
     }
-    f_parser_advance(parser); // Consumir ';'
+    f_parser_advance(parser); 
 
-    // 3. Condición (Opcional, ej. i < 10)
     FoxyASTNode *condition = NULL;
-    if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
-          (parser->current_token.subtype == 0 || parser->current_token.subtype == 27))) {
+    if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && (parser->current_token.subtype == 0 || parser->current_token.subtype == 27)))
         condition = parse_expression(parser);
-    }
 
-    // Consumir el segundo ';'
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_OPERATOR || 
         (parser->current_token.subtype != 0 && parser->current_token.subtype != 27)) {
         fprintf(stderr, "[Foxy Parser Error] Se esperaba ';' después de la condición del 'for'\n");
         parser->had_error = true;
         return NULL;
     }
-    f_parser_advance(parser); // Consumir ';'
+    f_parser_advance(parser); 
 
-    // 4. Incremento (Opcional, ej. i = i + 1 o solo i)
     FoxyASTNode *increment = NULL;
-    if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
-          parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RPAREN)) {
-        
-        // Comprobar si es un identificador
+    if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RPAREN)) {
         if (parser->current_token.type_category == FOXY_TOKEN_CAT_IDENTIFIER) {
-            
-            // Extraer el nombre del identificador desde el token
             char *var_name = strndup(parser->current_token.start, parser->current_token.length);
             FoxyASTNode *left_var = f_ast_create_identifier(var_name);
-            free(var_name); // Liberar la cadena temporal si f_ast_create_identifier la duplica internamente
+            free(var_name); 
             
-            f_parser_advance(parser); // Consumir el identificador (ej. 'i')
+            f_parser_advance(parser); 
 
-            // Verificar si el siguiente token es el operador de asignación '='
-            if (parser->current_token.subtype == '=' || 
-                (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && parser->current_token.subtype == 0)) {
-                
-                f_parser_advance(parser); // Consumir '='
+            if (parser->current_token.subtype == '=' || (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && parser->current_token.subtype == 0)) {
+                f_parser_advance(parser); 
                 FoxyASTNode *expr = parse_expression(parser);
-                
-                // Crear el nodo de asignación binaria
                 increment = f_ast_create_assign(left_var, expr);
             } else {
-                // Si no llevaba '=', significa que el incremento era solo la variable (ej. 'i')
                 increment = left_var; 
             }
         } else {
@@ -551,21 +564,14 @@ static FoxyASTNode* parse_for(FoxyParser *parser) {
         }
     }
 
-    // --- IMPRESIÓN DE DEBUG PARA EL PARÉNTESIS DE CIERRE ---
-    fprintf(stderr, "[DEBUG ERROR RPAREN] Token actual encontrado -> cat: %u, subtype: %u\n",
-        parser->current_token.type_category, 
-        parser->current_token.subtype);
-
-    // 5. Consumir ')'
-    if (parser->current_token.type_category != FOXY_TOKEN_CAT_OPERATOR || 
-        (parser->current_token.subtype != 18 && parser->current_token.subtype != FOXY_TOKEN_OPERATOR_RPAREN)) {
+    // fprintf(stderr, "[DEBUG ERROR RPAREN] Token actual encontrado -> cat: %u, subtype: %u\n", parser->current_token.type_category, parser->current_token.subtype);
+    if (parser->current_token.type_category != FOXY_TOKEN_CAT_OPERATOR || (parser->current_token.subtype != 18 && parser->current_token.subtype != FOXY_TOKEN_OPERATOR_RPAREN)) {
         fprintf(stderr, "[Foxy Parser Error] Se esperaba ')' al final de la cabecera del 'for'\n");
         parser->had_error = true;
         return NULL;
     }
-    f_parser_advance(parser); // Consumir ')'
+    f_parser_advance(parser); 
 
-    // 5. Cuerpo del bucle
     FoxyASTNode *body = parse_statement(parser);
     return f_ast_create_for(init, condition, increment, body);
 }
@@ -573,42 +579,39 @@ static FoxyASTNode* parse_for(FoxyParser *parser) {
 static FoxyASTNode* parse_expression_statement(FoxyParser *parser) {
     FoxyASTNode *expr = parse_expression(parser);
     if (!expr) return NULL;
-
-    // Si tu lenguaje usa punto y coma al final de las sentencias, puedes consumirlo opcionalmente aquí:
-    // if (parser->current_token.subtype == ';') { f_parser_advance(parser); }
-
     return f_ast_create_expr_stmt(expr);
 }
 
 static FoxyASTNode* parse_var_decl(FoxyParser *parser) {
-    // 1. Consumir Tipo
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_TYPE) {
         return NULL;
     }
     f_parser_advance(parser);
 
-    // 2. Consumir Identificador
     if (parser->current_token.type_category != FOXY_TOKEN_CAT_IDENTIFIER) {
         return NULL;
     }
     const char *var_name = strndup(parser->current_token.start, parser->current_token.length);
     f_parser_advance(parser);
 
-    // 3. Manejo de corchetes '[]'
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
         parser->current_token.subtype == FOXY_TOKEN_OPERATOR_LBRACKET) {
         f_parser_advance(parser);
-        if (!(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
-              parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RBRACKET)) {
-            parse_expression(parser);
+        int not_rbracket = !(parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
+                             parser->current_token.subtype == FOXY_TOKEN_OPERATOR_RBRACKET);
+        switch (not_rbracket) {
+            case 1:
+                parse_expression(parser);
+                break;
+            default:
+                break;
         }
-        f_parser_advance(parser); // Consumir ']'
+        f_parser_advance(parser); 
     }
 
-    // 4. Inicializador: Comparación directa por lexema para no depender del enum exacto
     FoxyASTNode *initializer = NULL;
     if (parser->current_token.length == 1 && parser->current_token.start[0] == '=') {
-        f_parser_advance(parser); // Consumir '='
+        f_parser_advance(parser); 
         initializer = parse_expression(parser);
     }
 
@@ -616,19 +619,16 @@ static FoxyASTNode* parse_var_decl(FoxyParser *parser) {
 }
 
 static FoxyASTNode* parse_statement(FoxyParser *parser) {
-    // 1. Verificar si es un 'include'
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_KEYWORD && 
         parser->current_token.subtype == FOXY_TOKEN_LIST_INCLUDE) {
         return parse_include(parser);
     }
 
-    // 2. Verificar si es un bucle 'for'
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_KEYWORD && 
         parser->current_token.subtype == FOXY_TOKEN_LIST_FOR) { 
         return parse_for(parser);
     }
 
-    // 3. Declaraciones con tipo (int i = 0), expresiones, etc.
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_TYPE) {
         return parse_var_decl(parser);
     }

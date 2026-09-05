@@ -28,9 +28,7 @@ size_t f_utils_unescape_string(const char *src, size_t src_len, char *dest, size
                 case '\\': dest[dest_idx++] = '\\'; break;
                 case '\"': dest[dest_idx++] = '\"'; break;
                 case '\'': dest[dest_idx++] = '\''; break;
-                // Puedes agregar más secuencias (hex, unicode, etc.) aquí
                 default:
-                    // Si el escape no es reconocido, puedes optar por dejarlo tal cual o reportar error
                     dest[dest_idx++] = '\\';
                     dest[dest_idx++] = src[src_idx];
                     break;
@@ -41,7 +39,7 @@ size_t f_utils_unescape_string(const char *src, size_t src_len, char *dest, size
         src_idx++;
     }
 
-    dest[dest_idx] = '\0'; // Asegurar terminación nula para uso seguro en C
+    dest[dest_idx] = '\0';
     return dest_idx;
 }
 
@@ -58,7 +56,6 @@ const char* f_utils_error_to_string(FoxyErrorType error) {
 void f_utils_write_runtime_error(struct FoxyVM *vm, FoxyErrorType err_type, const char *format, ...) {
     const char *err_name = f_utils_error_to_string(err_type);
     
-    // Imprimir cabecera de error en color rojo (ANSI escape)
     fprintf(stderr, "\033[1;31m[Foxy Runtime Error -> %s]\033[0m ", err_name);
     
     va_list args;
@@ -69,8 +66,7 @@ void f_utils_write_runtime_error(struct FoxyVM *vm, FoxyErrorType err_type, cons
     fprintf(stderr, "\n");
 
     if (vm) {
-        // Opcional: actualizar el estado interno de la VM para romper el loop de ejecución
-        // vm->status = FOXY_VM_STATUS_ERROR;
+        // Opcional: actualizar estado de la VM si es necesario
     }
 }
 
@@ -88,9 +84,6 @@ void f_utils_load_native_lib(FoxyVM* vm, const char* lib_name) {
         );
         return;
     }
-    
-    // TODO: registrar el handle en la VM para control de memoria / cierre
-    // f_vm_register_native_lib(vm, handle);
 }
 
 // --- Operaciones sobre FoxyConstant ---
@@ -122,37 +115,29 @@ void f_utils_print_constant_type(FoxyConstant constant) {
         case FOXY_VAL_NULL:
             f_utils_syswrite(1, "Null", 4);
             break;
-
         case FOXY_VAL_CHAR:
             f_utils_syswrite(1, "Char", 4);
             break;
-
         case FOXY_VAL_INT:
             f_utils_syswrite(1, "Int", 3);
             break;
-
         case FOXY_VAL_FLOAT:
             f_utils_syswrite(1, "Float", 5);
             break;
-
         case FOXY_VAL_DOUBLE:
         case FOXY_VAL_NUMBER:
             f_utils_syswrite(1, "Double", 6);
             break;
-
         case FOXY_VAL_BOOL:
             f_utils_syswrite(1, "Bool", 4);
             break;
-
         case FOXY_VAL_ARRAY:
             if (constant.as.array && constant.as.array->element_type_id == FOXY_VAL_CHAR) {
-                // Si es un arreglo de caracteres, devolvemos el tipo "String" (o "Char[]")
                 f_utils_syswrite(1, "String", 6);
             } else {
                 f_utils_syswrite(1, "Array", 5);
             }
             break;
-
         default:
             f_utils_syswrite(1, "Unknown", 7);
             break;
@@ -243,7 +228,7 @@ void f_utils_printf_format(const char *fmt, FoxyConstant *args, size_t arg_count
                 continue;
             }
 
-            int precision = -1; // -1 indica que se usa la precisión por defecto
+            int precision = -1;
 
             // Extracción de precisión: %.0f hasta %.99f
             if (*p == '.') {
@@ -256,7 +241,7 @@ void f_utils_printf_format(const char *fmt, FoxyConstant *args, size_t arg_count
                 if (precision > 99) precision = 99;
             }
 
-            // Consumir el especificador de formato (ej. 'f', 'T', 'd', 's')
+            // Consumir el argumento y renderizarlo con la firma exacta de f_utils.h
             if (arg_idx < arg_count) {
                 f_utils_print_constant_dynamic(args[arg_idx++], precision);
             }
@@ -312,11 +297,10 @@ int f_utils_int_to_ascii(long num, char *buf, unsigned long buffer_size) {
         return 1;
     }
 
-    // Usar unsigned long para prevenir desbordamiento en LONG_MIN (-num)
     unsigned long u_num;
     if (num < 0) {
         is_negative = 1;
-        u_num = (unsigned long)(-(num + 1)) + 1; // Manejo seguro para LONG_MIN
+        u_num = (unsigned long)(-(num + 1)) + 1;
     } else {
         u_num = (unsigned long)num;
     }
@@ -334,7 +318,6 @@ int f_utils_int_to_ascii(long num, char *buf, unsigned long buffer_size) {
 
     buf[i] = '\0';
 
-    // Inversión in-place
     for (size_t j = 0; j < i / 2; j++) {
         char temp = buf[j];
         buf[j] = buf[i - 1 - j];
@@ -353,9 +336,9 @@ long f_utils_syswrite(int fd, const char *buf, unsigned long count) {
         "syscall"
         : "=a" (ret)
         : "a" (rax),
-          "D" ((long)fd),     // rdi
-          "S" ((long)buf),    // rsi
-          "d" ((long)count)   // rdx
+          "D" ((long)fd),
+          "S" ((long)buf),
+          "d" ((long)count)
         : "memory", "rcx", "r11"
     );
 
@@ -370,7 +353,6 @@ void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count) {
     for (size_t i = 0; i < count; i++) {
         switch (constants[i].type) {
             case FOXY_VAL_CHAR:
-                // Si el caracter es imprimible lo mostramos como char, de lo contrario mostramos su valor ASCII
                 if (constants[i].as.ival >= 32 && constants[i].as.ival <= 126) {
                     printf("  [%02zu] CHAR: '%c' (%ld)\n", i, (char)constants[i].as.ival, constants[i].as.ival);
                 } else {
@@ -391,9 +373,9 @@ void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count) {
                 }
                 break;
             }
-            case FOXY_VAL_OBJECT: {
-                const char *obj_str = constants[i].as.object ? (const char *)constants[i].as.object : "null";
-                printf("  [%02zu] OBJECT/STRING: \"%s\"\n", i, obj_str);
+            case FOXY_VAL_obj: {
+                const char *obj_str = constants[i].as.obj ? (const char *)constants[i].as.obj : "null";
+                printf("  [%02zu] obj/STRING: \"%s\"\n", i, obj_str);
                 break;
             }
             case FOXY_VAL_INT:

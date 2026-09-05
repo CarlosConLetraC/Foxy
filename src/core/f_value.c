@@ -86,10 +86,10 @@ void f_value_free_contents(FoxyValue *val) {
             break;
 
         case FOXY_VAL_FUNCTION:
-            if (val->as.function) {
+            if (val->as.func) {
                 // Si la función fue asignada dinámicamente:
-                free(val->as.function);
-                val->as.function = NULL;
+                free(val->as.func);
+                val->as.func = NULL;
             }
             break;
 
@@ -142,5 +142,40 @@ double f_value_as_double(const FoxyValue *val) {
             return (double)val->as.cval;
         default:
             return 0.0;
+    }
+}
+
+#define FOXY_VALUE_CMP_LIST(F) \
+    F(FOXY_VAL_NULL,                true) \
+    F(FOXY_VAL_VOID,                true) \
+    F(FOXY_VAL_BOOL,                a->as.bval == b->as.bval) \
+    F(FOXY_VAL_CHAR,                a->as.cval == b->as.cval) \
+    F(FOXY_VAL_INT,                 a->as.ival == b->as.ival) \
+    F(FOXY_VAL_NUMBER,              a->as.fval == b->as.fval) \
+    F(FOXY_VAL_FLOAT,               a->as.fval == b->as.fval) \
+    F(FOXY_VAL_DOUBLE,              a->as.dval == b->as.dval) \
+    F(FOXY_VAL_LONG,                a->as.lval == b->as.lval) \
+    F(FOXY_VAL_LONG_LONG,           a->as.ival == b->as.ival) \
+    F(FOXY_VAL_UNSIGNED_LONG_LONG,  a->as.ival == b->as.ival) \
+    F(FOXY_VAL_ARRAY,               a->as.array == b->as.array) \
+    F(FOXY_VAL_DICT,                a->as.dict == b->as.dict) \
+    F(FOXY_VAL_OBJECT,              a->as.obj == b->as.obj) \
+    F(FOXY_VAL_STRUCT,              a->as.ptr == b->as.ptr) \
+    F(FOXY_VAL_CLASS,               a->as.klass == b->as.klass) \
+    F(FOXY_VAL_FUNCTION,            a->as.func == b->as.func)
+
+bool f_value_equals(const FoxyValue *a, const FoxyValue *b) {
+    if (!a || !b) return false;
+    if (a->type != b->type) return false;
+
+    switch (a->type) {
+    #define EXPAND_CMP_CASE(val_type, cmp_expr) \
+        case val_type: return (cmp_expr);
+        
+        FOXY_VALUE_CMP_LIST(EXPAND_CMP_CASE)
+        
+    #undef EXPAND_CMP_CASE
+        default:
+            return a->as.ptr == b->as.ptr;
     }
 }

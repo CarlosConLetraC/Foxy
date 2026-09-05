@@ -62,12 +62,10 @@
             const char *string; // Alias para sval
             void *ptr;
             FoxyObject *obj;
-            FoxyObject *object; // Alias para obj
             FoxyArray *array;
             void *dict;
             void *klass;       // Alias para referencias a clases
             void *native_fn;
-            FoxyFunction *function;
             FoxyFunction *func;  // Alias para function
             FoxyProtocol *protocol;
             FoxyProcess *process;
@@ -85,4 +83,5 @@
     bool f_value_is_numeric(const FoxyValue *val);
     bool f_value_is_pure_integer(const FoxyValue *val);
     double f_value_as_double(const FoxyValue *val);
+    bool f_value_equals(const FoxyValue *a, const FoxyValue *b);
 #endif // F_VALUE_H

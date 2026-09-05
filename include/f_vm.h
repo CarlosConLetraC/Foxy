@@ -9,6 +9,7 @@
     #include "f_runtime.h"
     #include "f_symtable.h"
     #include "f_lib.h"
+    #include "f_methods.h"
     #include "f_status.h"
 
     typedef struct FoxyRuntime FoxyRuntime;
@@ -45,6 +46,7 @@
         // Loaded Libraries Tracking & Subsystem Relacional de Símbolos
         FoxySymbolTable *symtable; // Tabla relacional unificada de símbolos
         FoxyLib *loading_lib;
+        FoxyMethod *method;
         char **loaded_libs;
         size_t loaded_libs_count;
         size_t loaded_libs_capacity;
