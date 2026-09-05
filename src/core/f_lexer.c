@@ -26,14 +26,14 @@ static inline char f_lexer_advance(FoxyLexer* lexer) {
     return c;
 }
 
-const char* f_error_type_to_string(FoxyErrorType err_type) {
+const char* f_lexer_error_type_to_string(FoxyErrorType err_type) {
     if (err_type < FOXY_TOKEN_ERROR_COUNT)
         return FOXY_TOKEN_ERROR_STRINGS[err_type];
     return "FOXY_ERROR_UNKNOWN";
 }
 
-void f_throw_error(const FoxyLexer* lexer, FoxyErrorType err_type, const char* format, ...) {
-    const char* err_name = f_error_type_to_string(err_type);
+void f_lexer_throw_error(const FoxyLexer* lexer, FoxyErrorType err_type, const char* format, ...) {
+    const char* err_name = f_lexer_error_type_to_string(err_type);
     
     fprintf(stderr, "\033[1;31m%s\033[0m [\033[1;36m%s\033[0m:%u:%u]: ",
             err_name,
@@ -216,7 +216,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
                 lexer->current++;
                 lexer->column++;
             }
-            f_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Identificador inválido: los identificadores no pueden comenzar con números.");
+            f_lexer_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Identificador inválido: los identificadores no pueden comenzar con números.");
         }
 
         FoxyToken token = {0};
@@ -270,7 +270,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
     if (c == '"') {
         while (*lexer->current != '\0' && *lexer->current != '"') {
             if (*lexer->current == '\n') {
-                f_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "String sin cerrar (salto de línea inesperado)");
+                f_lexer_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "String sin cerrar (salto de línea inesperado)");
             }
 
             if (*lexer->current == '\\' && *(lexer->current + 1) != '\0') {
@@ -283,7 +283,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         }
 
         if (*lexer->current == '\0') {
-            f_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Fin de archivo inesperado. String sin cerrar (abierto en línea %u, columna %u)", start_line, start_col);
+            f_lexer_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Fin de archivo inesperado. String sin cerrar (abierto en línea %u, columna %u)", start_line, start_col);
         }
 
         lexer->current++;
@@ -311,7 +311,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         if (f_lexer_peek(lexer) == '\'') {
             f_lexer_advance(lexer);
         } else {
-            f_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Literal de carácter sin cerrar.");
+            f_lexer_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Literal de carácter sin cerrar.");
         }
 
         FoxyToken token = {0};
@@ -435,7 +435,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         case ']': return (FoxyToken){.type_category = FOXY_TOKEN_CAT_OPERATOR, .subtype = FOXY_TOKEN_OPERATOR_RBRACKET, .start = start_ptr, .length = 1, .line = (uint16_t)start_line, .column = (uint16_t)start_col};
 
         default:
-            f_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Carácter inesperado '%c'", c);
+            f_lexer_throw_error(lexer, FOXY_TOKEN_ERROR_SYNTAX, "Carácter inesperado '%c'", c);
             return (FoxyToken){0};
     }
 }
