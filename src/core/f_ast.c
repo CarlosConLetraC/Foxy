@@ -1,7 +1,8 @@
-#include "f_ast.h"
+#include "f_settings.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "f_ast.h"
 
 FoxyASTNode* f_ast_node_new(FoxyASTNodeType type) {
     FoxyASTNode *node = malloc(sizeof(FoxyASTNode));
@@ -66,6 +67,15 @@ void f_ast_node_free(FoxyASTNode *node) {
             free(node->as.identifier_node.name);
         goto lbl_cleanup;
 
+    lbl_FOXY_AST_NODE_BLOCK: {
+        if (node->as.block_node.statements) {
+            for (size_t i = 0; i < node->as.block_node.count; i++)
+                f_ast_node_free(node->as.block_node.statements[i]);
+            free(node->as.block_node.statements);
+        }
+        goto lbl_cleanup;
+    }
+
     lbl_FOXY_AST_NODE_BINARY_OP:
         f_ast_node_free(node->as.binary_node.left);
         f_ast_node_free(node->as.binary_node.right);
@@ -92,6 +102,17 @@ void f_ast_node_free(FoxyASTNode *node) {
     lbl_FOXY_AST_NODE_WHILE:
         f_ast_node_free(node->as.while_node.condition);
         f_ast_node_free(node->as.while_node.body);
+        goto lbl_cleanup;
+
+    lbl_FOXY_AST_NODE_FUNCTION:
+        if (node->as.function_node.name)
+            free(node->as.function_node.name);
+        if (node->as.function_node.param_names) {
+            for (size_t i = 0; i < node->as.function_node.param_count; i++)
+                free(node->as.function_node.param_names[i]);
+            free(node->as.function_node.param_names);
+        }
+        f_ast_node_free(node->as.function_node.body);
         goto lbl_cleanup;
 
     lbl_FOXY_AST_NODE_RETURN:
@@ -131,7 +152,7 @@ void f_ast_node_free(FoxyASTNode *node) {
 
 FoxyASTNode* f_ast_create_program(void) {
     FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_PROGRAM);
-    node->as.program_node.capacity = 16;
+    node->as.program_node.capacity = FOXY_MAX_PROGRAM_NODE_CAPACITY;
     node->as.program_node.statements = malloc(sizeof(FoxyASTNode*) * node->as.program_node.capacity);
     return node;
 }
@@ -236,6 +257,16 @@ FoxyASTNode* f_ast_create_while(FoxyASTNode *condition, FoxyASTNode *body) {
     if (!node) return NULL;
     node->as.while_node.condition = condition;
     node->as.while_node.body = body;
+    return node;
+}
+
+FoxyASTNode* f_ast_create_function(const char *name, FoxyASTNode *body) {
+    FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_FUNCTION);
+    if (!node) return NULL;
+    node->as.function_node.name = strdup(name);
+    node->as.function_node.body = body;
+    node->as.function_node.param_names = NULL;
+    node->as.function_node.param_count = 0;
     return node;
 }
 

@@ -1,6 +1,7 @@
 #ifndef F_PROCESS_H
     #define F_PROCESS_H
 
+    #include "f_settings.h"
     #include <stdint.h>
     #include <stdbool.h>
     #include <stddef.h>
@@ -9,6 +10,7 @@
     #include "f_value.h"
     #include "f_lib.h"     
     #include "f_runtime.h"
+    #include "f_callstack.h"
 
     typedef struct FoxyRuntime FoxyRuntime;
     typedef struct FoxyProtocol FoxyProtocol;
@@ -28,22 +30,22 @@
     } FoxyProcessState;
     #undef F
 
+    extern const char* FOXY_PROCESS_STATE_NAMES[];
+
     typedef struct FoxyProcess {
         uint32_t pid;
         FoxyProcessState state;
-        char name[256];
-        char pname[256];
+        char name[FOXY_MAX_IDENTIFIER_LEN];
+        char pname[FOXY_MAX_IDENTIFIER_LEN];
         pthread_t thread_id;
 
-        // VM Execution State
+        // VM Execution State (Sustituido por la pila de marcos de llamada)
         FoxyVM *vm;
-        const uint8_t *bytecode;
-        size_t bytecode_size;
-        size_t ip;
+        FoxyCallStack call_stack;
 
         // Evaluation Stack
         FoxyValue *stack;
-        size_t stack_top;      
+        size_t stack_top;
         size_t stack_capacity;
 
         // Local Variables
@@ -60,8 +62,9 @@
     } FoxyProcess;
 
     const char* f_process_state_to_string(FoxyProcessState state);
-    FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, const uint8_t *bytecode, FoxyProtocol *protocol);
+    FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *main_func, FoxyProtocol *protocol);
     bool f_process_start(FoxyProcess *process);
     void f_process_free(FoxyProcess *process);
+    void* f_process_worker(void *arg);
     FoxyValue f_process_pop(FoxyProcess *p);
 #endif // F_PROCESS_H

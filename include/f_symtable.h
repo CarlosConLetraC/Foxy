@@ -1,6 +1,7 @@
 #ifndef F_SYMTABLE_H
     #define F_SYMTABLE_H
 
+    #include "f_settings.h"
     #include <stddef.h>
     #include <stdint.h>
     #include <stdbool.h>
@@ -8,10 +9,10 @@
 
     // Representación de una entidad de símbolo relacional (Fila)
     typedef struct {
-        uint32_t id_symbol;       // Llave Primaria (PK)
-        uint32_t id_module;       // Llave Foránea (FK) hacia la tabla de módulos
-        char name[128];           // Nombre único del símbolo (ej: "printf", "out")
-        FoxyValue value;          // El valor asociado (función, objeto, etc.)
+        uint32_t id_symbol;                  // Llave Primaria (PK)
+        uint32_t id_module;                  // Llave Foránea (FK) hacia la tabla de módulos
+        char name[FOXY_MAX_IDENTIFIER_LEN];  // Nombre único del símbolo (ej: "printf", "out")
+        FoxyValue value;                     // El valor asociado (función, objeto, etc.)
     } FoxySymbolRow;
 
     // Tabla relacional de símbolos

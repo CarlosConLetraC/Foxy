@@ -3,9 +3,11 @@
 #include <string.h>
 #include <stdio.h>
 #include "f_object.h"
+#include "f_gc.h" // Importar el GC
 
 FoxyObject* f_object_new(FoxyClass *klass) {
-    FoxyObject *obj = (FoxyObject *)calloc(1, sizeof(FoxyObject));
+    // Asignación gestionada por el GC
+    FoxyObject *obj = (FoxyObject *)f_gc_allocate(FOXY_HEAP_OBJECT, sizeof(FoxyObject), (void(*)(void*))f_object_free);
     if (!obj) return NULL;
 
     obj->klass = klass;
@@ -20,15 +22,10 @@ FoxyObject* f_object_new(FoxyClass *klass) {
 
 void f_object_free(FoxyObject *obj) {
     if (!obj) return;
-
     for (size_t i = 0; i < obj->field_count; i++) {
-        if (obj->fields[i].name) {
-            free(obj->fields[i].name);
-        }
+        if (obj->fields[i].name) free(obj->fields[i].name);
     }
-    if (obj->fields) {
-        free(obj->fields);
-    }
+    if (obj->fields) free(obj->fields);
     free(obj);
 }
 

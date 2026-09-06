@@ -14,12 +14,14 @@
         F(FOXY_AST_NODE_CALL,        "CALL") \
         F(FOXY_AST_NODE_LITERAL,     "LITERAL") \
         F(FOXY_AST_NODE_IDENTIFIER,  "IDENTIFIER") \
+        F(FOXY_AST_NODE_BLOCK,       "BLOCK") \
         F(FOXY_AST_NODE_BINARY_OP,   "BINARY_OP") \
         F(FOXY_AST_NODE_VAR_DECL,    "VAR_DECL") \
         F(FOXY_AST_NODE_ASSIGN,      "ASSIGN") \
         F(FOXY_AST_NODE_IF,          "IF") \
         F(FOXY_AST_NODE_WHILE,       "WHILE") \
         F(FOXY_AST_NODE_RETURN,      "RETURN") \
+        F(FOXY_AST_NODE_FUNCTION,    "FUNCTION") \
         F(FOXY_AST_NODE_FOR,         "FOR") \
         F(FOXY_AST_NODE_ENV,         "ENV") \
         F(FOXY_AST_NODE_ENV_CREATE,  "ENV_CREATE") \
@@ -55,6 +57,12 @@
             struct {
                 FoxyValue value;
             } literal_node;
+
+            struct {
+                FoxyASTNode **statements;
+                size_t count;
+                size_t capacity;
+            } block_node;
 
             struct {
                 char *name;
@@ -95,6 +103,13 @@
                 FoxyASTNode *condition;
                 FoxyASTNode *body;
             } while_node;
+
+            struct {
+                char *name;
+                char **param_names;
+                size_t param_count;
+                FoxyASTNode *body;
+            } function_node;
 
             struct {
                 FoxyASTNode *init;
@@ -146,6 +161,7 @@
     FoxyASTNode* f_ast_create_assign(FoxyASTNode *left, FoxyASTNode *right);
     FoxyASTNode* f_ast_create_if(FoxyASTNode *condition, FoxyASTNode *then_branch, FoxyASTNode *else_branch);
     FoxyASTNode* f_ast_create_while(FoxyASTNode *condition, FoxyASTNode *body);
+    FoxyASTNode* f_ast_create_function(const char *name, FoxyASTNode *body);
     FoxyASTNode* f_ast_create_for(FoxyASTNode *init, FoxyASTNode *condition, FoxyASTNode *increment, FoxyASTNode *body);
     FoxyASTNode* f_ast_create_return(FoxyASTNode *value);
     FoxyASTNode* f_ast_create_expr_stmt(FoxyASTNode *expr);

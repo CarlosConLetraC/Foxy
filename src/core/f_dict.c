@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include "f_dict.h"
+#include "f_gc.h" // Importar el GC
 
 FoxyDict* f_dict_new(void) {
-    FoxyDict *dict = (FoxyDict*)malloc(sizeof(FoxyDict));
+    // Asignación controlada por el heap del GC
+    FoxyDict *dict = (FoxyDict*)f_gc_allocate(FOXY_HEAP_DICT, sizeof(FoxyDict), (void(*)(void*))f_dict_free);
     if (!dict) return NULL;
-    dict->head = NULL;      // En uthash, la tabla inicia apuntando a NULL
-    dict->is_marked = false;
-    dict->next = NULL;
+    dict->head = NULL;      // En uthash, la tabla inicia apuntando a NULL[cite: 7, 10]
     return dict;
 }
 

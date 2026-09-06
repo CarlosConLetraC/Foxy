@@ -7,7 +7,7 @@ FoxySymbolTable* f_symtable_new(void) {
     FoxySymbolTable *table = (FoxySymbolTable *)malloc(sizeof(FoxySymbolTable));
     if (!table) return NULL;
 
-    table->capacity = 32;
+    table->capacity = FOXY_MAX_TABLE_CAPACITY;
     table->count = 0;
     table->next_id = 1; // Estilo AUTO_INCREMENT
     table->rows = (FoxySymbolRow *)malloc(sizeof(FoxySymbolRow) * table->capacity);

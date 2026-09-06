@@ -11,6 +11,8 @@
         bool had_error;
     } FoxyParser;
 
+    char* f_parser_token_to_string(FoxyToken *token);
+
     // --- Prototipos de gestión del AST ---
     FoxyASTNode* f_ast_node_new(FoxyASTNodeType type);
     FoxyASTNode* f_parser_parse(FoxyLexer *lexer);

@@ -3,9 +3,11 @@
 #include <string.h>
 #include "f_class.h"
 #include "f_methods.h"
+#include "f_gc.h"
 
 FoxyClass* f_class_new(const char *name, FoxyClass *super_class) {
-    FoxyClass *klass = (FoxyClass*)malloc(sizeof(FoxyClass));
+    // Controlador gestionado por el GC en lugar de malloc directo. . .
+    FoxyClass *klass = (FoxyClass*)f_gc_allocate(FOXY_HEAP_CLASS, sizeof(FoxyClass), (void(*)(void*))f_class_free);
     if (!klass) return NULL;
 
     klass->name = name ? strdup(name) : NULL;

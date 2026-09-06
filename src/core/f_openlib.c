@@ -10,7 +10,7 @@
 typedef void (*FoxyInitModuleFunc)(FoxyVM *vm);
 
 static void *f_vm_resolve_and_dlopen(const char *cpath, const char *lib_name, char *out_resolved_path, size_t max_len) {
-    char template_buffer[512];
+    char template_buffer[FOXY_MAX_MODULE_NAME_SIZE];
     const char *start = cpath;
     const char *end;
     
@@ -65,7 +65,7 @@ bool f_vm_load_library(FoxyVM *vm, const char *lib_name) {
         if (strcmp(vm->loaded_libs[i], lib_name) == 0) return true;
     }
 
-    char resolved_path[512] = {0};
+    char resolved_path[FOXY_MAX_MODULE_NAME_SIZE] = {0};
     
     // Si vm->cpath fuera dinámico podrías usarlo aquí, o usar el macro por defecto
     const char *cpath = FOXY_DEFAULT_CPATH;

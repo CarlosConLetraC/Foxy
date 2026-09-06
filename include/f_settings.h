@@ -1,5 +1,6 @@
 #ifndef F_SETTINGS_H
     #define F_SETTINGS_H
+    typedef unsigned int uint;
 
     // Habilitar características extendidas de POSIX y GNU (necesario para strdup)
     #ifndef _GNU_SOURCE
@@ -10,11 +11,16 @@
     #endif
 
     // Límites de la Máquina Virtual y Procesos
-    #define FOXY_MAX_FRAMES         256
-    #define FOXY_STACK_MAX          1024
-    #define FOXY_NAME_BUFFER_SIZE   1024
-    #define FOXY_MAX_LOCALS         256
-    #define FOXY_MAX_IDENTIFIER_LEN 128
+    #define FOXY_MAX_STACK_SIZE            (1u << 3) // 8
+    #define FOXY_MAX_CALL_STACK_SIZE       (1u << 3) // 8
+    #define FOXY_MAX_LOCALS_CAPACITY       (1u << 4)  // 16
+    #define FOXY_MAX_PROGRAM_NODE_CAPACITY (1u << 4)  // 16
+    #define FOXY_MAX_TABLE_CAPACITY        (1u << 5)  // 32
+    #define FOXY_MAX_IDENTIFIER_LEN        (1u << 7)  // 128
+    #define FOXY_MAX_FRAMES                (1u << 8)  // 256
+    #define FOXY_MAX_LOCALS                (1u << 8)  // 256
+    #define FOXY_MAX_MODULE_NAME_SIZE      (1u << 9)  // 512
+    #define FOXY_NAME_BUFFER_SIZE          (1u << 10) // 1024
 
     #define FOXY_NULL_VALUE ((FoxyValue){ .type = FOXY_VAL_NULL, .as.ptr = NULL })
 
@@ -24,7 +30,7 @@
     #endif
 
     #ifndef FOXY_DEFAULT_CPATH
-        #define FOXY_DEFAULT_CPATH "./?.so;./sys/?.so;./f_include/?.so;./?/init.so"
+        #define FOXY_DEFAULT_CPATH FOXY_DEFAULT_HOME "/f_include/?.so;./?.so;./sys/?.so;./f_include/?.so;./?/init.so"
     #endif
 
     #ifndef FOXY_EXPORT

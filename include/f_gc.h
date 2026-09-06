@@ -10,7 +10,8 @@
         F(FOXY_HEAP_DICT,               "dict")     \
         F(FOXY_HEAP_OBJECT,             "object")   \
         F(FOXY_HEAP_FUNCTION,           "function") \
-        F(FOXY_HEAP_CLASS,              "class")
+        F(FOXY_HEAP_CLASS,              "class")    \
+        F(FOXY_HEAP_ENV,                "env")
 
     // Generación de la enumeración usando la X-Macro
     #define GENERATE_ENUM(enum_val, string_val) enum_val,

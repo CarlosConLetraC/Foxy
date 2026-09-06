@@ -1,16 +1,17 @@
 #ifndef F_VM_H
     #define F_VM_H
 
+    #include "f_settings.h"
     #include <stdint.h>
     #include <stdbool.h>
     #include <stddef.h>
     #include "f_value.h"
-    #include "f_process.h"
     #include "f_runtime.h"
     #include "f_symtable.h"
     #include "f_lib.h"
     #include "f_methods.h"
     #include "f_status.h"
+    #include "f_process.h"
 
     typedef struct FoxyRuntime FoxyRuntime;
     typedef struct FoxyObject FoxyObject;
@@ -19,7 +20,7 @@
     typedef FoxyNativeFunc FoxyNativeMethod;
 
     typedef struct {
-        char name[128];
+        char name[FOXY_MAX_IDENTIFIER_LEN];
         FoxyNativeFunc func;
     } FoxyNativeSymbol;
 
@@ -44,7 +45,7 @@
         size_t native_symbols_capacity;
 
         // Loaded Libraries Tracking & Subsystem Relacional de Símbolos
-        FoxySymbolTable *symtable; // Tabla relacional unificada de símbolos
+        FoxySymbolTable *symtable; 
         FoxyLib *loading_lib;
         FoxyMethod *method;
         char **loaded_libs;
@@ -60,12 +61,15 @@
     void f_vm_free(FoxyVM *vm);
     void f_vm_push(FoxyProcess *p, FoxyValue val);
     void f_vm_register_native(FoxyVM *vm, const char *name, FoxyNativeMethod func);
+    void f_vm_load_module(FoxyVM *vm, const char *path);
+    FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc); // Rutina del worker de hilos para la ejecución concurrente de procesos
 
     FoxyValue f_vm_pop(FoxyProcess *p);
     FoxyValue f_vm_peek(FoxyProcess *p, size_t distance);
     FoxyNativeFunc f_vm_find_native(FoxyVM *vm, const char *name);
     FoxyLib* f_vm_get_current_loading_lib(FoxyVM *vm);
+    void f_vm_set_current_loading_lib(FoxyVM *vm, FoxyLib *lib);
 
     void f_vm_load_process(FoxyVM *vm, const uint8_t *code, size_t code_size, const char *filename);
-    FoxyStatus f_vm_run(FoxyVM *vm);
+    FoxyStatus f_vm_run(FoxyVM *vm); // interpreta todo el bytecode con ayuda de f_vm_execute_process. . .
 #endif // F_VM_H

@@ -50,8 +50,8 @@
         F(FOXCODE_BIT_OR,        "BIT_OR",        "|") \
         F(FOXCODE_BIT_XOR,       "BIT_XOR",       "^") \
         F(FOXCODE_BIT_NOT,       "BIT_NOT",       "~") \
-        F(FOXCODE_SHL,           "SHL",           "<<") \
-        F(FOXCODE_SHR,           "SHR",           ">>") \
+        F(FOXCODE_BIT_SHL,       "SHL",           "<<") \
+        F(FOXCODE_BIT_SHR,       "SHR",           ">>") \
         \
         /* Control de Flujo */ \
         F(FOXCODE_JUMP,          "JUMP",          "jump") \

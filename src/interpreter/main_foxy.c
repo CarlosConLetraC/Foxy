@@ -64,7 +64,6 @@ int main(int argc, char** argv) {
     FoxyCodegen cg;
     f_codegen_init(&cg);
 
-    // Hacer el cast a (FoxyASTNode*) si f_codegen_generate espera ese tipo
     if (!f_codegen_generate(&cg, (FoxyASTNode*)ast_root)) {
         fprintf(stderr, "[Error] Fallo durante la generación de bytecode.\n");
         f_codegen_free(&cg);
@@ -79,25 +78,38 @@ int main(int argc, char** argv) {
         f_utils_dump_bytecode(cg.bytecode, cg.code_count);
     }
 
-    // 4. Transferir recursos a la VM
+    // 4. Inicializar la VM y transferir recursos bajo la nueva arquitectura
     FoxyVM* vm = f_vm_new();
+    if (!vm) {
+        fprintf(stderr, "[Error] No se pudo inicializar la Máquina Virtual.\n");
+        f_codegen_free(&cg);
+        f_ast_node_free((FoxyASTNode*)ast_root);
+        free(source);
+        return 1;
+    }
     
-    // Cargar el búfer de bytecode de 32 bits en la VM
-    f_vm_load_process(vm, (uint8_t*)cg.bytecode, cg.code_count * sizeof(FoxInstruction), filename);
-
     // Asignar el pool de constantes transferido a la VM
     vm->constants = cg.constants;
     vm->constants_count = cg.constants_count;
     vm->constants_capacity = cg.constants_capacity;
 
-    // Invalidar los punteros del codegen para que f_codegen_free no los libere 
-    // ya que ahora la VM asume la propiedad de los búferes.
+    // Cargar el búfer de bytecode creando el proceso principal
+    f_vm_load_process(vm, (uint8_t*)cg.bytecode, cg.code_count * sizeof(FoxInstruction), filename);
+
+    // --- SOLUCIÓN PARA LOS 1,024 BYTES ---
+    // Como f_vm_load_process ya copió el bytecode al proceso, 
+    // liberamos el búfer de capacidad inicial de 1024 bytes de f_codegen_init.
+    free(cg.bytecode); 
     cg.bytecode = NULL;
-    cg.constants = NULL;
+    
+    // Invalidamos constants para que f_codegen_free no intente liberarlas 
+    // ya que ahora la VM es la dueña absoluta de ese arreglo.
+    cg.constants = NULL; 
+    
     f_codegen_free(&cg);
 
     // 5. Ejecución y limpieza final
-    int exit_code = f_vm_run(vm);
+    int exit_code = (int)f_vm_run(vm);
 
     f_vm_free(vm);
     f_ast_node_free((FoxyASTNode*)ast_root);

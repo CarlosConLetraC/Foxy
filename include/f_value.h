@@ -73,7 +73,7 @@
     } FoxyValue;
 
     // Prototipos
-    extern const char * const FOXY_VALUE_TYPE_STRINGS[];
+    extern const char * const FOXY_VALUE_TYPE_NAMES[];
     const char* f_value_type_to_char_array(FoxyValueType type);
     FoxyValue f_value_create_char_array(const char *str, size_t len);
     const char* f_value_get_char_array_data(const FoxyValue *val);

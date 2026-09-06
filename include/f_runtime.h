@@ -20,7 +20,7 @@
     FoxyRuntime* f_runtime_new(void);
     void f_runtime_free(FoxyRuntime *rt);
 
-    FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, const uint8_t *bytecode, FoxyProtocol *protocol);
-    bool f_process_start(FoxyProcess *process);
-    FoxyProtocol* f_protocol_get_or_create(FoxyRuntime *rt, const char *name);
+    FoxyProcess* f_runtime_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *main_func, FoxyProtocol *protocol);
+    bool f_runtime_process_start(FoxyProcess *process);
+    FoxyProtocol* f_runtime_get_or_create(FoxyRuntime *rt, const char *name);
 #endif // F_RUNTIME_H

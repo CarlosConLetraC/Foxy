@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, Foxyobj *self, int argc) {
+FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
     (void)self;
 
     if (argc < 1 || vm->process_count == 0) {

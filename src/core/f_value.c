@@ -1,17 +1,18 @@
-#include "f_value.h"
+#include "f_settings.h"
 #include <stdlib.h>
 #include <string.h>
+#include "f_value.h"
 
 // Generación del arreglo de cadenas alineado con los índices del enum mediante X-Macro
-const char * const FOXY_VALUE_TYPE_STRINGS[] = {
+const char * const FOXY_VALUE_TYPE_NAMES[] = {
     #define X(type_enum, type_str) [type_enum] = type_str,
     FOXY_VALUE_TYPE_LIST(X)
     #undef X
 };
 
 const char* f_value_type_to_char_array(FoxyValueType type) {
-    if ((unsigned int)type >= FOXY_VAL_COUNT) return "unknown";
-    return FOXY_VALUE_TYPE_STRINGS[type];
+    if ((uint)type >= FOXY_VAL_COUNT) return "unknown";
+    return FOXY_VALUE_TYPE_NAMES[type];
 }
 
 FoxyValue f_value_create_char_array(const char *str, size_t len) {
@@ -76,25 +77,21 @@ void f_value_free_contents(FoxyValue *val) {
             }
             break;
 
+        // Los objetos, clases, structs y funciones son gestionados por el
+        // Recolector de Basura (GC) o el ciclo de vida de la VM.
+        // NO deben hacer free() directo en el destructor escalar de FoxyValue.
         case FOXY_VAL_OBJECT:
         case FOXY_VAL_STRUCT:
         case FOXY_VAL_CLASS:
-            if (val->as.obj) {
-                free(val->as.obj);
-                val->as.obj = NULL;
-            }
+            val->as.obj = NULL;
             break;
 
         case FOXY_VAL_FUNCTION:
-            if (val->as.func) {
-                // Si la función fue asignada dinámicamente:
-                free(val->as.func);
-                val->as.func = NULL;
-            }
+            val->as.func = NULL;
             break;
 
         default:
-            // Tipos primitivos y escalares (int, float, bool, null)
+            // Tipos primitivos (int, float, bool, null, etc.)
             break;
     }
 }

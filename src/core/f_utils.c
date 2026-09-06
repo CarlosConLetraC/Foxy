@@ -351,54 +351,45 @@ long f_utils_syswrite(int fd, const char *buf, unsigned long count) {
 void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count) {
     printf("=== [DEBUG] CONSTANT POOL (%zu elementos) ===\n", count);
     for (size_t i = 0; i < count; i++) {
-        switch (constants[i].type) {
-            case FOXY_VAL_CHAR:
-                if (constants[i].as.ival >= 32 && constants[i].as.ival <= 126) {
-                    printf("  [%02zu] CHAR: '%c' (%ld)\n", i, (char)constants[i].as.ival, constants[i].as.ival);
-                } else {
-                    printf("  [%02zu] CHAR: '\\x%02X' (%ld)\n", i, (unsigned char)constants[i].as.ival, constants[i].as.ival);
-                }
-                break;
-            case FOXY_VAL_ARRAY: {
-                FoxyArray *arr = constants[i].as.array;
-                if (arr) {
-                    if (arr->element_type_id == FOXY_VAL_CHAR && arr->data) {
-                        printf("  [%02zu] CHAR ARRAY (String): \"%s\"\n", i, (const char*)arr->data);
-                    } else {
-                        printf("  [%02zu] GENERIC ARRAY (Elem Type: %d, Length: %zu)\n", 
-                               i, arr->element_type_id, arr->length);
-                    }
-                } else {
-                    printf("  [%02zu] ARRAY: null\n", i);
-                }
-                break;
-            }
-            case FOXY_VAL_obj: {
-                const char *obj_str = constants[i].as.obj ? (const char *)constants[i].as.obj : "null";
-                printf("  [%02zu] obj/STRING: \"%s\"\n", i, obj_str);
-                break;
-            }
+        const FoxyValue *val = &constants[i];
+        // Usar f_value_type_to_char_array garantiza que siempre imprima el nombre real del enum
+        printf("  [%02zu] %s: ", i, f_value_type_to_char_array(val->type));
+
+        switch (val->type) {
             case FOXY_VAL_INT:
-                printf("  [%02zu] INT: %ld\n", i, constants[i].as.ival);
+            case FOXY_VAL_LONG:
+            case FOXY_VAL_LONG_LONG:
+                printf("%lld\n", (long long)val->as.ival);
                 break;
             case FOXY_VAL_FLOAT:
-                printf("  [%02zu] FLOAT: %f\n", i, constants[i].as.fval);
-                break;
-            case FOXY_VAL_NUMBER:
             case FOXY_VAL_DOUBLE:
-                printf("  [%02zu] DOUBLE: %f\n", i, constants[i].as.dval);
+            case FOXY_VAL_NUMBER:
+                printf("%f\n", val->as.dval);
                 break;
             case FOXY_VAL_BOOL:
-                printf("  [%02zu] BOOL: %s\n", i, constants[i].as.boolean ? "true" : "false");
+                printf("%s\n", val->as.bval ? "true" : "false");
                 break;
-            case FOXY_VAL_NULL:
-                printf("  [%02zu] NULL\n", i);
+            case FOXY_VAL_CHAR:
+                printf("'%c'\n", val->as.cval);
+                break;
+            case FOXY_VAL_ARRAY: {
+                const char *str_data = f_value_get_char_array_data(val);
+                if (str_data) {
+                    printf("CHAR ARRAY (String): \"%s\"\n", str_data);
+                } else {
+                    printf("ARRAY (len=%zu)\n", val->as.array ? val->as.array->length : 0);
+                }
+                break;
+            }
+            case FOXY_VAL_FUNCTION:
+                printf("<function: %p>\n", (void*)val->as.func);
                 break;
             default:
-                printf("  [%02zu] UNKNOWN TYPE (%d)\n", i, constants[i].type);
+                printf("<object: %p, type: %i>\n", (void*)val->as.ptr, val->type);
                 break;
         }
     }
+    printf("============================================================\n");
 }
 
 void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count) {

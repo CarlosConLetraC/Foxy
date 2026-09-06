@@ -1,7 +1,9 @@
+#include "f_settings.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include "f_callstack.h"
 #include "f_runtime.h"
 #include "f_symtable.h"
 #include "f_utils.h"
@@ -40,9 +42,8 @@ void f_runtime_free(FoxyRuntime *rt) {
         HASH_DEL(rt->processes, curr_proc);
         
         // Esperar a que el hilo termine si aún sigue activo
-        if (curr_proc->state == FOXY_PROCESS_RUNNING) {
+        if (curr_proc->state == FOXY_PROCESS_RUNNING)
             pthread_join(curr_proc->thread_id, NULL);
-        }
 
         // Liberar librerías locales
         FoxyLib *curr_llib, *tmp_llib;
@@ -83,8 +84,8 @@ void f_runtime_free(FoxyRuntime *rt) {
 
 // --- Gestión de Procesos (processes) ---
 
-FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, const uint8_t *bytecode, FoxyProtocol *protocol) {
-    if (!rt || !pname) return NULL;
+FoxyProcess* f_runtime_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *main_func, FoxyProtocol *protocol) {
+    if (!rt || !pname || !main_func) return NULL;
 
     pthread_mutex_lock(&rt->global_lock);
 
@@ -113,10 +114,15 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, const uint8_t 
     proc->locallibs = NULL;
     proc->protocol = protocol; // Enlace al SharedEnv (puede ser NULL)
 
-    // Bytecode
-    proc->bytecode = bytecode;
-    proc->ip = 0;
-    proc->stack_top = 0;
+    // Inicializar el CallStack del proceso e insertar la función principal
+    f_callstack_init(&proc->call_stack);
+    
+    // Puntear el primer marco de ejecución con la función main
+    if (!f_callstack_push(&proc->call_stack, main_func, 0, 0)) {
+        free(proc);
+        pthread_mutex_unlock(&rt->global_lock);
+        return NULL;
+    }
 
     // Registrar en el hashmap global
     HASH_ADD_STR(rt->processes, pname, proc);
@@ -125,31 +131,11 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, const uint8_t 
     return proc;
 }
 
-// --- Worker de Hilo POSIX ---
-
-static void* f_vm_process_worker(void *arg) {
-    FoxyProcess *proc = (FoxyProcess*)arg;
-    proc->state = FOXY_PROCESS_RUNNING;
-
-    // Loop principal del intérprete para este proceso
-    while (proc->state == FOXY_PROCESS_RUNNING && proc->bytecode != NULL) {
-        uint8_t opcode = proc->bytecode[proc->ip++];
-
-        // Simulación: detener al llegar a un opcode de fin (0x00 / OP_HALT)
-        if (opcode == 0x00) {
-            break;
-        }
-    }
-
-    proc->state = FOXY_PROCESS_DEAD;
-    return NULL;
-}
-
-bool f_process_start(FoxyProcess *process) {
+bool f_runtime_process_start(FoxyProcess *process) {
     if (!process || process->state != FOXY_PROCESS_READY) return false;
 
     // Lanza el proceso en un hilo nativo del SO
-    if (pthread_create(&process->thread_id, NULL, f_vm_process_worker, process) != 0) {
+    if (pthread_create(&process->thread_id, NULL, f_process_worker, process) != 0) {
         process->state = FOXY_PROCESS_DEAD;
         return false;
     }
@@ -159,7 +145,7 @@ bool f_process_start(FoxyProcess *process) {
 
 // --- Gestión de Protocolos / SharedEnv (protocols) ---
 
-FoxyProtocol* f_protocol_get_or_create(FoxyRuntime *rt, const char *name) {
+FoxyProtocol* f_runtime_get_or_create(FoxyRuntime *rt, const char *name) {
     if (!rt || !name) return NULL;
 
     pthread_mutex_lock(&rt->global_lock);

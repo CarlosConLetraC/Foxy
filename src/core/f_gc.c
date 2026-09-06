@@ -2,9 +2,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include "uthash.h"
 #include "f_gc.h"
 #include "f_dict.h"
 #include "f_value.h"
+#include "f_function.h"
+#include "f_object.h"
+#include "f_class.h"
+#include "f_dict.h"
 
 // Estructura interna del nodo de control del GC en el heap
 typedef struct InternalGNode {
@@ -51,7 +56,6 @@ void* f_gc_allocate(FoxyHeapType type, size_t size, void (*free_func)(void*)) {
 void f_gc_mark_value(FoxyValue value) {
     void *target_ptr = NULL;
 
-    // Extraemos el puntero del heap según el tipo definido en f_value.h
     switch (value.type) {
         case FOXY_VAL_DICT:
             target_ptr = value.as.dict;
@@ -66,25 +70,79 @@ void f_gc_mark_value(FoxyValue value) {
             target_ptr = value.as.klass;
             break;
         default:
-            return; // Tipos primitivos o sin gestión en heap no se marcan
+            return; 
     }
 
     if (target_ptr) {
-        // Obtenemos la cabecera InternalGNode restando el offset del arreglo flexible
         InternalGNode *node = (InternalGNode*)((char*)target_ptr - offsetof(InternalGNode, data));
         
         if (node && !node->is_marked) {
             node->is_marked = true;
 
-            // Marcado recursivo de dependencias internas según el tipo de objeto
-            if (node->type == FOXY_HEAP_DICT) {
-                FoxyDict *dict = (FoxyDict*)node->data;
-                FoxyDictEntry *current, *tmp;
-                HASH_ITER(hh, dict->head, current, tmp) {
-                    f_gc_mark_value(current->value);
+            // Marcado recursivo de dependencias según el tipo de objeto en el heap
+            switch (node->type) {
+                case FOXY_HEAP_DICT: {
+                    FoxyDict *dict = (FoxyDict*)node->data;
+                    FoxyDictEntry *current, *tmp;
+                    HASH_ITER(hh, dict->head, current, tmp) {
+                        f_gc_mark_value(current->value);
+                    }
+                    break;
+                }
+                case FOXY_HEAP_OBJECT: {
+                    FoxyObject *obj = (FoxyObject*)node->data;
+                    // Marcar la clase del objeto
+                    if (obj->klass) {
+                        f_gc_mark_root(obj->klass);
+                    }
+                    // Marcar los valores de cada campo/propiedad
+                    for (size_t i = 0; i < obj->field_count; i++) {
+                        f_gc_mark_value(obj->fields[i].value);
+                    }
+                    break;
+                }
+                case FOXY_HEAP_CLASS: {
+                    FoxyClass *klass = (FoxyClass*)node->data;
+                    // Marcar la clase padre si existe (herencia)
+                    if (klass->super_class) {
+                        f_gc_mark_root(klass->super_class);
+                    }
+                    break;
+                }
+                case FOXY_HEAP_ENV: {
+                    FoxyEnv *env = (FoxyEnv*)node->data;
+                    // Marcar recursivamente el entorno padre si existe
+                    if (env->parent) {
+                        f_gc_mark_root(env->parent);
+                    }
+                    // Marcar el diccionario interno de bindings y sus valores contenidos
+                    if (env->bindings) {
+                        f_gc_mark_root(env->bindings);
+                        FoxyDictEntry *current, *tmp;
+                        HASH_ITER(hh, env->bindings->head, current, tmp) {
+                            f_gc_mark_value(current->value);
+                        }
+                    }
+                    break;
+                }
+                case FOXY_HEAP_FUNCTION: {
+                    FoxyFunction *func = (FoxyFunction*)node->data;
+                    // Las funciones nativas no tienen entorno léxico ni constantes de usuario que marcar
+                    if (func->type == FOXY_FUNCTION_USER) {
+                        // Marcar el entorno léxico capturado por la función
+                        if (func->as.user.env) {
+                            f_gc_mark_root(func->as.user.env);
+                        }
+                        // Marcar el pool de constantes de la función
+                        if (func->as.user.constants) {
+                            for (size_t i = 0; i < func->as.user.constants_count; i++) {
+                                f_gc_mark_value(func->as.user.constants[i]);
+                            }
+                        }
+                    }
+                    break;
                 }
             }
-            // TODO: gregar la recursión para object, class y function conforme implementes sus estructuras internas.
         }
     }
 }

@@ -185,8 +185,8 @@
         uint32_t length;                // Longitud del lexema
         uint16_t line;                  // Línea de origen
         uint16_t column;                // Columna de origen
-        unsigned int type_category : 4; // Categoría principal (0-15)
-        unsigned int subtype : 12;      // Subtipo del enum correspondiente (0-4095)
+        uint type_category : 4; // Categoría principal (0-15)
+        uint subtype : 12;      // Subtipo del enum correspondiente (0-4095)
         
         // Unión para almacenar valores evaluados directamente en el lexer
         union {
@@ -198,8 +198,8 @@
 
     typedef struct {
         const char* text;            // Nombre de la palabra reservada
-        unsigned int category : 4;   // Categoría (1: Keyword, 2: Primitive Type)
-        unsigned int subtype : 12;    // Valor enum asignado
+        uint category : 4;   // Categoría (1: Keyword, 2: Primitive Type)
+        uint subtype : 12;    // Valor enum asignado
     } FoxyKeywordMap;
 
     // TODO: Renombrar KEYWORD_TABLE a FOXY_KEYWORD_TABLE para futuras anotaciones. . .

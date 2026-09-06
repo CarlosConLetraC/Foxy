@@ -6,13 +6,13 @@
     #include "f_foxmode.h"
 
     typedef struct {
-        char name[64];
+        char name[FOXY_MAX_IDENTIFIER_LEN];
         int index;
     } FoxyCodegenLocal;
 
     typedef struct {
-        FoxyCodegenLocal locals[256];
-        int local_count;
+        FoxyCodegenLocal locals[FOXY_MAX_LOCALS];
+        uint local_count;
         
         FoxInstruction *bytecode;
         size_t code_count;
@@ -27,7 +27,7 @@
     void f_codegen_free(FoxyCodegen *cg);
     size_t f_codegen_emit(FoxyCodegen *cg, FoxInstruction inst);
     void f_codegen_emit_byte(FoxyCodegen *cg, uint8_t opcode);
-    int f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val);
+    size_t f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val);
 
     bool f_codegen_visit(FoxyCodegen *cg, FoxyASTNode *node);
     
