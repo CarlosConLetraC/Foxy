@@ -1,6 +1,7 @@
-#include "f_process.h"
+#include "f_settings.h"
 #include <stdlib.h>
 #include <string.h>
+#include "f_process.h"
 #include "f_vm.h"
 
 // Generación automática del arreglo de strings usando la misma X-Macro
@@ -47,7 +48,7 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *
     }
 
     // Inicializar el stack de evaluación
-    proc->stack_capacity = 256;
+    proc->stack_capacity = FOXY_MAX_STACK_CAPACITY;
     proc->stack_top = 0;
     proc->stack = malloc(sizeof(FoxyValue) * proc->stack_capacity);
 
@@ -59,16 +60,17 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *
     return proc;
 }
 
-void f_process_free(FoxyProcess *process) {
-    if (!process) return;
+void f_process_free(FoxyProcess *proc) {
+    if (!proc) return;
 
-    // Liberar recursos de la pila de llamadas
-    f_callstack_free(&process->call_stack);
+    // Solo liberar el stack / registros locales, NO las funciones cargadas desde vm->constants
+    if (proc->stack) {
+        // Liberar stack si corresponde
+        free(proc->stack);
+        proc->stack = NULL;
+    }
 
-    if (process->stack) free(process->stack);
-    if (process->locals) free(process->locals);
-
-    free(process);
+    free(proc);
 }
 
 FoxyValue f_process_pop(FoxyProcess *p) {

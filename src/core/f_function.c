@@ -47,7 +47,7 @@ FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNati
 void f_function_free(FoxyFunction *fn) {
     if (!fn) return;
 
-    // 1. Liberar el nombre de la función si fue asignado dinámicamente
+    // 1. Liberar el nombre si fue asignado en Heap
     if (fn->name) {
         free(fn->name);
         fn->name = NULL;
@@ -55,41 +55,22 @@ void f_function_free(FoxyFunction *fn) {
 
     // 2. Liberar recursos específicos según el tipo de función
     if (fn->type == FOXY_FUNCTION_USER) {
-        // Liberar el bytecode de la función de usuario
+        // Liberar el buffer del Bytecode
         if (fn->as.user.code) {
             free(fn->as.user.code);
             fn->as.user.code = NULL;
         }
 
-        // Liberar el sub-pool de constantes de la función
+        // Liberar el Pool de Constantes local de la función
         if (fn->as.user.constants) {
-            for (size_t j = 0; j < fn->as.user.constants_count; j++) {
-                FoxyValue *val = &fn->as.user.constants[j];
-                
-                // Liberación recursiva si hay arreglos u objetos internos
-                if (val->type == FOXY_VAL_ARRAY || val->type == FOXY_VAL_OBJECT) {
-                    if (val->as.array) {
-                        free(val->as.array->data);
-                        free(val->as.array);
-                        val->as.array = NULL;
-                    }
-                } 
-                // Si el sub-pool contiene funciones anidadas, se liberan recursivamente
-                else if (val->type == FOXY_VAL_FUNCTION) {
-                    f_function_free(val->as.func);
-                    val->as.func = NULL;
-                }
-            }
+            for (size_t i = 0; i < fn->as.user.constants_count; i++)
+                f_value_free_contents(&fn->as.user.constants[i]);
             free(fn->as.user.constants);
             fn->as.user.constants = NULL;
         }
-    } 
-    else if (fn->type == FOXY_FUNCTION_NATIVE) {
-        // Las funciones nativas (como las de los .so) apuntan a memoria del sistema (dlopen).
-        // No se hace free del puntero de la función, pero sí de estructuras auxiliares si las hubiera.
     }
 
-    // 3. Liberar el contenedor principal de la función
+    // 3. Liberar la estructura contenedora
     free(fn);
 }
 

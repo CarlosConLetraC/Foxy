@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "f_ast.h"
+#include "f_array.h"
 
 FoxyASTNode* f_ast_node_new(FoxyASTNodeType type) {
     FoxyASTNode *node = malloc(sizeof(FoxyASTNode));
@@ -152,22 +153,23 @@ void f_ast_node_free(FoxyASTNode *node) {
 
 FoxyASTNode* f_ast_create_program(void) {
     FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_PROGRAM);
+    node->as.program_node.count = 0;
     node->as.program_node.capacity = FOXY_MAX_PROGRAM_NODE_CAPACITY;
-    node->as.program_node.statements = malloc(sizeof(FoxyASTNode*) * node->as.program_node.capacity);
+    // Inicialización estandarizada usando macros de f_array
+    f_array_init(node->as.program_node.statements, node->as.program_node.capacity);
     return node;
 }
 
 void f_ast_program_add(FoxyASTNode *program, FoxyASTNode *stmt) {
     if (!program || !stmt || program->type != FOXY_AST_NODE_PROGRAM) return;
 
-    if (program->as.program_node.count >= program->as.program_node.capacity) {
-        program->as.program_node.capacity *= 2;
-        program->as.program_node.statements = realloc(
-            program->as.program_node.statements, 
-            sizeof(FoxyASTNode*) * program->as.program_node.capacity
-        );
-    }
-    program->as.program_node.statements[program->as.program_node.count++] = stmt;
+    // Macro genérica de f_array que maneja realloc dinámico y duplica capacidad cuando es necesario
+    f_array_push(
+        program->as.program_node.statements, 
+        program->as.program_node.count, 
+        program->as.program_node.capacity, 
+        stmt
+    );
 }
 
 FoxyASTNode* f_ast_create_include(const char *path) {
@@ -187,14 +189,12 @@ FoxyASTNode* f_ast_create_call(const char *callee) {
 void f_ast_call_add_arg(FoxyASTNode *call_node, FoxyASTNode *arg) {
     if (!call_node || !arg || call_node->type != FOXY_AST_NODE_CALL) return;
 
-    if (call_node->as.call_node.arg_count >= call_node->as.call_node.arg_capacity) {
-        call_node->as.call_node.arg_capacity *= 2;
-        call_node->as.call_node.arguments = realloc(
-            call_node->as.call_node.arguments, 
-            sizeof(FoxyASTNode*) * call_node->as.call_node.arg_capacity
-        );
-    }
-    call_node->as.call_node.arguments[call_node->as.call_node.arg_count++] = arg;
+    f_array_push(
+        call_node->as.call_node.arguments, 
+        call_node->as.call_node.arg_count, 
+        call_node->as.call_node.arg_capacity, 
+        arg
+    );
 }
 
 FoxyASTNode* f_ast_create_literal(FoxyValue val) {

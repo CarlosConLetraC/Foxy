@@ -24,6 +24,7 @@
 #include "f_process.h"
 #include "f_lib.h"
 #include "f_gc.h"
+#include "f_array.h"
 
 extern void foxy_init_module(FoxyVM *vm);
 
@@ -34,49 +35,33 @@ extern void foxy_init_module(FoxyVM *vm);
 void f_vm_register_native(FoxyVM *vm, const char *name, FoxyNativeMethod func) {
     if (!vm || !name || !func) return;
 
-    if (vm->native_symbols_count >= vm->native_symbols_capacity) {
-        size_t new_cap = vm->native_symbols_capacity == 0 ? 8 : vm->native_symbols_capacity * 2;
-        FoxyNativeSymbol *new_syms = (FoxyNativeSymbol *)realloc(vm->native_symbols, sizeof(FoxyNativeSymbol) * new_cap);
-        if (!new_syms) return;
-        vm->native_symbols = new_syms;
-        vm->native_symbols_capacity = new_cap;
+    FoxyNativeSymbolEntry *entry = NULL;
+    HASH_FIND_STR(vm->native_symbols_hash, name, entry);
+    
+    if (!entry) {
+        entry = (FoxyNativeSymbolEntry *)malloc(sizeof(FoxyNativeSymbolEntry));
+        if (!entry) return;
+        
+        strncpy(entry->name, name, sizeof(entry->name) - 1);
+        entry->name[sizeof(entry->name) - 1] = '\0';
+        HASH_ADD_STR(vm->native_symbols_hash, name, entry);
     }
-
-    FoxyNativeSymbol *sym = &vm->native_symbols[vm->native_symbols_count++];
-    strncpy(sym->name, name, sizeof(sym->name) - 1);
-    sym->name[sizeof(sym->name) - 1] = '\0';
-    sym->func = func;
+    
+    entry->func = func;
 }
 
-/*void f_vm_load_module(FoxyVM *vm, const char *path) {
-    char lib_path[FOXY_MAX_MODULE_NAME_SIZE];
-    // Construye la ruta completa al archivo .so (ej: sys/out.so)
-    snprintf(lib_path, sizeof(lib_path), "%s.so", path);
+FoxyProcess* f_vm_get_process(FoxyVM *vm, uint32_t pid) {
+    if (!vm) return NULL;
     
-    // Guardamos opcionalmente el contexto del path actual si tu arquitectura lo requiere
-    // f_vm_set_current_loading_lib_path(vm, path);
+    FoxyProcess *proc = NULL;
+    HASH_FIND_INT(vm->processes_hash, &pid, proc);
+    return proc;
+}
 
-    void *handle = dlopen(lib_path, RTLD_NOW | RTLD_LOCAL);
-    if (!handle) {
-        fprintf(stderr, "[Foxy VM Error] No se pudo cargar el módulo '%s': %s\n", lib_path, dlerror());
-        return;
-    }
-
-    // Limpiamos errores previos de dl
-    dlerror();
-
-    // La VM busca el punto de entrada estándar definido en _f_init.c
-    void (*foxy_init_module)(FoxyVM *) = (void (*)(FoxyVM *))dlsym(handle, "foxy_init_module");
-    char *error = dlerror();
-    if (error != NULL) {
-        fprintf(stderr, "[Foxy VM Error] No se encontró 'foxy_init_module' en el módulo: %s\n", error);
-        dlclose(handle);
-        return;
-    }
-
-    // Ejecutamos la inicialización para registrar las funciones en vm->symtable
-    foxy_init_module(vm);
-}*/
+void f_vm_add_process(FoxyVM *vm, FoxyProcess *proc) {
+    if (!vm || !proc) return;
+    HASH_ADD_INT(vm->processes_hash, pid, proc);
+}
 
 FoxyValue f_vm_peek(FoxyProcess *p, size_t distance) {
     if (!p || p->stack_top <= distance) {
@@ -165,6 +150,7 @@ void f_vm_load_process(FoxyVM *vm, const uint8_t *code, size_t code_size, const 
     FoxyFunction *main_func = (FoxyFunction *)calloc(1, sizeof(FoxyFunction));
     if (!main_func) {
         f_process_free(proc);
+        f_function_free(main_func);
         return;
     }
     main_func->type = FOXY_FUNCTION_USER;
@@ -1020,9 +1006,7 @@ FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc) {
     }
 }
 
-// ==========================================
 // INTERFACES PÚBLICAS DE LA VM
-// ==========================================
 
 FoxyStatus f_vm_run(FoxyVM *vm) {
     if (!vm || vm->process_count == 0) return FOXY_STATUS_SUCCESS;
@@ -1069,68 +1053,35 @@ FoxyVM* f_vm_new(void) {
     return vm;
 }
 
+FoxyNativeMethod f_vm_lookup_native(FoxyVM *vm, const char *name) {
+    if (!vm || !name) return NULL;
+    
+    FoxyNativeSymbolEntry *entry = NULL;
+    HASH_FIND_STR(vm->native_symbols_hash, name, entry);
+    
+    return entry ? entry->func : NULL;
+}
+
 void f_vm_free(FoxyVM *vm) {
     if (!vm) return;
 
-    if (vm->native_symbols) {
-        free(vm->native_symbols);
-        vm->native_symbols = NULL;
+    // Liberar tabla Hash de símbolos nativos
+    FoxyNativeSymbolEntry *curr_sym, *tmp_sym;
+    HASH_ITER(hh, vm->native_symbols_hash, curr_sym, tmp_sym) {
+        HASH_DEL(vm->native_symbols_hash, curr_sym);
+        free(curr_sym);
     }
 
-    if (vm->loaded_libs) {
-        for (size_t i = 0; i < vm->loaded_libs_count; i++) {
-            if (vm->loaded_libs[i]) free(vm->loaded_libs[i]);
-        }
-        free(vm->loaded_libs);
-        vm->loaded_libs = NULL;
+    // Liberar tabla Hash de procesos
+    FoxyProcess *curr_proc, *tmp_proc;
+    HASH_ITER(hh, vm->processes_hash, curr_proc, tmp_proc) {
+        HASH_DEL(vm->processes_hash, curr_proc);
+        if (curr_proc->stack) free(curr_proc->stack);
+        free(curr_proc);
     }
 
-    if (vm->constants) {
-        for (size_t i = 0; i < vm->constants_count; i++) {
-            // Liberar objetos genéricos si aplica
-            if (vm->constants[i].type == FOXY_VAL_OBJECT && vm->constants[i].as.obj) {
-                free(vm->constants[i].as.obj);
-            }
-            // Liberar arreglos y cadenas del pool heredados del codegen
-            else if (vm->constants[i].type == FOXY_VAL_ARRAY && vm->constants[i].as.array) {
-                FoxyArray *arr = vm->constants[i].as.array;
-                if (arr) {
-                    if (arr->data) {
-                        free(arr->data);
-                        arr->data = NULL;
-                    }
-                    free(arr);
-                    vm->constants[i].as.array = NULL;
-                }
-            }
-        }
-        free(vm->constants);
-        vm->constants = NULL;
-    }
-
-    // CORRECCIÓN DE FUGAS: Liberar los globales reservados dinámicamente si existían
-    if (vm->globals) {
-        free(vm->globals);
-        vm->globals = NULL;
-    }
-
-    if (vm->processes) {
-        for (size_t i = 0; i < vm->process_count; i++) {
-            if (vm->processes[i]) f_process_free(vm->processes[i]);
-        }
-        free(vm->processes);
-        vm->processes = NULL;
-    }
-
-    if (vm->symtable) {
-        f_symtable_free(vm->symtable);
-        vm->symtable = NULL;
-    }
-
-    if (vm->runtime) {
-        f_runtime_free(vm->runtime);
-        vm->runtime = NULL;
-    }
+    if (vm->constants) free(vm->constants);
+    if (vm->globals) free(vm->globals);
 
     free(vm);
 }

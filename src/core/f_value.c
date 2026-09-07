@@ -1,7 +1,12 @@
 #include "f_settings.h"
 #include <stdlib.h>
 #include <string.h>
+#include "f_function.h"
+#include "f_object.h"
+#include "f_dict.h"
+#include "f_class.h"
 #include "f_value.h"
+#include "f_array.h"
 
 // Generación del arreglo de cadenas alineado con los índices del enum mediante X-Macro
 const char * const FOXY_VALUE_TYPE_NAMES[] = {
@@ -59,41 +64,55 @@ void f_value_free_contents(FoxyValue *val) {
     if (!val) return;
 
     switch (val->type) {
+        /*
+            Foxy no tiene tipos de dato "string", pero si existen arreglos de caracteres.
+            para poder trabajar con "string", se necesita de la librería string. En ese caso
+            se utiliza un swich case para FOXY_VAL_OBJECT y FOXY_VAL_CLASS para poder realizar
+            la limpieza de tipos de datos más complejos.
+        */
+
         case FOXY_VAL_ARRAY:
             if (val->as.array) {
-                if (val->as.array->data) {
-                    free(val->as.array->data);
-                    val->as.array->data = NULL;
-                }
-                free(val->as.array);
+                // Si tienes un destructor de arreglos:
+                f_array_free(val->as.array);
                 val->as.array = NULL;
+            }
+            break;
+
+        case FOXY_VAL_OBJECT:
+            if (val->as.obj) {
+                f_object_free(val->as.obj);
+                val->as.obj = NULL;
+            }
+            break;
+
+        case FOXY_VAL_FUNCTION:
+            if (val->as.func) {
+                f_function_free(val->as.func);
+                val->as.func = NULL;
             }
             break;
 
         case FOXY_VAL_DICT:
             if (val->as.dict) {
-                free(val->as.dict);
+                f_dict_free(val->as.dict);
                 val->as.dict = NULL;
             }
             break;
 
-        // Los objetos, clases, structs y funciones son gestionados por el
-        // Recolector de Basura (GC) o el ciclo de vida de la VM.
-        // NO deben hacer free() directo en el destructor escalar de FoxyValue.
-        case FOXY_VAL_OBJECT:
-        case FOXY_VAL_STRUCT:
         case FOXY_VAL_CLASS:
-            val->as.obj = NULL;
-            break;
-
-        case FOXY_VAL_FUNCTION:
-            val->as.func = NULL;
+            if (val->as.klass) {
+                f_class_free(val->as.klass);
+                val->as.klass = NULL;
+            }
             break;
 
         default:
-            // Tipos primitivos (int, float, bool, null, etc.)
+            // Tipos primitivos no requieren free().
             break;
     }
+
+    val->type = FOXY_VAL_NULL;
 }
 
 bool f_value_is_numeric(const FoxyValue *val) {

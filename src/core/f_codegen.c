@@ -11,17 +11,18 @@
 #include "f_function.h"
 #include "f_object.h"
 #include "f_ast.h"
+#include "f_array.h"
 
 void f_codegen_init(FoxyCodegen *cg) {
     if (!cg) return;
     
     cg->code_count = 0;
-    cg->code_capacity = 256;
-    cg->bytecode = malloc(sizeof(FoxInstruction) * cg->code_capacity);
+    cg->code_capacity = FOXY_MAX_CODE_CAPACITY;
+    f_array_init(cg->bytecode, cg->code_capacity);
 
     cg->constants_count = 0;
-    cg->constants_capacity = 64;
-    cg->constants = malloc(sizeof(FoxyValue) * cg->constants_capacity);
+    cg->constants_capacity = FOXY_MAX_CONSTANTS_CAPACITY;
+    f_array_init(cg->constants, cg->constants_capacity);
 
     cg->local_count = 0;
 }
@@ -74,18 +75,9 @@ void f_codegen_free(FoxyCodegen *cg) {
 size_t f_codegen_emit(FoxyCodegen *cg, FoxInstruction inst) {
     if (!cg) return 0;
 
-    if (cg->code_count >= cg->code_capacity) {
-        cg->code_capacity *= 2;
-        FoxInstruction *new_bytecode = realloc(cg->bytecode, sizeof(FoxInstruction) * cg->code_capacity);
-        if (!new_bytecode) {
-            fprintf(stderr, "[Foxy Codegen Error] Out of memory reallocating bytecode buffer\n");
-            exit(1);
-        }
-        cg->bytecode = new_bytecode;
-    }
-    
-    cg->bytecode[cg->code_count] = inst;
-    return cg->code_count++;
+    // Sustituye el realloc manual y la verificación de Out of Memory
+    f_array_push(cg->bytecode, cg->code_count, cg->code_capacity, inst);
+    return cg->code_count - 1;
 }
 
 void f_codegen_emit_byte(FoxyCodegen *cg, uint8_t opcode) {
@@ -94,7 +86,6 @@ void f_codegen_emit_byte(FoxyCodegen *cg, uint8_t opcode) {
 }
 
 size_t f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val) {
-    // Si la constante es un arreglo (como los arreglos de caracteres / cadenas en Foxy):
     if (val.type == FOXY_VAL_ARRAY && val.as.array) {
         FoxyArray *orig_arr = val.as.array;
         FoxyArray *new_arr = malloc(sizeof(FoxyArray));
@@ -117,13 +108,9 @@ size_t f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val) {
         }
     }
 
-    if (cg->constants_count >= cg->constants_capacity) {
-        cg->constants_capacity = cg->constants_capacity == 0 ? 8 : cg->constants_capacity * 2;
-        cg->constants = realloc(cg->constants, sizeof(FoxyValue) * cg->constants_capacity);
-    }
-
-    cg->constants[cg->constants_count] = val;
-    return cg->constants_count++;
+    // Inserción segura con auto-expansión vía f_array
+    f_array_push(cg->constants, cg->constants_count, cg->constants_capacity, val);
+    return cg->constants_count - 1;
 }
 
 static int f_codegen_resolve_local(FoxyCodegen *cg, const char *name) {
@@ -170,11 +157,12 @@ bool f_codegen_visit(FoxyCodegen *cg, FoxyASTNode *node) {
     lbl_FOXY_AST_NODE_INCLUDE: {
         const char *path_str = node->as.include_node.path;
         
-        // Como f_parser_token_to_string ya eliminó las comillas, path_str está listo
         FoxyValue path_val = f_value_create_char_array(path_str, strlen(path_str));
         int const_idx = f_codegen_add_constant(cg, path_val);
 
-        // El pool de constantes toma la propiedad de path_val.as.array, no hacemos free aquí.
+        // f_codegen_add_constant clona o toma posesión. 
+        // Liberamos el contenedor temporal path_val para no dejar bloques huérfanos
+        f_value_free_contents(&path_val);
 
         f_codegen_emit(cg, CREATE_ABx(FOXCODE_INCLUDE, 0, (uint16_t)const_idx));
         return true;
@@ -243,9 +231,7 @@ bool f_codegen_visit(FoxyCodegen *cg, FoxyASTNode *node) {
 
     lbl_FOXY_AST_NODE_VAR_DECL: {
         if (node->as.var_decl_node.initializer) {
-            if (!f_codegen_visit(cg, node->as.var_decl_node.initializer)) {
-                return false;
-            }
+            if (!f_codegen_visit(cg, node->as.var_decl_node.initializer)) return false;
         } else {
             FoxyValue null_val = { .type = FOXY_VAL_NULL, .as.ptr = NULL };
             int const_idx = f_codegen_add_constant(cg, null_val);

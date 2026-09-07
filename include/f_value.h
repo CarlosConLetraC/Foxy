@@ -4,6 +4,7 @@
     #include <stdint.h>
     #include <stdbool.h>
     #include <stddef.h>
+    #include "f_array.h"
 
     typedef struct FoxyVM FoxyVM;
     typedef struct FoxyObject FoxyObject;
@@ -39,13 +40,6 @@
         #undef F
         FOXY_VAL_COUNT
     } FoxyValueType;
-
-    // Estructura de FoxyArray
-    struct FoxyArray {
-        uint8_t element_type_id;
-        size_t length;
-        void *data;
-    };
 
     // Unión tipada segura con todos los alias requeridos por el intérprete
     typedef struct FoxyValue {

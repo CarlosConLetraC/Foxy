@@ -5,6 +5,7 @@
     #include <stdint.h>
     #include <stdbool.h>
     #include <stddef.h>
+    #include "uthash.h"
     #include "f_value.h"
     #include "f_runtime.h"
     #include "f_symtable.h"
@@ -13,38 +14,32 @@
     #include "f_status.h"
     #include "f_process.h"
 
-    typedef struct FoxyRuntime FoxyRuntime;
-    typedef struct FoxyObject FoxyObject;
-
     typedef void (*FoxyNativeFunc)(FoxyVM *vm, FoxyObject *obj, int args);
     typedef FoxyNativeFunc FoxyNativeMethod;
 
-    typedef struct {
-        char name[FOXY_MAX_IDENTIFIER_LEN];
-        FoxyNativeFunc func;
-    } FoxyNativeSymbol;
+    // Nodo Hash para símbolos/métodos nativos en C
+    typedef struct FoxyNativeSymbolEntry {
+        char name[FOXY_MAX_IDENTIFIER_LEN]; // Clave (Key)
+        FoxyNativeMethod func;               // Valor (Función C)
+        UT_hash_handle hh;                   // Handle interno de uthash
+    } FoxyNativeSymbolEntry;
 
     typedef struct FoxyVM {
         FoxyRuntime *runtime;
         bool running;
 
-        // Process table
-        FoxyProcess **processes;
-        size_t process_count;
-        size_t process_capacity;
-        size_t current_process_index;
+        // Tabla Hash de Procesos (indexada por PID)
+        FoxyProcess *processes_hash;
 
-        // Constant Pool
+        // Pool de constantes (Valores Foxy de runtime)
         FoxyValue *constants;
         size_t constants_count;
         size_t constants_capacity;
 
-        // Native Function Table
-        FoxyNativeSymbol *native_symbols;
-        size_t native_symbols_count;
-        size_t native_symbols_capacity;
+        // Tabla Hash de Símbolos y Protocolos Nativos de C
+        FoxyNativeSymbolEntry *native_symbols_hash;
 
-        // Loaded Libraries Tracking & Subsystem Relacional de Símbolos
+        // Cargador de librerías y subsistema de símbolos
         FoxySymbolTable *symtable; 
         FoxyLib *loading_lib;
         FoxyMethod *method;
@@ -60,16 +55,23 @@
     FoxyVM* f_vm_new(void);
     void f_vm_free(FoxyVM *vm);
     void f_vm_push(FoxyProcess *p, FoxyValue val);
+
+    // Búsqueda y Registro O(1) de Protocolos Nativos de C
+    FoxyNativeMethod f_vm_lookup_native(FoxyVM *vm, const char *name);
     void f_vm_register_native(FoxyVM *vm, const char *name, FoxyNativeMethod func);
+
+    // Gestión de Procesos vía uthash
+    FoxyProcess* f_vm_get_process(FoxyVM *vm, uint32_t pid);
+    void f_vm_add_process(FoxyVM *vm, FoxyProcess *proc);
+
     void f_vm_load_module(FoxyVM *vm, const char *path);
-    FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc); // Rutina del worker de hilos para la ejecución concurrente de procesos
+    FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc);
 
     FoxyValue f_vm_pop(FoxyProcess *p);
     FoxyValue f_vm_peek(FoxyProcess *p, size_t distance);
-    FoxyNativeFunc f_vm_find_native(FoxyVM *vm, const char *name);
     FoxyLib* f_vm_get_current_loading_lib(FoxyVM *vm);
     void f_vm_set_current_loading_lib(FoxyVM *vm, FoxyLib *lib);
 
     void f_vm_load_process(FoxyVM *vm, const uint8_t *code, size_t code_size, const char *filename);
-    FoxyStatus f_vm_run(FoxyVM *vm); // interpreta todo el bytecode con ayuda de f_vm_execute_process. . .
+    FoxyStatus f_vm_run(FoxyVM *vm);
 #endif // F_VM_H
