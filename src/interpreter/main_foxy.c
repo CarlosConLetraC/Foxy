@@ -64,10 +64,10 @@ int main(int argc, char** argv) {
     FoxyCodegen cg;
     f_codegen_init(&cg);
 
-    if (!f_codegen_generate(&cg, (FoxyASTNode*)ast_root)) {
-        fprintf(stderr, "[Error] Fallo durante la generación de bytecode.\n");
+    if (!f_codegen_generate(&cg, ast_root)) {
+        fprintf(stderr, "[Error] Fallo la generación de bytecode.\n");
         f_codegen_free(&cg);
-        f_ast_node_free((FoxyASTNode*)ast_root);
+        f_ast_node_free(ast_root);
         free(source);
         return 1;
     }
@@ -78,42 +78,38 @@ int main(int argc, char** argv) {
         f_utils_dump_bytecode(cg.bytecode, cg.code_count);
     }
 
-    // 4. Inicializar la VM y transferir recursos bajo la nueva arquitectura
-    FoxyVM* vm = f_vm_new();
+    FoxyVM *vm = f_vm_new();
     if (!vm) {
-        fprintf(stderr, "[Error] No se pudo inicializar la Máquina Virtual.\n");
         f_codegen_free(&cg);
-        f_ast_node_free((FoxyASTNode*)ast_root);
+        f_ast_node_free(ast_root);
         free(source);
         return 1;
     }
-    
-    // Asignar el pool de constantes transferido a la VM
+
+    // Transferir la propiedad del pool de constantes a la VM
     vm->constants = cg.constants;
     vm->constants_count = cg.constants_count;
     vm->constants_capacity = cg.constants_capacity;
 
-    // Cargar el búfer de bytecode creando el proceso principal
-    f_vm_load_process(vm, (uint8_t*)cg.bytecode, cg.code_count * sizeof(FoxInstruction), filename);
+    // Desvincular de cg para que f_codegen_free no libere el pool de constantes asignado a la VM
+    cg.constants = NULL;
+    cg.constants_count = 0;
+    cg.constants_capacity = 0;
 
-    // --- SOLUCIÓN PARA LOS 1,024 BYTES ---
-    // Como f_vm_load_process ya copió el bytecode al proceso, 
-    // liberamos el búfer de capacidad inicial de 1024 bytes de f_codegen_init.
-    free(cg.bytecode); 
-    cg.bytecode = NULL;
-    
-    // Invalidamos constants para que f_codegen_free no intente liberarlas 
-    // ya que ahora la VM es la dueña absoluta de ese arreglo.
-    cg.constants = NULL; 
-    
-    f_codegen_free(&cg);
+    // Cargar el proceso
+    f_vm_load_process(vm, (const uint8_t*)cg.bytecode, cg.code_count * sizeof(FoxInstruction), filename);
 
-    // 5. Ejecución y limpieza final
-    int exit_code = (int)f_vm_run(vm);
-
-    f_vm_free(vm);
-    f_ast_node_free((FoxyASTNode*)ast_root);
+    // Liberar recursos de compilación
+    f_codegen_free(&cg); // Solo liberará cg.bytecode limpiamente
+    f_ast_node_free(ast_root);
     free(source);
+
+    // Ejecución de la VM
+    FoxyStatus status = f_vm_run(vm);
+    int exit_code = (status == FOXY_STATUS_SUCCESS) ? 0 : 1;
+
+    // Liberar la VM completamente
+    f_vm_free(vm);
 
     return exit_code;
 }

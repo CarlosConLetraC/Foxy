@@ -12,7 +12,7 @@ static const char* FOXY_TOKEN_ERROR_NAMES[] = {
 };
 #undef F
 
-// Auxiliares internos de lectura basados en punteros directos[cite: 10]
+// Auxiliares internos de lectura basados en punteros directos
 static inline char f_lexer_peek(FoxyLexer* lexer) {
     return *lexer->current;
 }
@@ -63,7 +63,7 @@ void f_lexer_throw_error(const FoxyLexer* lexer, FoxyErrorType err_type, const c
     exit(EXIT_FAILURE);
 }
 
-// Lógica de comentarios basados en '@' y espacios en blanco[cite: 10]
+// Lógica de comentarios basados en '@' y espacios en blanco
 void f_lexer_skip_comments_and_whitespace(FoxyLexer* lexer) {
     for (;;) {
         char c = f_lexer_peek(lexer);
@@ -137,7 +137,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
 
     char c = f_lexer_advance(lexer);
 
-    // 1. Identificadores, Palabras Clave y Tipos[cite: 10]
+    // 1. Identificadores, Palabras Clave y Tipos
     if (isalpha((unsigned char)c) || c == '_') {
         while (isalnum((unsigned char)f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_')
             f_lexer_advance(lexer);
@@ -170,7 +170,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 2. Literales Numéricos[cite: 10]
+    // 2. Literales Numéricos
     if (isdigit((unsigned char)c)) {
         bool is_float = false;
 
@@ -270,7 +270,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 3. Literales de Cadena ("...")[cite: 10]
+    // 3. Literales de Cadena ("...")
     if (c == '"') {
         lexer->in_string = 1;
         while (*lexer->current != '\0' && *lexer->current != '"') {
@@ -305,7 +305,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 4. Literales de Carácter ('...')[cite: 10]
+    // 4. Literales de Carácter ('...')
     if (c == '\'') {
         while (f_lexer_peek(lexer) != '\'' && f_lexer_peek(lexer) != '\0') {
             if (f_lexer_peek(lexer) == '\\') {
@@ -335,7 +335,7 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 5. Operadores y Delimitadores[cite: 10]
+    // 5. Operadores y Delimitadores
     switch (c) {
         case '=': 
             if (f_lexer_peek(lexer) == '=') {

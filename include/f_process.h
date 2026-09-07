@@ -22,7 +22,6 @@
         F(FOXY_PROCESS_WAITING, "WAITING") \
         F(FOXY_PROCESS_DEAD,    "DEAD")
 
-    // 1. Generar el enum automáticamente y el contador total
     #define F(name, str) name,
     typedef enum __attribute__((__packed__)){
         FOXY_PROCESS_STATE_LIST(F)
@@ -33,13 +32,12 @@
     extern const char* FOXY_PROCESS_STATE_NAMES[];
 
     typedef struct FoxyProcess {
-        uint32_t pid;
         FoxyProcessState state;
         char name[FOXY_MAX_IDENTIFIER_LEN];
         char pname[FOXY_MAX_IDENTIFIER_LEN];
         pthread_t thread_id;
 
-        // VM Execution State (Sustituido por la pila de marcos de llamada)
+        // VM Execution State
         FoxyVM *vm;
         FoxyCallStack call_stack;
 
@@ -59,6 +57,7 @@
 
         int running;
         UT_hash_handle hh;
+        FoxyFunction *main_func;
     } FoxyProcess;
 
     const char* f_process_state_to_string(FoxyProcessState state);

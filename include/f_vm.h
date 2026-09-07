@@ -61,7 +61,7 @@
     void f_vm_register_native(FoxyVM *vm, const char *name, FoxyNativeMethod func);
 
     // Gestión de Procesos vía uthash
-    FoxyProcess* f_vm_get_process(FoxyVM *vm, uint32_t pid);
+    FoxyProcess* f_vm_get_process(FoxyVM *vm, FoxyProcess *proc_ptr);
     void f_vm_add_process(FoxyVM *vm, FoxyProcess *proc);
 
     void f_vm_load_module(FoxyVM *vm, const char *path);
@@ -73,5 +73,6 @@
     void f_vm_set_current_loading_lib(FoxyVM *vm, FoxyLib *lib);
 
     void f_vm_load_process(FoxyVM *vm, const uint8_t *code, size_t code_size, const char *filename);
+    void f_vm_stack_pop_n(FoxyVM *vm, size_t n);
     FoxyStatus f_vm_run(FoxyVM *vm);
 #endif // F_VM_H

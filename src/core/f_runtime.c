@@ -34,28 +34,39 @@ FoxyRuntime* f_runtime_new(void) {
 void f_runtime_free(FoxyRuntime *rt) {
     if (!rt) return;
 
+    // 1. Detener/esperar procesos fuera del lock crítico si es posible
+    // o asegurar el join antes de mutar la estructura
     pthread_mutex_lock(&rt->global_lock);
 
-    // 1. Liberar procesos (processes)
+    // Liberar procesos
     FoxyProcess *curr_proc, *tmp_proc;
     HASH_ITER(hh, rt->processes, curr_proc, tmp_proc) {
         HASH_DEL(rt->processes, curr_proc);
         
-        // Esperar a que el hilo termine si aún sigue activo
-        if (curr_proc->state == FOXY_PROCESS_RUNNING)
+        // Esperar a que el hilo termine si sigue activo
+        if (curr_proc->state == FOXY_PROCESS_RUNNING) {
+            pthread_mutex_unlock(&rt->global_lock);
             pthread_join(curr_proc->thread_id, NULL);
+            pthread_mutex_lock(&rt->global_lock);
+        }
 
         // Liberar librerías locales
         FoxyLib *curr_llib, *tmp_llib;
         HASH_ITER(hh, curr_proc->locallibs, curr_llib, tmp_llib) {
             HASH_DEL(curr_proc->locallibs, curr_llib);
+            // if (curr_llib->name) free(curr_llib->name);
             free(curr_llib);
         }
+
+        // Liberar callstack y buffers del proceso
+        if (curr_proc->call_stack.frames) free(curr_proc->call_stack.frames);
+        if (curr_proc->stack) free(curr_proc->stack);
+        if (curr_proc->locals) free(curr_proc->locals);
 
         free(curr_proc);
     }
 
-    // 2. Liberar protocolos compartidos (protocols)
+    // 2. Liberar protocolos compartidos
     FoxyProtocol *curr_prot, *tmp_prot;
     HASH_ITER(hh, rt->protocols, curr_prot, tmp_prot) {
         HASH_DEL(rt->protocols, curr_prot);
@@ -66,22 +77,24 @@ void f_runtime_free(FoxyRuntime *rt) {
         free(curr_prot);
     }
 
-    // 3. Liberar librerías globales del sistema (loadedlibs)
+    // 3. Liberar librerías globales del sistema
     FoxyLib *curr_glib, *tmp_glib;
     HASH_ITER(hh, rt->loadedlibs, curr_glib, tmp_glib) {
         HASH_DEL(rt->loadedlibs, curr_glib);
+    #ifdef FOXY_ENABLE_DYNAMIC_LOADING
         if (curr_glib->handle) {
-            // dlclose(curr_glib->handle); // Descomentar si se usa dlfcn.h
+            dlclose(curr_glib->handle);
         }
+    #endif
         free(curr_glib);
     }
 
+    // Unlocking antes de destruir el mutex
     pthread_mutex_unlock(&rt->global_lock);
     pthread_mutex_destroy(&rt->global_lock);
 
     free(rt);
 }
-
 // --- Gestión de Procesos (processes) ---
 
 FoxyProcess* f_runtime_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *main_func, FoxyProtocol *protocol) {
@@ -89,7 +102,7 @@ FoxyProcess* f_runtime_process_create(FoxyRuntime *rt, const char *pname, FoxyFu
 
     pthread_mutex_lock(&rt->global_lock);
 
-    // Verificar si ya existe un proceso con el mismo nombre
+    // Verificar si ya existe un proceso registrado por su nombre
     FoxyProcess *existing = NULL;
     HASH_FIND_STR(rt->processes, pname, existing);
     if (existing != NULL) {
@@ -97,7 +110,7 @@ FoxyProcess* f_runtime_process_create(FoxyRuntime *rt, const char *pname, FoxyFu
         return NULL; // Nombre de proceso duplicado
     }
 
-    FoxyProcess *proc = (FoxyProcess*)malloc(sizeof(FoxyProcess));
+    FoxyProcess *proc = (FoxyProcess*)calloc(1, sizeof(FoxyProcess));
     if (!proc) {
         pthread_mutex_unlock(&rt->global_lock);
         return NULL;
@@ -106,26 +119,34 @@ FoxyProcess* f_runtime_process_create(FoxyRuntime *rt, const char *pname, FoxyFu
     strncpy(proc->pname, pname, sizeof(proc->pname) - 1);
     proc->pname[sizeof(proc->pname) - 1] = '\0';
     
-    static int pid_counter = 1;
-    proc->pid = pid_counter++;
     proc->state = FOXY_PROCESS_READY;
 
     // Entornos aislados y dependencias
     proc->locallibs = NULL;
-    proc->protocol = protocol; // Enlace al SharedEnv (puede ser NULL)
+    proc->protocol = protocol;
 
     // Inicializar el CallStack del proceso e insertar la función principal
     f_callstack_init(&proc->call_stack);
     
-    // Puntear el primer marco de ejecución con la función main
     if (!f_callstack_push(&proc->call_stack, main_func, 0, 0)) {
         free(proc);
         pthread_mutex_unlock(&rt->global_lock);
         return NULL;
     }
 
-    // Registrar en el hashmap global
+    // Registrar en el hashmap global usando el nombre como clave
     HASH_ADD_STR(rt->processes, pname, proc);
+
+    pthread_mutex_unlock(&rt->global_lock);
+    return proc;
+}
+
+FoxyProcess* f_runtime_process_get(FoxyRuntime *rt, FoxyProcess *proc_ptr) {
+    if (!rt || !proc_ptr) return NULL;
+    pthread_mutex_lock(&rt->global_lock);
+
+    FoxyProcess *proc = NULL;
+    HASH_FIND_PTR(rt->processes, &proc_ptr, proc);
 
     pthread_mutex_unlock(&rt->global_lock);
     return proc;

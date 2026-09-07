@@ -1,12 +1,11 @@
 #ifndef F_AST_H
     #define F_AST_H
 
+    #include "f_settings.h"
     #include <stddef.h>
     #include <stdbool.h>
-    #include "f_settings.h"
     #include "f_value.h"
 
-    // 1. Definición centralizada de nodos AST usando X-Macros
     #define FOXY_AST_NODE_LIST(F) \
         F(FOXY_AST_NODE_PROGRAM,     "PROGRAM") \
         F(FOXY_AST_NODE_INCLUDE,     "INCLUDE") \
@@ -28,24 +27,21 @@
         F(FOXY_AST_NODE_ENV_BIND,    "ENV_BIND") \
         F(FOXY_AST_NODE_POPEN,       "POPEN")
 
-    // 2. Generación automática del enum usando la X-macro
-    #define F(node_type, name_str) node_type,
     typedef enum __attribute__((__packed__)) {
+    #define F(node_type, name_str) node_type,
         FOXY_AST_NODE_LIST(F)
+    #undef F
         AST_NODE_COUNT
     } FoxyASTNodeType;
-    #undef F
 
+    extern const char * const FOXY_AST_NODE_TYPE_NAMES[];
     typedef struct FoxyASTNode FoxyASTNode;
 
-    // Estructura general de un nodo del AST
     struct FoxyASTNode {
         FoxyASTNodeType type;
         
         union {
-            struct {
-                char *path;
-            } include_node;
+            struct { char *path; } include_node;
 
             struct {
                 char *callee_name;
@@ -54,9 +50,7 @@
                 size_t arg_capacity;
             } call_node;
 
-            struct {
-                FoxyValue value;
-            } literal_node;
+            struct { FoxyValue value; } literal_node;
 
             struct {
                 FoxyASTNode **statements;
@@ -64,9 +58,7 @@
                 size_t capacity;
             } block_node;
 
-            struct {
-                char *name;
-            } identifier_node;
+            struct { char *name; } identifier_node;
 
             struct {
                 FoxyASTNode *left;
@@ -80,19 +72,16 @@
                 size_t capacity;
             } program_node;
 
-            // --- Nodo de Declaración de Variable (ej. int i = 0) ---
             struct {
                 char *name;
                 FoxyASTNode *initializer;
             } var_decl_node;
 
-            // --- Nodo de Asignación de Variable (ej. i = 5) ---
             struct {
                 char *name;
                 FoxyASTNode *value;
             } assign_node;
 
-            // --- Nodos de Control de Flujo ---
             struct {
                 FoxyASTNode *condition;
                 FoxyASTNode *then_branch;
@@ -118,14 +107,9 @@
                 FoxyASTNode *body;
             } for_node;
 
-            struct {
-                FoxyASTNode *value;
-            } return_node;
+            struct { FoxyASTNode *value; } return_node;
 
-            // --- Nodos de Concurrencia y SharedEnv ---
-            struct {
-                FoxyASTNode *name_expr;
-            } env_create_node;
+            struct { FoxyASTNode *name_expr; } env_create_node;
 
             struct {
                 FoxyASTNode *process_expr;
@@ -138,17 +122,13 @@
                 FoxyASTNode *env_expr;
             } popen_node;
 
-            struct {
-                FoxyASTNode *expression;
-            } expr_stmt_node;
+            struct { FoxyASTNode *expression; } expr_stmt_node;
         } as;
     };
 
-    // --- Prototipos de gestión del AST ---
     FoxyASTNode* f_ast_node_new(FoxyASTNodeType type);
     void f_ast_node_free(FoxyASTNode *node);
 
-    // Constructores auxiliares
     FoxyASTNode* f_ast_create_program(void);
     void f_ast_program_add(FoxyASTNode *program, FoxyASTNode *stmt);
     FoxyASTNode* f_ast_create_include(const char *path);
@@ -166,12 +146,10 @@
     FoxyASTNode* f_ast_create_return(FoxyASTNode *value);
     FoxyASTNode* f_ast_create_expr_stmt(FoxyASTNode *expr);
 
-    // Constructores para Concurrencia / SharedEnv
     FoxyASTNode* f_ast_create_env(void);
     FoxyASTNode* f_ast_create_env_create(FoxyASTNode *name_expr);
     FoxyASTNode* f_ast_create_env_bind(FoxyASTNode *proc_expr, FoxyASTNode *env_expr);
     FoxyASTNode* f_ast_create_popen(FoxyASTNode *callback_expr, FoxyASTNode *name_expr, FoxyASTNode *env_expr);
 
-    // Función auxiliar generada por X-macro para depuración
-    const char* f_ast_node_type_to_string(FoxyASTNodeType type);
+    const char* f_ast_node_type_to_string(FoxyASTNodeType type);    
 #endif // F_AST_H

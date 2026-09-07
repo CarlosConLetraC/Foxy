@@ -13,8 +13,6 @@
 
     struct FoxyObject {
         FoxyClass *klass;
-        size_t ref_count;
-        int marked;
         FoxyField *fields;
         size_t field_count;
         size_t field_capacity;
@@ -24,4 +22,4 @@
     void f_object_free(FoxyObject *obj);
     void f_object_set_field(FoxyObject *obj, const char *name, FoxyValue val);
     bool f_object_get_field(FoxyObject *obj, const char *name, FoxyValue *out_val);
-#endif
+#endif // F_OBJECT_H

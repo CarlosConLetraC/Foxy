@@ -18,8 +18,8 @@ const char* f_process_state_to_string(FoxyProcessState state) {
 }
 
 FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *main_func, FoxyProtocol *protocol) {
-    (void)rt; // por el momento. . .
-    FoxyProcess *proc = malloc(sizeof(FoxyProcess));
+    (void)rt;
+    FoxyProcess *proc = (FoxyProcess *)malloc(sizeof(FoxyProcess));
     if (!proc) return NULL;
 
     proc->vm = NULL;
@@ -28,7 +28,6 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *
     proc->protocol = protocol;
     proc->locallibs = NULL;
 
-    // Copiar el nombre del proceso de forma segura
     if (pname) {
         strncpy(proc->pname, pname, FOXY_MAX_IDENTIFIER_LEN - 1);
         proc->pname[FOXY_MAX_IDENTIFIER_LEN - 1] = '\0';
@@ -36,26 +35,24 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *
         strcpy(proc->pname, "main_proc");
     }
 
-    // Inicializar la pila de llamadas
     f_callstack_init(&proc->call_stack);
 
-    // Si se proporciona una función principal, empujarla como el marco inicial (ip = 0, stack_base = 0)
-    if (main_func) {
-        if (!f_callstack_push(&proc->call_stack, main_func, 0, 0)) {
+    if (main_func && main_func->type == FOXY_FUNCTION_USER) {
+        // Direccionamiento directo en memoria (&code[0])
+        const FoxInstruction *entry_ip = main_func->as.user.code;
+        if (!f_callstack_push(&proc->call_stack, main_func, entry_ip, 0)) {
             free(proc);
             return NULL;
         }
     }
 
-    // Inicializar el stack de evaluación
     proc->stack_capacity = FOXY_MAX_STACK_CAPACITY;
     proc->stack_top = 0;
-    proc->stack = malloc(sizeof(FoxyValue) * proc->stack_capacity);
+    proc->stack = (FoxyValue *)malloc(sizeof(FoxyValue) * proc->stack_capacity);
 
-    // Inicializar el arreglo de variables locales
     proc->locals_capacity = FOXY_MAX_LOCALS;
     proc->locals_count = 0;
-    proc->locals = malloc(sizeof(FoxyValue) * proc->locals_capacity);
+    proc->locals = (FoxyValue *)malloc(sizeof(FoxyValue) * proc->locals_capacity);
 
     return proc;
 }
@@ -63,13 +60,30 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *
 void f_process_free(FoxyProcess *proc) {
     if (!proc) return;
 
-    // Solo liberar el stack / registros locales, NO las funciones cargadas desde vm->constants
+    // Liberar la función principal generada exclusivamente para este proceso
+    if (proc->main_func) {
+        f_function_free(proc->main_func);
+        proc->main_func = NULL;
+    }
+
+    // 1. Solo liberar el arreglo de frames de la callstack, NO las funciones referenciadas
+    if (proc->call_stack.frames) {
+        free(proc->call_stack.frames);
+        proc->call_stack.frames = NULL;
+    }
+
+    // 2. Liberar Stack de operandos y Variables Locales
     if (proc->stack) {
-        // Liberar stack si corresponde
         free(proc->stack);
         proc->stack = NULL;
     }
+    
+    if (proc->locals) {
+        free(proc->locals);
+        proc->locals = NULL;
+    }
 
+    // 3. Liberar la estructura del proceso
     free(proc);
 }
 

@@ -1,3 +1,4 @@
+// f_callstack.h
 #ifndef F_CALLSTACK_H
     #define F_CALLSTACK_H
 
@@ -7,11 +8,12 @@
     #include <stdbool.h>
     #include "f_value.h"
     #include "f_function.h"
+    #include "f_foxcode.h"
 
     typedef struct {
-        FoxyFunction *func;       // Función ejecutándose en este marco
-        size_t ip;                // Puntero de instrucción actual (offset en el bytecode)
-        size_t stack_base;        // Base del stack o variables locales para este marco
+        FoxyFunction *func;            // Función ejecutándose en este marco
+        const FoxInstruction *ip;      // Puntero en memoria a la instrucción actual
+        size_t stack_base;             // Base del stack para variables locales
     } FoxyCallFrame;
 
     typedef struct {
@@ -21,8 +23,8 @@
     } FoxyCallStack;
 
     void f_callstack_init(FoxyCallStack *cs);
-    void f_callstack_free(FoxyCallStack *cs);    
-    bool f_callstack_push(FoxyCallStack *cs, FoxyFunction *func, size_t ip, size_t stack_base);
+    void f_callstack_free(FoxyCallStack *cs);
+    bool f_callstack_push(FoxyCallStack *cs, FoxyFunction *func, const FoxInstruction *ip, size_t stack_base);
     FoxyCallFrame* f_callstack_pop(FoxyCallStack *cs);
     FoxyCallFrame* f_callstack_peek(FoxyCallStack *cs);
 #endif // F_CALLSTACK_H

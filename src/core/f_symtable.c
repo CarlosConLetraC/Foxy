@@ -21,9 +21,12 @@ FoxySymbolTable* f_symtable_new(void) {
 
 void f_symtable_free(FoxySymbolTable *table) {
     if (!table) return;
+
     if (table->rows) {
         free(table->rows);
+        table->rows = NULL;
     }
+
     free(table);
 }
 

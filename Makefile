@@ -1,7 +1,7 @@
 # Compilador y banderas
 CC = gcc
-###################### -std=c11 flag viejo. . .
-CFLAGS = -Wall -Wextra -g -std=c99 -O3 -Iinclude -If_include -fPIC
+###################### -std=c11 -O3 flags viejos. . .
+CFLAGS = -Wall -Wextra -g -std=c99 -O2 -fomit-frame-pointer -Iinclude -If_include -fPIC
 # Se corrige LDFLAGS: -rdynamic exporta símbolos globales; -Wl,-rpath,. busca librerías en el directorio actual
 LDFLAGS = -rdynamic -ldl -lm -Wl,-rpath,.
 
@@ -12,7 +12,11 @@ SYS_OUT_DIR = f_include/sys/out
 
 # Encontrar recursivamente todos los archivos .c dentro de src/
 SRCS = $(shell find $(SRC_DIR) -name "*.c")
-OBJS = $(patsubst %, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # Binario final
 TARGET = foxy

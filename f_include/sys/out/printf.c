@@ -1,6 +1,11 @@
 #include "f_settings.h"
 #include "f_value.h"
 #include "f_vm.h"
+#include "f_object.h"
+#include "f_class.h"
+#include "f_dict.h"
+#include "f_function.h"
+#include "f_methods.h"
 #include "f_utils.h"
 #include "f_init.h"
 #include <stdlib.h>
@@ -9,44 +14,48 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
-    (void)self;
+FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *obj, int args) {
+    (void)obj;
 
-    if (argc < 1 || vm->process_count == 0) {
-        return;
+    if (!vm || args < 1) return;
+
+    // Obtener el proceso activo de la VM
+    FoxyProcess *p = F_SYS_OUT_GET_CURRENT_PROCESS(vm);
+    if (!p) return;
+
+    // El argumento 0 (cadena de formato) está en el fondo del marco de este llamado
+    FoxyValue fmt_val = f_vm_peek(p, (size_t)(args - 1));
+    char *allocated_fmt = NULL;
+    const char *format = NULL;
+
+    if (fmt_val.type == FOXY_VAL_ARRAY) {
+        allocated_fmt = (char*)f_value_get_char_array_data(&fmt_val);
+        format = allocated_fmt;
+    } else if (fmt_val.type == FOXY_VAL_OBJECT && fmt_val.as.obj) {
+        format = (const char*)fmt_val.as.obj;
     }
 
-    FoxyProcess *p = vm->processes[vm->current_process_index];
-
-    // El argumento 0 de la llamada es el format string
-    FoxyValue fmt_val = f_vm_peek(p, (size_t)(argc - 1));
-    if (fmt_val.type != FOXY_VAL_ARRAY) {
-        return;
-    }
-
-    const char *format = f_value_get_char_array_data(&fmt_val);
     if (!format) {
+        if (allocated_fmt) free(allocated_fmt);
         return;
     }
 
     int arg_index = 1; 
     const char *ptr = format;
-    char buffer[256];
+    char buffer[FOXY_NAME_BUFFER_SIZE];
     int len = 0;
 
     while (*ptr != '\0') {
         if (*ptr == '%') {
             ptr++;
 
-            // Secuencia '%%': Imprimir '%' literal vía syswrite
             if (*ptr == '%') {
                 f_utils_syswrite(1, "%", 1);
                 ptr++;
                 continue;
             }
 
-            // Si se acabaron los argumentos pasados al printf
-            if (arg_index >= argc) {
+            if (arg_index >= args) {
                 f_utils_syswrite(1, "%", 1);
                 if (*ptr != '\0') {
                     f_utils_syswrite(1, ptr, 1);
@@ -55,7 +64,6 @@ FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
                 continue;
             }
 
-            // Parsear precisión flotante (ej. %.2f)
             int precision = -1;
             if (*ptr == '.') {
                 ptr++;
@@ -67,175 +75,56 @@ FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
                 if (precision > 99) precision = 99;
             }
 
-            // Obtener el valor de la pila de la VM
-            // size_t distance = (size_t)(argc - 1) - (size_t)arg_index;
-            // size_t distance = (size_t)(argc - arg_index);
-            size_t distance = (size_t)(argc - 1 - arg_index);
-            FoxyConstant val = f_vm_peek(p, distance);
+            size_t distance = (size_t)(args - 1 - arg_index);
+            FoxyValue val = f_vm_peek(p, distance);
 
-            // Manejo por cada especificador de formato con conversiones implícitas totales
             switch (*ptr) {
                 case 'T': {
-                    // %T: Comodín universal / ToString dinámico usando f_utils
-                    f_utils_print_constant_dynamic(val, precision);
+                    // %T: Imprime cualquier tipo de dato Foxy
+                    f_utils_print_constant_dynamic(*(FoxyConstant*)&val, precision);
                     break;
                 }
                 case 'd':
                 case 'i': {
                     int64_t num = 0;
-                    switch (val.type) {
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                        case FOXY_VAL_CHAR:
-                            num = val.as.ival;
-                            break;
-                        case FOXY_VAL_BOOL:
-                            num = val.as.boolean ? 1 : 0;
-                            break;
-                        case FOXY_VAL_FLOAT:
-                            num = (int64_t)val.as.fval;
-                            break;
-                        case FOXY_VAL_DOUBLE:
-                        case FOXY_VAL_NUMBER:
-                            num = (int64_t)val.as.dval;
-                            break;
-                        default:
-                            num = val.as.ival;
-                            break;
+                    if (f_value_is_numeric(&val)) {
+                        num = (int64_t)f_value_as_double(&val);
+                    } else if (val.type == FOXY_VAL_BOOL) {
+                        num = val.as.boolean ? 1 : 0;
                     }
                     len = snprintf(buffer, sizeof(buffer), "%" PRId64, num);
                     if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
                     break;
                 }
-                case 'u': {
-                    uint64_t num = 0;
-                    switch (val.type) {
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                        case FOXY_VAL_CHAR:
-                            num = (uint64_t)val.as.ival;
-                            break;
-                        case FOXY_VAL_BOOL:
-                            num = val.as.boolean ? 1ULL : 0ULL;
-                            break;
-                        case FOXY_VAL_FLOAT:
-                            num = (uint64_t)val.as.fval;
-                            break;
-                        case FOXY_VAL_DOUBLE:
-                        case FOXY_VAL_NUMBER:
-                            num = (uint64_t)val.as.dval;
-                            break;
-                        default:
-                            num = (uint64_t)val.as.ival;
-                            break;
-                    }
-                    len = snprintf(buffer, sizeof(buffer), "%" PRIu64, num);
-                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
-                    break;
-                }
-                case 'x': {
-                    uint64_t num = 0;
-                    switch (val.type) {
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                        case FOXY_VAL_CHAR:
-                            num = (uint64_t)val.as.ival;
-                            break;
-                        case FOXY_VAL_BOOL:
-                            num = val.as.boolean ? 1ULL : 0ULL;
-                            break;
-                        case FOXY_VAL_FLOAT:
-                            num = (uint64_t)val.as.fval;
-                            break;
-                        case FOXY_VAL_DOUBLE:
-                        case FOXY_VAL_NUMBER:
-                            num = (uint64_t)val.as.dval;
-                            break;
-                        default:
-                            num = (uint64_t)val.as.ival;
-                            break;
-                    }
-                    len = snprintf(buffer, sizeof(buffer), "%" PRIx64, num);
-                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
-                    break;
-                }
+                case 'u':
+                case 'x':
                 case 'X': {
                     uint64_t num = 0;
-                    switch (val.type) {
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                        case FOXY_VAL_CHAR:
-                            num = (uint64_t)val.as.ival;
-                            break;
-                        case FOXY_VAL_BOOL:
-                            num = val.as.boolean ? 1ULL : 0ULL;
-                            break;
-                        case FOXY_VAL_FLOAT:
-                            num = (uint64_t)val.as.fval;
-                            break;
-                        case FOXY_VAL_DOUBLE:
-                        case FOXY_VAL_NUMBER:
-                            num = (uint64_t)val.as.dval;
-                            break;
-                        default:
-                            num = (uint64_t)val.as.ival;
-                            break;
+                    if (f_value_is_numeric(&val)) {
+                        num = (uint64_t)f_value_as_double(&val);
+                    } else if (val.type == FOXY_VAL_BOOL) {
+                        num = val.as.boolean ? 1ULL : 0ULL;
                     }
-                    len = snprintf(buffer, sizeof(buffer), "%" PRIX64, num);
+
+                    const char *fmt_str = (*ptr == 'u') ? "%" PRIu64 : ((*ptr == 'x') ? "%" PRIx64 : "%" PRIX64);
+                    len = snprintf(buffer, sizeof(buffer), fmt_str, num);
                     if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
                     break;
                 }
                 case 'b': {
                     bool b = false;
-                    switch (val.type) {
-                        case FOXY_VAL_BOOL:
-                            b = val.as.boolean;
-                            break;
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                        case FOXY_VAL_CHAR:
-                            b = (val.as.ival != 0);
-                            break;
-                        case FOXY_VAL_FLOAT:
-                            b = (val.as.fval != 0.0f);
-                            break;
-                        case FOXY_VAL_DOUBLE:
-                        case FOXY_VAL_NUMBER:
-                            b = (val.as.dval != 0.0);
-                            break;
-                        default:
-                            b = (val.as.obj != NULL);
-                            break;
-                    }
-                    if (b) {
-                        f_utils_syswrite(1, "true", 4);
+                    if (val.type == FOXY_VAL_BOOL) {
+                        b = val.as.boolean;
+                    } else if (f_value_is_numeric(&val)) {
+                        b = (f_value_as_double(&val) != 0.0);
                     } else {
-                        f_utils_syswrite(1, "false", 5);
+                        b = (val.as.ptr != NULL);
                     }
+                    f_utils_syswrite(1, b ? "true" : "false", b ? 4 : 5);
                     break;
                 }
                 case 'f': {
-                    double num = 0.0;
-                    switch (val.type) {
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                        case FOXY_VAL_CHAR:
-                            num = (double)val.as.ival;
-                            break;
-                        case FOXY_VAL_BOOL:
-                            num = val.as.boolean ? 1.0 : 0.0;
-                            break;
-                        case FOXY_VAL_FLOAT:
-                            num = (double)val.as.fval;
-                            break;
-                        case FOXY_VAL_DOUBLE:
-                        case FOXY_VAL_NUMBER:
-                            num = val.as.dval;
-                            break;
-                        default:
-                            num = (double)val.as.ival;
-                            break;
-                    }
+                    double num = f_value_as_double(&val);
                     if (precision >= 0) {
                         len = snprintf(buffer, sizeof(buffer), "%.*f", precision, num);
                     } else {
@@ -245,32 +134,46 @@ FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
                     break;
                 }
                 case 'c': {
-                    char c = ' ';
-                    switch (val.type) {
-                        case FOXY_VAL_CHAR:
-                        case FOXY_VAL_INT:
-                        case FOXY_VAL_LONG:
-                            c = (char)val.as.ival;
-                            break;
-                        case FOXY_VAL_BOOL:
-                            c = val.as.boolean ? '1' : '0';
-                            break;
-                        default:
-                            c = (char)val.as.ival;
-                            break;
-                    }
+                    char c = (char)f_value_as_double(&val);
                     f_utils_syswrite(1, &c, 1);
                     break;
                 }
                 case 's': {
-                    const char *str = f_utils_get_string_from_constant(val);
+                    char *allocated_str = NULL;
+                    const char *str = NULL;
+
+                    if (val.type == FOXY_VAL_ARRAY) {
+                        allocated_str = (char*)f_value_get_char_array_data(&val);
+                        str = allocated_str;
+                    } else if (val.type == FOXY_VAL_OBJECT && val.as.obj) {
+                        str = (const char*)val.as.obj;
+                    } else {
+                        str = f_utils_get_string_from_constant(*(FoxyConstant*)&val);
+                    }
+
                     if (str) {
                         f_utils_syswrite(1, str, strlen(str));
-                    } else if (val.as.obj) {
-                        f_utils_syswrite(1, (const char*)val.as.obj, strlen((const char*)val.as.obj));
                     } else {
                         f_utils_syswrite(1, "(null)", 6);
                     }
+
+                    if (allocated_str) free(allocated_str);
+                    break;
+                }
+                case 'O': {
+                    if (val.type == FOXY_VAL_OBJECT && val.as.obj) {
+                        FoxyClass *klass = (FoxyClass*)val.as.obj->klass;
+                        const char *cname = (klass && klass->name) ? klass->name : "Object";
+                        len = snprintf(buffer, sizeof(buffer), "<Object:%s>", cname);
+                    } else if (val.type == FOXY_VAL_CLASS && val.as.klass) {
+                        FoxyClass *klass = (FoxyClass*)val.as.klass;
+                        len = snprintf(buffer, sizeof(buffer), "<Class:%s>", (klass->name) ? klass->name : "Anon");
+                    } else if (val.type == FOXY_VAL_DICT) {
+                        len = snprintf(buffer, sizeof(buffer), "<Dict:%p>", (void*)val.as.dict);
+                    } else {
+                        len = snprintf(buffer, sizeof(buffer), "<NullObject>");
+                    }
+                    if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
                     break;
                 }
                 default: {
@@ -283,14 +186,14 @@ FOXY_EXPORT void f_sys_out_printf(FoxyVM *vm, FoxyObject *self, int argc) {
             }
 
             arg_index++;
-            if (*ptr != '\0') {
-                ptr++;
-            }
+            if (*ptr != '\0') ptr++;
         } else {
             f_utils_syswrite(1, ptr, 1);
             ptr++;
         }
     }
+
+    if (allocated_fmt) free(allocated_fmt);
 
     fflush(stdout);
 }

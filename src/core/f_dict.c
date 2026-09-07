@@ -2,13 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "f_dict.h"
-#include "f_gc.h" // Importar el GC
+#include "f_gc.h"
 
 FoxyDict* f_dict_new(void) {
-    // Asignación controlada por el heap del GC
     FoxyDict *dict = (FoxyDict*)f_gc_allocate(FOXY_HEAP_DICT, sizeof(FoxyDict), (void(*)(void*))f_dict_free);
     if (!dict) return NULL;
-    dict->head = NULL;      // En uthash, la tabla inicia apuntando a NULL[cite: 7, 10]
+    dict->head = NULL;
     return dict;
 }
 
@@ -16,37 +15,29 @@ void f_dict_free(FoxyDict *dict) {
     if (!dict) return;
 
     FoxyDictEntry *current, *tmp;
-    
-    // Macro segura de uthash para iterar y liberar toda la tabla en bucle
     HASH_ITER(hh, dict->head, current, tmp) {
-        HASH_DEL(dict->head, current); // Lo saca de la tabla hash
-        free(current->key);            // Libera la llave duplicada
-        free(current);                 // Libera la entrada
+        HASH_DEL(dict->head, current);
+        if (current->key) free(current->key);
+        f_value_free_contents(&current->value);
+        free(current);
     }
-    
-    free(dict);
 }
 
 void f_dict_set(FoxyDict *dict, const char *key, FoxyValue value) {
     if (!dict || !key) return;
 
     FoxyDictEntry *entry = NULL;
-
-    // Buscar si la clave ya existe en la tabla hash
     HASH_FIND_STR(dict->head, key, entry);
 
     if (entry == NULL) {
-        // Si no existe, creamos una nueva entrada
         entry = (FoxyDictEntry*)malloc(sizeof(FoxyDictEntry));
         if (!entry) return;
 
         entry->key = strdup(key);
         entry->value = value;
-        
-        // Añadir la entrada a la tabla hash de uthash usando la clave string
         HASH_ADD_KEYPTR(hh, dict->head, entry->key, strlen(entry->key), entry);
     } else {
-        // Si ya existe, simplemente actualizamos su valor
+        f_value_free_contents(&entry->value);
         entry->value = value;
     }
 }
@@ -66,9 +57,9 @@ bool f_dict_remove(FoxyDict *dict, const char *key) {
     HASH_FIND_STR(dict->head, key, entry);
     if (entry == NULL) return false;
 
-    // Remover de la tabla hash y liberar memoria
     HASH_DEL(dict->head, entry);
-    free(entry->key);
+    if (entry->key) free(entry->key);
+    f_value_free_contents(&entry->value);
     free(entry);
     return true;
 }

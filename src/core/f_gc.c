@@ -9,18 +9,16 @@
 #include "f_function.h"
 #include "f_object.h"
 #include "f_class.h"
-#include "f_dict.h"
+#include "f_env.h"
 
-// Estructura interna del nodo de control del GC en el heap
 typedef struct InternalGNode {
     FoxyHeapType type;
     bool is_marked;
     struct InternalGNode *next;
     void (*free_func)(void*);
-    char data[]; // Flexible array member para alojar el objeto real
+    char data[];
 } InternalGNode;
 
-// Contexto global del Garbage Collector
 static struct {
     InternalGNode *head;
     size_t total_allocated_objects;
@@ -32,10 +30,9 @@ void f_gc_init(void) {
 }
 
 void* f_gc_allocate(FoxyHeapType type, size_t size, void (*free_func)(void*)) {
-    // Reservamos espacio para la cabecera de control + el tamaño del objeto real
     InternalGNode *node = (InternalGNode*)malloc(sizeof(InternalGNode) + size);
     if (!node) {
-        fprintf(stderr, "[Foxy GC Error] Memoria agotada al asignar objeto en el heap\n");
+        fprintf(stderr, "[Foxy GC Error] Memoria agotada en el heap\n");
         return NULL;
     }
 
@@ -43,13 +40,10 @@ void* f_gc_allocate(FoxyHeapType type, size_t size, void (*free_func)(void*)) {
     node->is_marked = false;
     node->free_func = free_func;
 
-    // Enlazar al inicio de la lista global del GC
     node->next = GC_State.head;
     GC_State.head = node;
 
     GC_State.total_allocated_objects++;
-
-    // Retornamos el puntero al área de datos útiles (payload)
     return (void*)node->data;
 }
 
@@ -61,7 +55,7 @@ void f_gc_mark_value(FoxyValue value) {
             target_ptr = value.as.dict;
             break;
         case FOXY_VAL_OBJECT:
-            target_ptr = value.as.obj; // o value.as.object
+            target_ptr = value.as.obj;
             break;
         case FOXY_VAL_FUNCTION:
             target_ptr = value.as.func;
@@ -79,7 +73,6 @@ void f_gc_mark_value(FoxyValue value) {
         if (node && !node->is_marked) {
             node->is_marked = true;
 
-            // Marcado recursivo de dependencias según el tipo de objeto en el heap
             switch (node->type) {
                 case FOXY_HEAP_DICT: {
                     FoxyDict *dict = (FoxyDict*)node->data;
@@ -91,31 +84,18 @@ void f_gc_mark_value(FoxyValue value) {
                 }
                 case FOXY_HEAP_OBJECT: {
                     FoxyObject *obj = (FoxyObject*)node->data;
-                    // Marcar la clase del objeto
-                    if (obj->klass) {
-                        f_gc_mark_root(obj->klass);
-                    }
-                    // Marcar los valores de cada campo/propiedad
-                    for (size_t i = 0; i < obj->field_count; i++) {
-                        f_gc_mark_value(obj->fields[i].value);
-                    }
+                    if (obj->klass) f_gc_mark_root(obj->klass);
+                    for (size_t i = 0; i < obj->field_count; i++) f_gc_mark_value(obj->fields[i].value);
                     break;
                 }
                 case FOXY_HEAP_CLASS: {
                     FoxyClass *klass = (FoxyClass*)node->data;
-                    // Marcar la clase padre si existe (herencia)
-                    if (klass->super_class) {
-                        f_gc_mark_root(klass->super_class);
-                    }
+                    if (klass->super_class) f_gc_mark_root(klass->super_class);
                     break;
                 }
                 case FOXY_HEAP_ENV: {
                     FoxyEnv *env = (FoxyEnv*)node->data;
-                    // Marcar recursivamente el entorno padre si existe
-                    if (env->parent) {
-                        f_gc_mark_root(env->parent);
-                    }
-                    // Marcar el diccionario interno de bindings y sus valores contenidos
+                    if (env->parent) f_gc_mark_root(env->parent);
                     if (env->bindings) {
                         f_gc_mark_root(env->bindings);
                         FoxyDictEntry *current, *tmp;
@@ -127,17 +107,10 @@ void f_gc_mark_value(FoxyValue value) {
                 }
                 case FOXY_HEAP_FUNCTION: {
                     FoxyFunction *func = (FoxyFunction*)node->data;
-                    // Las funciones nativas no tienen entorno léxico ni constantes de usuario que marcar
                     if (func->type == FOXY_FUNCTION_USER) {
-                        // Marcar el entorno léxico capturado por la función
-                        if (func->as.user.env) {
-                            f_gc_mark_root(func->as.user.env);
-                        }
-                        // Marcar el pool de constantes de la función
+                        if (func->as.user.env) f_gc_mark_root(func->as.user.env);
                         if (func->as.user.constants) {
-                            for (size_t i = 0; i < func->as.user.constants_count; i++) {
-                                f_gc_mark_value(func->as.user.constants[i]);
-                            }
+                            for (size_t i = 0; i < func->as.user.constants_count; i++) f_gc_mark_value(func->as.user.constants[i]);
                         }
                     }
                     break;
@@ -157,7 +130,6 @@ void f_gc_collect(void) {
     InternalGNode *current = GC_State.head;
     InternalGNode *prev = NULL;
 
-    // Fase de Sweep (Barrer objetos no marcados)
     while (current != NULL) {
         if (!current->is_marked) {
             InternalGNode *to_delete = current;
@@ -169,7 +141,6 @@ void f_gc_collect(void) {
 
             current = current->next;
 
-            // Ejecutar el destructor específico si fue provisto
             if (to_delete->free_func)
                 to_delete->free_func((void*)to_delete->data);
 
@@ -178,7 +149,6 @@ void f_gc_collect(void) {
             if (GC_State.total_allocated_objects > 0)
                 GC_State.total_allocated_objects--;
         } else {
-            // El objeto sobrevivió al ciclo, reseteamos la marca para el siguiente barrido
             current->is_marked = false;
             prev = current;
             current = current->next;

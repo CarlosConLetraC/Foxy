@@ -60,6 +60,7 @@ bool f_parser_expect(FoxyParser *parser, int token_subtype, const char *message)
 
 // Declaraciones adelantadas
 static FoxyASTNode* parse_statement(FoxyParser *parser);
+static FoxyASTNode* parse_unary(FoxyParser *parser);
 static FoxyASTNode* parse_expression(FoxyParser *parser);
 static FoxyASTNode* parse_primary(FoxyParser *parser);
 
@@ -218,7 +219,7 @@ static FoxyASTNode* parse_include(FoxyParser *parser) {
     return node;
 }
 
-static const char escape_lookup_table[256] = {
+static const char escape_lookup_table[FOXY_MAX_ASCII_SIZE] = {
     ['a']  = '\a', 
     ['b']  = '\b', 
     ['f']  = '\f', 
@@ -514,35 +515,48 @@ static FoxyASTNode* parse_primary(FoxyParser *parser) {
     }
 }
 
-static FoxyASTNode* parse_expression(FoxyParser *parser) {
-    bool is_negative = false;
+static FoxyASTNode* parse_unary(FoxyParser *parser) {
+    // Si encontramos un '-' prefijo, es un operador unario (negación)
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR && 
         parser->current_token.subtype == FOXY_TOKEN_OPERATOR_SUB) {
-        is_negative = true;
-        f_parser_advance(parser); 
+        
+        f_parser_advance(parser); // Consumir el '-'
+        
+        FoxyASTNode *operand = parse_unary(parser); // Evaluar recursivamente el operando
+        if (!operand) return NULL;
+
+        // Si el operando es un literal numérico inmediato, invertimos su signo directamente
+        if (operand->type == FOXY_AST_NODE_LITERAL) {
+            switch (operand->as.literal_node.value.type) {
+                case FOXY_VAL_INT:
+                case FOXY_VAL_LONG:
+                case FOXY_VAL_LONG_LONG:
+                case FOXY_VAL_UNSIGNED_LONG_LONG:
+                    operand->as.literal_node.value.as.ival = -operand->as.literal_node.value.as.ival;
+                    return operand;
+                case FOXY_VAL_NUMBER:
+                case FOXY_VAL_FLOAT:
+                case FOXY_VAL_DOUBLE:
+                    operand->as.literal_node.value.as.dval = -operand->as.literal_node.value.as.dval;
+                    return operand;
+                default:
+                    break;
+            }
+        }
+
+        // Si es una variable/expresión (ej. -x), creamos un nodo de operación unaria
+        return f_ast_create_binary_op('-', NULL, operand); // o f_ast_create_unary_op('-', operand);
     }
 
-    FoxyASTNode *left = parse_primary(parser);
+    return parse_primary(parser);
+}
+
+static FoxyASTNode* parse_expression(FoxyParser *parser) {
+    // El lado izquierdo primero evalúa unarios y primarios
+    FoxyASTNode *left = parse_unary(parser);
     if (!left) return NULL;
 
-    if (is_negative && left->type == FOXY_AST_NODE_LITERAL) {
-        switch (left->as.literal_node.value.type) {
-            case FOXY_VAL_INT:
-            case FOXY_VAL_LONG:
-            case FOXY_VAL_LONG_LONG:
-            case FOXY_VAL_UNSIGNED_LONG_LONG:
-                left->as.literal_node.value.as.ival = -left->as.literal_node.value.as.ival;
-                break;
-            case FOXY_VAL_NUMBER:
-            case FOXY_VAL_FLOAT:
-            case FOXY_VAL_DOUBLE:
-                left->as.literal_node.value.as.dval = -left->as.literal_node.value.as.dval;
-                break;
-            default:
-                break;
-        }
-    }
-
+    // Si el siguiente token es un operador infix (+, -, *, /)
     if (parser->current_token.type_category == FOXY_TOKEN_CAT_OPERATOR) {
         int op_subtype = parser->current_token.subtype;
 
@@ -601,7 +615,8 @@ static FoxyASTNode* parse_expression(FoxyParser *parser) {
         if (is_binary_op) {
             f_parser_advance(parser); 
 
-            FoxyASTNode *right = parse_primary(parser);
+            // El lado derecho procesa unarios también (permite cosas como 5 - -3)
+            FoxyASTNode *right = parse_unary(parser);
             if (!right) {
                 fprintf(stderr, "[Foxy Parser Error] Se esperaba una expresión a la derecha del operador\n");
                 parser->had_error = true;

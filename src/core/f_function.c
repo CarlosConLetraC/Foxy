@@ -3,18 +3,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include "f_function.h"
-#include "f_gc.h" // Importar el GC
+#include "f_gc.h"
+
+const char * const FOXY_FUNCTION_TYPE_NAMES[] = {
+    #define X(type_enum, type_str) [type_enum] = type_str,
+    FOXY_FUNCTION_TYPE_LIST(X)
+    #undef X
+};
 
 FoxyFunction* f_function_create(const char *name, uint8_t arity) {
-    // Asignación controlada por el heap del GC
     FoxyFunction *func = (FoxyFunction*)f_gc_allocate(FOXY_HEAP_FUNCTION, sizeof(FoxyFunction), (void(*)(void*))f_function_free);
     if (!func) return NULL;
 
     func->name = name ? strdup(name) : NULL;
     func->arity = arity;
-    func->type = FOXY_FUNCTION_USER; // Por defecto se crea como función de usuario. . .
-    
-    // Inicializar los campos internos de la unión de usuario. . .
+    func->type = FOXY_FUNCTION_USER;
+
     func->as.user.code = NULL;
     func->as.user.code_size = 0;
     func->as.user.code_capacity = 0;
@@ -30,7 +34,6 @@ FoxyFunction* f_function_create(const char *name, uint8_t arity) {
     return func;
 }
 
-// Opcional: Constructor útil si necesitas registrar funciones nativas de C fácilmente
 FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNativeFn native_ptr) {
     FoxyFunction *func = (FoxyFunction*)f_gc_allocate(FOXY_HEAP_FUNCTION, sizeof(FoxyFunction), (void(*)(void*))f_function_free);
     if (!func) return NULL;
@@ -38,7 +41,6 @@ FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNati
     func->name = name ? strdup(name) : NULL;
     func->arity = arity;
     func->type = FOXY_FUNCTION_NATIVE;
-    
     func->as.native.function_ptr = native_ptr;
 
     return func;
@@ -47,47 +49,39 @@ FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNati
 void f_function_free(FoxyFunction *fn) {
     if (!fn) return;
 
-    // 1. Liberar el nombre si fue asignado en Heap
     if (fn->name) {
         free(fn->name);
         fn->name = NULL;
     }
 
-    // 2. Liberar recursos específicos según el tipo de función
     if (fn->type == FOXY_FUNCTION_USER) {
-        // Liberar el buffer del Bytecode
         if (fn->as.user.code) {
             free(fn->as.user.code);
             fn->as.user.code = NULL;
         }
-
-        // Liberar el Pool de Constantes local de la función
         if (fn->as.user.constants) {
-            for (size_t i = 0; i < fn->as.user.constants_count; i++)
+            for (size_t i = 0; i < fn->as.user.constants_count; i++) {
                 f_value_free_contents(&fn->as.user.constants[i]);
+            }
             free(fn->as.user.constants);
             fn->as.user.constants = NULL;
         }
     }
 
-    // 3. Liberar la estructura contenedora
     free(fn);
 }
 
 void f_function_add_constant(FoxyFunction *func, FoxyValue value) {
     if (!func || func->type != FOXY_FUNCTION_USER) return;
 
-    // Verificar si necesitamos expandir la capacidad del pool de constantes usando los campos de user
     if (func->as.user.constants_count >= func->as.user.constants_capacity) {
         size_t new_cap = func->as.user.constants_capacity == 0 ? 8 : func->as.user.constants_capacity * 2;
-        FoxyValue *new_constants = (FoxyValue *)realloc(func->as.user.constants, sizeof(FoxyValue) * new_cap);
-        if (!new_constants) {
-            return;
-        }
+        FoxyValue *new_constants = (FoxyValue*)realloc(func->as.user.constants, sizeof(FoxyValue) * new_cap);
+        if (!new_constants) return;
+
         func->as.user.constants = new_constants;
         func->as.user.constants_capacity = new_cap;
     }
 
-    // Insertar el valor FoxyValue e incrementar el contador
     func->as.user.constants[func->as.user.constants_count++] = value;
 }

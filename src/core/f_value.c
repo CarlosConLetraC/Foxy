@@ -8,7 +8,6 @@
 #include "f_value.h"
 #include "f_array.h"
 
-// Generación del arreglo de cadenas alineado con los índices del enum mediante X-Macro
 const char * const FOXY_VALUE_TYPE_NAMES[] = {
     #define X(type_enum, type_str) [type_enum] = type_str,
     FOXY_VALUE_TYPE_LIST(X)
@@ -16,7 +15,7 @@ const char * const FOXY_VALUE_TYPE_NAMES[] = {
 };
 
 const char* f_value_type_to_char_array(FoxyValueType type) {
-    if ((uint)type >= FOXY_VAL_COUNT) return "unknown";
+    if ((unsigned int)type >= FOXY_VAL_COUNT) return "unknown";
     return FOXY_VALUE_TYPE_NAMES[type];
 }
 
@@ -30,22 +29,23 @@ FoxyValue f_value_create_char_array(const char *str, size_t len) {
         return val;
     }
 
-    // Reservar len + 1 para asegurar el terminador nulo de C
-    char *buffer = (char*)malloc(len + 1);
-    if (!buffer) {
+    arr->array_type = FOXY_VAL_CHAR;
+    arr->count = len;
+    arr->length = len > 0 ? len : 1;
+    arr->items = (FoxyValue*)calloc(arr->length, sizeof(FoxyValue));
+
+    if (!arr->items) {
         free(arr);
         val.as.array = NULL;
         return val;
     }
 
     if (str && len > 0) {
-        memcpy(buffer, str, len);
+        for (size_t i = 0; i < len; i++) {
+            arr->items[i].type = FOXY_VAL_CHAR;
+            arr->items[i].as.cval = str[i];
+        }
     }
-    buffer[len] = '\0'; // Garantiza C-string válido en memoria contigua
-
-    arr->element_type_id = FOXY_VAL_CHAR;
-    arr->length = len;
-    arr->data = buffer;
 
     val.as.array = arr;
     return val;
@@ -54,8 +54,14 @@ FoxyValue f_value_create_char_array(const char *str, size_t len) {
 const char* f_value_get_char_array_data(const FoxyValue *val) {
     if (!val || val->type != FOXY_VAL_ARRAY || !val->as.array) return NULL;
     FoxyArray *arr = val->as.array;
-    if (arr->element_type_id == FOXY_VAL_CHAR) {
-        return (const char*)arr->data;
+    if (arr->array_type == FOXY_VAL_CHAR && arr->items) {
+        char *buffer = (char*)malloc(arr->count + 1);
+        if (!buffer) return NULL;
+        for (size_t i = 0; i < arr->count; i++) {
+            buffer[i] = arr->items[i].as.cval;
+        }
+        buffer[arr->count] = '\0';
+        return buffer;
     }
     return NULL;
 }
@@ -64,19 +70,12 @@ void f_value_free_contents(FoxyValue *val) {
     if (!val) return;
 
     switch (val->type) {
-        /*
-            Foxy no tiene tipos de dato "string", pero si existen arreglos de caracteres.
-            para poder trabajar con "string", se necesita de la librería string. En ese caso
-            se utiliza un swich case para FOXY_VAL_OBJECT y FOXY_VAL_CLASS para poder realizar
-            la limpieza de tipos de datos más complejos.
-        */
-
         case FOXY_VAL_ARRAY:
-            if (val->as.array) {
-                // Si tienes un destructor de arreglos:
-                f_array_free(val->as.array);
-                val->as.array = NULL;
+            if (val->as.array->items) {
+                free(val->as.array->items);
             }
+            free(val->as.array);
+            val->as.array = NULL;
             break;
 
         case FOXY_VAL_OBJECT:
@@ -108,7 +107,6 @@ void f_value_free_contents(FoxyValue *val) {
             break;
 
         default:
-            // Tipos primitivos no requieren free().
             break;
     }
 
