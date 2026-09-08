@@ -353,6 +353,7 @@ FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc) {
 
     #define DISPATCH() do { \
         FoxyCallFrame *frame = f_callstack_peek(&proc->call_stack); \
+        printf("FOXCODE->bytecode[%08x]: %d\n", *frame->ip, GET_FOXCODE(inst)); \
         if (!vm->running || !frame || !frame->func || frame->func->type != FOXY_FUNCTION_USER) \
             goto lbl_FOXCODE_HALT; \
         const FoxInstruction *code_end = frame->func->as.user.code + (frame->func->as.user.code_size / sizeof(FoxInstruction)); \
@@ -438,12 +439,14 @@ FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc) {
 
     lbl_FOXCODE_COLLECT: {
         f_gc_collect();
+        /**/printf("DEBUG[%s]\n", f_vm_foxcode_to_symbol(inst));
         DISPATCH();
     }
 
     lbl_FOXCODE_LOAD_CONST: {
         int const_idx = GETARG_Bx(inst);
         if (const_idx < (int)vm->constants_count) {
+            /**/printf("DEBUG: Carga de valor constante tipo [%s] en %p\n", FOXY_VALUE_TYPE_NAMES[vm->constants[const_idx].type], &(vm->constants[const_idx]));
             f_vm_push(proc, vm->constants[const_idx]);
         } else {
             vm->running = false;
@@ -453,6 +456,7 @@ FoxyStatus f_vm_execute_process(FoxyVM *vm, FoxyProcess *proc) {
     }
 
     lbl_FOXCODE_LOAD_NULL: {
+        /**/printf("DEBUG: Carga hardcodeada de valor nulo.\n");
         f_vm_push(proc, FOXY_NULL_VALUE);
         DISPATCH();
     }

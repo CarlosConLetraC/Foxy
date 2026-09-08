@@ -13,23 +13,23 @@
     typedef struct FoxyProcess FoxyProcess;
 
     #define FOXY_VALUE_TYPE_LIST(F) \
-        F(FOXY_VAL_NULL,                "null")     \
-        F(FOXY_VAL_VOID,                "void")     \
-        F(FOXY_VAL_BOOL,                "bool")     \
-        F(FOXY_VAL_CHAR,                "char")     \
-        F(FOXY_VAL_INT,                 "int")      \
-        F(FOXY_VAL_NUMBER,              "number")   \
-        F(FOXY_VAL_FLOAT,               "float")    \
-        F(FOXY_VAL_DOUBLE,              "double")   \
-        F(FOXY_VAL_LONG,                "long")     \
-        F(FOXY_VAL_LONG_LONG,           "llong")    \
-        F(FOXY_VAL_UNSIGNED_LONG_LONG,  "ullong")   \
-        F(FOXY_VAL_ARRAY,               "array")    \
-        F(FOXY_VAL_DICT,                "dict")     \
-        F(FOXY_VAL_OBJECT,              "object")   \
-        F(FOXY_VAL_STRUCT,              "struct")   \
-        F(FOXY_VAL_CLASS,               "class")    \
-        F(FOXY_VAL_FUNCTION,            "function")
+        F(FOXY_VAL_NULL,                "null")     /*[0]*/\
+        F(FOXY_VAL_VOID,                "void")     /*[1]*/\
+        F(FOXY_VAL_BOOL,                "bool")     /*[2]*/\
+        F(FOXY_VAL_CHAR,                "char")     /*[3]*/\
+        F(FOXY_VAL_INT,                 "int")      /*[4]*/\
+        F(FOXY_VAL_NUMBER,              "number")   /*[5]*/\
+        F(FOXY_VAL_FLOAT,               "float")    /*[6]*/\
+        F(FOXY_VAL_DOUBLE,              "double")   /*[7]*/\
+        F(FOXY_VAL_LONG,                "long")     /*[8]*/\
+        F(FOXY_VAL_LONG_LONG,           "llong")    /*[9]*/\
+        F(FOXY_VAL_UNSIGNED_LONG_LONG,  "ullong")   /*[10]*/\
+        F(FOXY_VAL_ARRAY,               "array")    /*[11]*/\
+        F(FOXY_VAL_DICT,                "dict")     /*[12]*/\
+        F(FOXY_VAL_OBJECT,              "object")   /*[13]*/\
+        F(FOXY_VAL_STRUCT,              "struct")   /*[14]*/\
+        F(FOXY_VAL_CLASS,               "class")    /*[15]*/\
+        F(FOXY_VAL_FUNCTION,            "function") /*[16]*/
 
     typedef enum {
         #define F(type_enum, type_str) type_enum,

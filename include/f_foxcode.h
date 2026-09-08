@@ -88,6 +88,6 @@
     #undef F
 
     typedef FOXY_FOXCODE FoxOpcode;
-    typedef FOXY_FOXCODE FoxyOpcode;
+    // typedef FOXY_FOXCODE FoxyOpcode;
 
 #endif /* F_FOXCODE_H */
