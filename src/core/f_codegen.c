@@ -12,7 +12,7 @@
 #include "f_object.h"
 #include "f_ast.h"
 #include "f_array.h"
-#include "utarray.h"
+// #include "utarray.h"
 
 // static const UT_icd fox_instruction_icd = {sizeof(FoxInstruction), NULL, NULL, NULL};
 // static const UT_icd foxy_value_icd = {sizeof(FoxyValue), NULL, NULL, NULL};
