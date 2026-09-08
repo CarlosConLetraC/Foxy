@@ -43,7 +43,7 @@
     void f_codegen_free(FoxyCodegen *cg);
 
     size_t f_codegen_emit(FoxyCodegen *cg, FoxInstruction inst);
-    int f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val);
+    size_t f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val);
 
     int f_codegen_resolve_local(FoxyCodegen *cg, const char *name);
     int f_codegen_add_local(FoxyCodegen *cg, const char *name, size_t name_len);
