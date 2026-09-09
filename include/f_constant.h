@@ -3,7 +3,7 @@
     #include <stdlib.h>
     #include "f_value.h"
 
-    // Estructura de una constante individual
+    typedef struct FoxyVM FoxyVM;
     typedef FoxyValue FoxyConstant;
     
     typedef struct {
@@ -14,5 +14,5 @@
 
     void f_constant_pool_init(FoxyConstantPool *pool);
     size_t f_constant_pool_add(FoxyConstantPool *pool, FoxyValue value);
-    void f_constant_pool_free(FoxyConstantPool *pool);
+    void f_constant_pool_free(FoxyConstantPool *pool, FoxyVM *vm);
 #endif // F_CONSTANT_H

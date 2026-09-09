@@ -434,3 +434,121 @@ void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count) {
     if (count % 8 != 0) printf("\n");
     printf("============================================================\n\n");
 }
+
+bool f_utils_dump_bytecode_to_file(const FoxInstruction *bytecode, size_t code_count, const FoxyVM *vm, const char *filepath) {
+    if (!bytecode || code_count == 0 || !filepath) return false;
+
+    FILE *file = fopen(filepath, "w");
+    if (!file) {
+        fprintf(stderr, "Error: No se pudo crear el archivo de dump '%s'\n", filepath);
+        return false;
+    }
+
+    fprintf(file, "======================================================================\n");
+    fprintf(file, " FOXY-LANG BYTECODE DUMP\n");
+    fprintf(file, " Instrucciones: %zu | Tamaño total: %zu bytes\n", code_count, code_count * sizeof(FoxInstruction));
+    fprintf(file, "======================================================================\n\n");
+
+    // 1. Exportación del Pool de Constantes desde la VM
+    if (vm && vm->constants && vm->constants_count > 0) {
+        fprintf(file, "--- CONSTANT POOL (%zu elementos) ---\n", vm->constants_count);
+        for (size_t i = 0; i < vm->constants_count; i++) {
+            const FoxyValue *val = &vm->constants[i];
+            const char *type_name = f_value_type_to_char_array(val->type);
+            fprintf(file, "[%04zu] Type: %-10s (0x%02X) | Value: ", i, type_name, val->type);
+
+            switch (val->type) {
+                case FOXY_VAL_INT:
+                case FOXY_VAL_LONG:
+                case FOXY_VAL_LONG_LONG:
+                    fprintf(file, "%" PRId64, val->as.ival);
+                    break;
+                case FOXY_VAL_FLOAT:
+                    fprintf(file, "%f", val->as.fval);
+                    break;
+                case FOXY_VAL_DOUBLE:
+                case FOXY_VAL_NUMBER:
+                    fprintf(file, "%.6f", val->as.dval);
+                    break;
+                case FOXY_VAL_BOOL:
+                    fprintf(file, "%s", (val->as.bval || val->as.boolean) ? "true" : "false");
+                    break;
+                case FOXY_VAL_CHAR:
+                    fprintf(file, "'%c'", val->as.cval);
+                    break;
+                case FOXY_VAL_ARRAY: {
+                    const char *str_data = f_value_get_char_array_data(val);
+                    if (str_data) {
+                        fprintf(file, "\"%s\"", str_data);
+                        free((void*)str_data);
+                    } else if (val->as.array) {
+                        fprintf(file, "[Array: count=%zu, length=%zu]", val->as.array->count, val->as.array->length);
+                    } else {
+                        fprintf(file, "[]");
+                    }
+                    break;
+                }
+                case FOXY_VAL_OBJECT: {
+                    FoxyObject *obj = val->as.obj;
+                    if (obj && obj->klass && obj->klass->name) {
+                        fprintf(file, "<instance %s @ %p>", obj->klass->name, (void*)obj);
+                    } else {
+                        fprintf(file, "<object @ %p>", (void*)obj);
+                    }
+                    break;
+                }
+                case FOXY_VAL_CLASS: {
+                    FoxyClass *klass = (FoxyClass*)val->as.klass;
+                    fprintf(file, "<class %s>", (klass && klass->name) ? klass->name : "anonymous");
+                    break;
+                }
+                case FOXY_VAL_FUNCTION: {
+                    FoxyFunction *func = val->as.func;
+                    fprintf(file, "<fn %s (arity %d)>", (func && func->name) ? func->name : "anonymous", func ? func->arity : 0);
+                    break;
+                }
+                default:
+                    fprintf(file, "<ptr %p>", val->as.ptr);
+                    break;
+            }
+            fprintf(file, "\n");
+        }
+        fprintf(file, "\n");
+    }
+
+    // 2. Exportación de Instrucciones del Bytecode
+    fprintf(file, "--- INSTRUCTION STREAM ---\n");
+    fprintf(file, " INDEX  | OFFSET | HEX CODE   | OPCODE | REG A | ARG BX / CONST\n");
+    fprintf(file, "--------+--------+------------+--------+-------+----------------\n");
+
+    for (size_t i = 0; i < code_count; i++) {
+        FoxInstruction inst = bytecode[i];
+
+        uint8_t opcode = (uint8_t)(inst & 0xFF);
+        uint8_t reg_a  = (uint8_t)((inst >> 8) & 0xFF);
+        uint16_t arg_bx = (uint16_t)((inst >> 16) & 0xFFFF);
+
+        fprintf(file, " %06zu | %06zu | 0x%08X | %-6u | %-5u | %-14u",
+                i, i * sizeof(FoxInstruction), inst, opcode, reg_a, arg_bx);
+
+        // Vista previa si arg_bx apunta a una constante válida en vm->constants
+        if (vm && vm->constants && arg_bx < vm->constants_count) {
+            const FoxyValue *c_val = &vm->constants[arg_bx];
+            if (c_val->type == FOXY_VAL_ARRAY) {
+                const char *str = f_value_get_char_array_data(c_val);
+                if (str) {
+                    fprintf(file, " ; Const[%u] = \"%s\"", arg_bx, str);
+                    free((void*)str);
+                }
+            } else if (f_value_is_pure_integer(c_val)) {
+                fprintf(file, " ; Const[%u] = %" PRId64, arg_bx, c_val->as.ival);
+            }
+        }
+
+        fprintf(file, "\n");
+    }
+
+    fprintf(file, "\n======================================================================\n");
+    fclose(file);
+    return true;
+}

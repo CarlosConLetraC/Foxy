@@ -26,8 +26,11 @@
         F(FOXY_TOKEN_LIST_OVERRULE) \
         F(FOXY_TOKEN_LIST_SUPER) \
         F(FOXY_TOKEN_LIST_SELF) \
+        F(FOXY_TOKEN_LIST_WHILE) \
         F(FOXY_TOKEN_LIST_FOR) \
         F(FOXY_TOKEN_LIST_IF) \
+        F(FOXY_TOKEN_LIST_ELSEIF) \
+        F(FOXY_TOKEN_LIST_ELSE) \
         F(FOXY_TOKEN_LIST_SWITCH) \
         F(FOXY_TOKEN_LIST_CASE) \
         F(FOXY_TOKEN_LIST_DEFAULT) \
@@ -135,11 +138,14 @@
         F(FOXY_TOKEN_ERROR_SYNTAX,              "SYNTAX")              /* Fallo de sintaxis */ \
         F(FOXY_TOKEN_ERROR_RUNTIME,             "RUNTIME")             /* Fallo de ejecución */ \
         F(FOXY_TOKEN_ERROR_ARITHMETIC,          "ARITHMETIC")          /* Error aritmético */ \
+        F(FOXY_TOKEN_ERROR_BITWISE,             "BITWISE")             /* Error operador lógico */ \
         F(FOXY_TOKEN_ERROR_CAST,                "CAST")                /* Fallo de cast */ \
         F(FOXY_TOKEN_ERROR_OUT_OF_RANGE,        "OUT_OF_RANGE")        /* Índices fuera de límites */ \
+        F(FOXY_TOKEN_ERROR_STACKOVERFLOW,       "STACK_OVERFLOW")      /* Límite de frames alcanzado */\
         F(FOXY_TOKEN_ERROR_VARIABLE_UNDEFINED,  "VARIABLE_UNDEFINED")  /* Variable sin definir */ \
         F(FOXY_TOKEN_ERROR_NULL,                "NULL")                /* Punteros no inicializados */ \
-        F(FOXY_TOKEN_ERROR_HAS_NO_ATTRIBUTE,    "HAS_NO_ATTRIBUTE")    /* Objeto sin atributo */
+        F(FOXY_TOKEN_ERROR_HAS_NO_ATTRIBUTE,    "HAS_NO_ATTRIBUTE")    /* Objeto sin atributo */ \
+        F(FOXY_TOKEN_ERROR_NOT_ENOUGH_MEMORY,   "NOT_ENOUGH_MEMORY")   /* Insuficiente memoria para procesar operadores de codigo. . .*/
 
     // 2. Generación de Enums compactos (__attribute__((__packed__)))
 
@@ -215,8 +221,11 @@
         { "overrule",  FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_OVERRULE },
         { "super",     FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_SUPER },
         { "self",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_SELF },
+        { "while",     FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_WHILE },
         { "for",       FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_FOR },
         { "if",        FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_IF },
+        { "elseif",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_ELSEIF },
+        { "else",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_ELSE },
         { "switch",    FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_SWITCH },
         { "case",      FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_CASE },
         { "default",   FOXY_TOKEN_CAT_KEYWORD, FOXY_TOKEN_LIST_DEFAULT },

@@ -33,6 +33,7 @@
         F(FOXCODE_SET_INDEX,     "SET_INDEX",     "[]=") \
         \
         /* Control de Ciclos e Iteradores */ \
+        F(FOXCODE_WHILE_ITER,    "WHILE_ITER",    "while_iter") \
         F(FOXCODE_FOR_ITER,      "FOR_ITER",      "for_iter") \
         F(FOXCODE_FOR_NEXT,      "FOR_NEXT",      "for_next") \
         F(FOXCODE_FOREACH_CALL,  "FOREACH_CALL",  "foreach_call") \
@@ -71,14 +72,29 @@
         F(FOXCODE_NEW_ARRAY,     "NEW_ARRAY",     "new_array") \
         F(FOXCODE_NEW_DICT,      "NEW_DICT",      "new_dict") \
         F(FOXCODE_CLASS_NEW,     "CLASS_NEW",     "class_new") \
-        F(FOXCODE_NEW_INSTANCE,  "NEW_INSTANCE",  "new_instance") \
+        F(FOXCODE_NEW_OBJECT,    "NEW_OBJECT",    "new_object") \
         F(FOXCODE_METHOD_BIND,   "METHOD_BIND",   "method_bind") \
         \
         /* Concurrencia y Procesos */ \
         F(FOXCODE_POPEN,         "POPEN",         "popen") \
         F(FOXCODE_ENV,           "ENV",           "env") \
         F(FOXCODE_ENV_CREATE,    "ENV_CREATE",    "env_create") \
-        F(FOXCODE_ENV_BIND,      "ENV_BIND",      "env_bind")
+        F(FOXCODE_ENV_BIND,      "ENV_BIND",      "env_bind") \
+        \
+        /* Control de excepciones */
+
+        /*
+        TODO: implementar estos foxcode:
+        lbl_FOXCODE_PUSH_LIST:
+        lbl_FOXCODE_PUSH_DICT:
+        lbl_FOXCODE_SUPER_CALL:
+        lbl_FOXCODE_THROW:
+        lbl_FOXCODE_TRY_BEGIN:
+        lbl_FOXCODE_TRY_END: {
+            VM_LOG("Opcode extendido o reservado alcanzado: %s", CURRENT_OP_NAME());
+            DISPATCH();
+        }
+        */
 
     #define F(fcode, name, symbol) fcode,
     typedef enum __attribute__((__packed__)) {

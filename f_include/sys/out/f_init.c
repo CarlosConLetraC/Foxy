@@ -16,9 +16,9 @@ FOXY_EXPORT FoxyObject* f_out_module_init(void) {
     FoxyValue fn_printf = { .type = FOXY_VAL_FUNCTION, .as.native_fn = (void *)f_sys_out_printf };
     FoxyValue fn_println = { .type = FOXY_VAL_FUNCTION, .as.native_fn = (void *)f_sys_out_println };
 
-    f_object_set_field(out_obj, "print", fn_print);
-    f_object_set_field(out_obj, "printf", fn_printf);
-    f_object_set_field(out_obj, "println", fn_println);
+    f_object_set_field(out_obj, "print", fn_print, NULL);
+    f_object_set_field(out_obj, "printf", fn_printf, NULL);
+    f_object_set_field(out_obj, "println", fn_println, NULL);
 
     return out_obj;
 }

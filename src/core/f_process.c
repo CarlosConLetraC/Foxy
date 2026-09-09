@@ -57,12 +57,12 @@ FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *
     return proc;
 }
 
-void f_process_free(FoxyProcess *proc) {
+void f_process_free(FoxyProcess *proc, FoxyVM *vm) {
     if (!proc) return;
 
     // Liberar la función principal generada exclusivamente para este proceso
     if (proc->main_func) {
-        f_function_free(proc->main_func);
+        f_function_free(proc->main_func, vm);
         proc->main_func = NULL;
     }
 

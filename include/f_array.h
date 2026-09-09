@@ -5,6 +5,8 @@
     #include <stdbool.h>
     #include "f_value.h"
 
+    typedef struct FoxyVM FoxyVM;
+
     typedef struct FoxyArray {
         FoxyValue *items;
         size_t length;            // Capacidad máxima de memoria reservada
@@ -14,8 +16,7 @@
 
     FoxyArray* f_array_new(size_t initial_length, FoxyValueType fval);
     FoxyArray* f_array_new_typed(size_t initial_length, FoxyValueType fval);
-    void       f_array_free(FoxyArray *array);
-
-    bool       f_array_push(FoxyArray *array, FoxyValue value);
-    bool       f_array_pop(FoxyArray *array, FoxyValue *out_value);
+    void f_array_free(FoxyArray *array, FoxyVM *vm);
+    bool f_array_push(FoxyArray *array, FoxyValue value);
+    bool f_array_pop(FoxyArray *array, FoxyValue *out_value, FoxyVM *vm);
 #endif // FOXY_ARRAY_H

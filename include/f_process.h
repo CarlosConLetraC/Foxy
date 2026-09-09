@@ -63,7 +63,7 @@
     const char* f_process_state_to_string(FoxyProcessState state);
     FoxyProcess* f_process_create(FoxyRuntime *rt, const char *pname, FoxyFunction *main_func, FoxyProtocol *protocol);
     bool f_process_start(FoxyProcess *process);
-    void f_process_free(FoxyProcess *process);
+    void f_process_free(FoxyProcess *proc, FoxyVM *vm);
     void* f_process_worker(void *arg);
     FoxyValue f_process_pop(FoxyProcess *p);
 #endif // F_PROCESS_H

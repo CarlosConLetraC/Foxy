@@ -24,13 +24,13 @@ size_t f_constant_pool_add(FoxyConstantPool *pool, FoxyValue value) {
     return pool->count++;
 }
 
-void f_constant_pool_free(FoxyConstantPool *pool) {
+void f_constant_pool_free(FoxyConstantPool *pool, FoxyVM *vm) {
     if (!pool) return;
 
     if (pool->values) {
         for (size_t i = 0; i < pool->count; i++) {
             // Liberar recursivamente los datos internos de cada constante (FoxyConstant es FoxyValue)
-            f_value_free_contents(&pool->values[i]);
+            f_value_free_contents(&pool->values[i], vm);
         }
         free(pool->values);
         pool->values = NULL;

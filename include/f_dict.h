@@ -6,6 +6,8 @@
     #include "f_value.h"
     #include "uthash.h"
 
+    typedef struct FoxyVM FoxyVM;
+
     typedef struct FoxyDictEntry {
         char *key;
         FoxyValue value;
@@ -17,9 +19,8 @@
     } FoxyDict;
 
     FoxyDict* f_dict_new(void);
-    void f_dict_free(FoxyDict *dict);
-
-    void f_dict_set(FoxyDict *dict, const char *key, FoxyValue value);
+    void f_dict_free(FoxyDict *dict, FoxyVM *vm);
+    void f_dict_set(FoxyDict *dict, const char *key, FoxyValue value, FoxyVM *vm);
     bool f_dict_get(FoxyDict *dict, const char *key, FoxyValue *out_value);
-    bool f_dict_remove(FoxyDict *dict, const char *key);
+    bool f_dict_remove(FoxyDict *dict, const char *key, FoxyVM *vm);
 #endif // FOXY_DICT_H

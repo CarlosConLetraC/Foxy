@@ -23,11 +23,11 @@ FoxyArray* f_array_new(size_t initial_length, FoxyValueType fval) {
     return f_array_new_typed(initial_length, fval);
 }
 
-void f_array_free(FoxyArray *array) {
+void f_array_free(FoxyArray *array, FoxyVM *vm) {
     if (!array) return;
 
     if (array->items) {
-        for (size_t i = 0; i < array->count; i++) f_value_free_contents(&array->items[i]);
+        for (size_t i = 0; i < array->count; i++) f_value_free_contents(&array->items[i], vm);
         free(array->items);
         array->items = NULL;
     }
@@ -53,14 +53,14 @@ bool f_array_push(FoxyArray *array, FoxyValue value) {
     return true;
 }
 
-bool f_array_pop(FoxyArray *array, FoxyValue *out_value) {
+bool f_array_pop(FoxyArray *array, FoxyValue *out_value, FoxyVM *vm) {
     if (!array || array->count == 0) return false;
 
     array->count--;
     if (out_value)
         *out_value = array->items[array->count];
     else
-        f_value_free_contents(&array->items[array->count]);
+        f_value_free_contents(&array->items[array->count], vm);
 
     array->items[array->count] = (FoxyValue){0};
     return true;

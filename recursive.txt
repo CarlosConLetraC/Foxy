@@ -1,0 +1,44 @@
+=== [DEBUG] CONSTANT POOL (6 elementos) ===
+  [00] array: CHAR ARRAY (String): "sys/out"
+  [01] null: <ptr: (nil), type: 0>
+  [02] int: 40
+  [03] int: 2
+  [04] function: <function calcular_total arity=2: 0x562539424000>
+  [05] array: CHAR ARRAY (String): "printf"
+============================================================
+
+=== [DEBUG] BYTECODE GENERADO (25 instrucciones / 100 bytes) ===
+00000002 00010004 00000009 00020004 00000109 00030004 00000209 00040004 
+00000309 00000108 00000208 00000308 0000022C 00000409 00010004 00000008 
+0005000A 0000022C 0000012B 00010004 00000408 0005000A 0000022C 0000012B 
+00000001 
+============================================================
+
+[VM TRACE] IP:0001 | Opcode: INCLUDE          | Sym: include | Hex: 0x00000002 (A:0, Bx:0)
+[VM TRACE] IP:0002 | Opcode: LOAD_CONST       | Sym: load_const | Hex: 0x00010004 (A:0, Bx:1)
+[VM TRACE] IP:0003 | Opcode: STORE_LOCAL      | Sym: store_local | Hex: 0x00000009 (A:0, Bx:0)
+[VM TRACE] IP:0004 | Opcode: LOAD_CONST       | Sym: load_const | Hex: 0x00020004 (A:0, Bx:2)
+[VM TRACE] IP:0005 | Opcode: STORE_LOCAL      | Sym: store_local | Hex: 0x00000109 (A:1, Bx:0)
+[VM TRACE] IP:0006 | Opcode: LOAD_CONST       | Sym: load_const | Hex: 0x00030004 (A:0, Bx:3)
+[VM TRACE] IP:0007 | Opcode: STORE_LOCAL      | Sym: store_local | Hex: 0x00000209 (A:2, Bx:0)
+[VM TRACE] IP:0008 | Opcode: LOAD_CONST       | Sym: load_const | Hex: 0x00040004 (A:0, Bx:4)
+[VM TRACE] IP:0009 | Opcode: STORE_LOCAL      | Sym: store_local | Hex: 0x00000309 (A:3, Bx:0)
+[VM TRACE] IP:0010 | Opcode: LOAD_LOCAL       | Sym: load_local | Hex: 0x00000108 (A:1, Bx:0)
+[VM TRACE] IP:0011 | Opcode: LOAD_LOCAL       | Sym: load_local | Hex: 0x00000208 (A:2, Bx:0)
+[VM TRACE] IP:0012 | Opcode: LOAD_LOCAL       | Sym: load_local | Hex: 0x00000308 (A:3, Bx:0)
+[VM TRACE] IP:0013 | Opcode: CALL             | Sym: call  | Hex: 0x0000022C (A:2, Bx:0)
+          └─ [CALL | 'call'] Llamada a funcion con 2 argumentos
+[VM TRACE] IP:0014 | Opcode: STORE_LOCAL      | Sym: store_local | Hex: 0x00000409 (A:4, Bx:0)
+[VM TRACE] IP:0015 | Opcode: LOAD_CONST       | Sym: load_const | Hex: 0x00010004 (A:0, Bx:1)
+[VM TRACE] IP:0016 | Opcode: LOAD_LOCAL       | Sym: load_local | Hex: 0x00000008 (A:0, Bx:0)
+[VM TRACE] IP:0017 | Opcode: LOAD_GLOBAL      | Sym: load_global | Hex: 0x0005000A (A:0, Bx:5)
+[VM TRACE] IP:0018 | Opcode: CALL             | Sym: call  | Hex: 0x0000022C (A:2, Bx:0)
+          └─ [CALL | 'call'] Llamada a funcion con 2 argumentos
+[VM TRACE] IP:0019 | Opcode: FOXCODE_POP      | Sym: pop   | Hex: 0x0000012B (A:1, Bx:0)
+[VM TRACE] IP:0020 | Opcode: LOAD_CONST       | Sym: load_const | Hex: 0x00010004 (A:0, Bx:1)
+[VM TRACE] IP:0021 | Opcode: LOAD_LOCAL       | Sym: load_local | Hex: 0x00000408 (A:4, Bx:0)
+[VM TRACE] IP:0022 | Opcode: LOAD_GLOBAL      | Sym: load_global | Hex: 0x0005000A (A:0, Bx:5)
+[VM TRACE] IP:0023 | Opcode: CALL             | Sym: call  | Hex: 0x0000022C (A:2, Bx:0)
+          └─ [CALL | 'call'] Llamada a funcion con 2 argumentos
+[VM TRACE] IP:0024 | Opcode: FOXCODE_POP      | Sym: pop   | Hex: 0x0000012B (A:1, Bx:0)
+[VM TRACE] IP:0025 | Opcode: HALT             | Sym: halt  | Hex: 0x00000001 (A:0, Bx:0)

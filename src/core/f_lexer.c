@@ -12,7 +12,6 @@ static const char* FOXY_TOKEN_ERROR_NAMES[] = {
 };
 #undef F
 
-// Auxiliares internos de lectura basados en punteros directos
 static inline char f_lexer_peek(FoxyLexer* lexer) {
     return *lexer->current;
 }
@@ -40,7 +39,6 @@ const char* f_lexer_error_type_to_string(FoxyErrorType err_type) {
 void f_lexer_throw_error(const FoxyLexer* lexer, FoxyErrorType err_type, const char* format, ...) {
     const char* err_name = f_lexer_error_type_to_string(err_type);
     
-    // Si ocurre un error, actualizamos el bit field de estado local
     if (lexer) {
         ((FoxyLexer*)lexer)->has_error = 1;
     }
@@ -63,7 +61,6 @@ void f_lexer_throw_error(const FoxyLexer* lexer, FoxyErrorType err_type, const c
     exit(EXIT_FAILURE);
 }
 
-// Lógica de comentarios basados en '@' y espacios en blanco
 void f_lexer_skip_comments_and_whitespace(FoxyLexer* lexer) {
     for (;;) {
         char c = f_lexer_peek(lexer);
@@ -71,7 +68,7 @@ void f_lexer_skip_comments_and_whitespace(FoxyLexer* lexer) {
         if (c == ' ' || c == '\r' || c == '\t' || c == '\n') {
             f_lexer_advance(lexer);
         } else if (c == '@') {
-            lexer->in_comment = 1; // Activación de bandera por bit field
+            lexer->in_comment = 1;
             int at_count = 0;
             const char* temp = lexer->current;
             
@@ -97,7 +94,7 @@ void f_lexer_skip_comments_and_whitespace(FoxyLexer* lexer) {
                     }
                 }
             }
-            lexer->in_comment = 0; // Desactivación al salir del comentario
+            lexer->in_comment = 0;
         } else {
             break;
         }
@@ -110,8 +107,6 @@ void f_lexer_init(FoxyLexer* lexer, const char* source_code, const char* filenam
     lexer->filename = filename ? filename : "<unknown>";
     lexer->line = 1;
     lexer->column = 1;
-    
-    // Inicialización de bit fields en cero
     lexer->has_error = 0;
     lexer->in_string = 0;
     lexer->in_comment = 0;
@@ -137,7 +132,6 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
 
     char c = f_lexer_advance(lexer);
 
-    // 1. Identificadores, Palabras Clave y Tipos
     if (isalpha((unsigned char)c) || c == '_') {
         while (isalnum((unsigned char)f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_')
             f_lexer_advance(lexer);
@@ -170,7 +164,6 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 2. Literales Numéricos
     if (isdigit((unsigned char)c)) {
         bool is_float = false;
 
@@ -270,7 +263,6 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 3. Literales de Cadena ("...")
     if (c == '"') {
         lexer->in_string = 1;
         while (*lexer->current != '\0' && *lexer->current != '"') {
@@ -305,7 +297,6 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 4. Literales de Carácter ('...')
     if (c == '\'') {
         while (f_lexer_peek(lexer) != '\'' && f_lexer_peek(lexer) != '\0') {
             if (f_lexer_peek(lexer) == '\\') {
@@ -335,7 +326,6 @@ FoxyToken f_lexer_next_token(FoxyLexer* lexer) {
         return token;
     }
 
-    // 5. Operadores y Delimitadores
     switch (c) {
         case '=': 
             if (f_lexer_peek(lexer) == '=') {

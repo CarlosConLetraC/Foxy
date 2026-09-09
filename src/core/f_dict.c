@@ -4,26 +4,31 @@
 #include "f_dict.h"
 #include "f_gc.h"
 
+static void f_dict_gc_free(void *ptr) {
+    if (!ptr) return;
+    f_dict_free((FoxyDict *)ptr, NULL);
+}
+
 FoxyDict* f_dict_new(void) {
-    FoxyDict *dict = (FoxyDict*)f_gc_allocate(FOXY_HEAP_DICT, sizeof(FoxyDict), (void(*)(void*))f_dict_free);
+    FoxyDict *dict = (FoxyDict*)f_gc_allocate(FOXY_HEAP_DICT, sizeof(FoxyDict), f_dict_gc_free);
     if (!dict) return NULL;
     dict->head = NULL;
     return dict;
 }
 
-void f_dict_free(FoxyDict *dict) {
+void f_dict_free(FoxyDict *dict, FoxyVM *vm) {
     if (!dict) return;
 
     FoxyDictEntry *current, *tmp;
     HASH_ITER(hh, dict->head, current, tmp) {
         HASH_DEL(dict->head, current);
         if (current->key) free(current->key);
-        f_value_free_contents(&current->value);
+        f_value_free_contents(&current->value, vm);
         free(current);
     }
 }
 
-void f_dict_set(FoxyDict *dict, const char *key, FoxyValue value) {
+void f_dict_set(FoxyDict *dict, const char *key, FoxyValue value, FoxyVM *vm) {
     if (!dict || !key) return;
 
     FoxyDictEntry *entry = NULL;
@@ -37,7 +42,7 @@ void f_dict_set(FoxyDict *dict, const char *key, FoxyValue value) {
         entry->value = value;
         HASH_ADD_KEYPTR(hh, dict->head, entry->key, strlen(entry->key), entry);
     } else {
-        f_value_free_contents(&entry->value);
+        f_value_free_contents(&entry->value, vm);
         entry->value = value;
     }
 }
@@ -51,7 +56,7 @@ bool f_dict_get(FoxyDict *dict, const char *key, FoxyValue *out_value) {
     return true;
 }
 
-bool f_dict_remove(FoxyDict *dict, const char *key) {
+bool f_dict_remove(FoxyDict *dict, const char *key, FoxyVM *vm) {
     if (!dict || !key) return false;
     FoxyDictEntry *entry = NULL;
     HASH_FIND_STR(dict->head, key, entry);
@@ -59,7 +64,7 @@ bool f_dict_remove(FoxyDict *dict, const char *key) {
 
     HASH_DEL(dict->head, entry);
     if (entry->key) free(entry->key);
-    f_value_free_contents(&entry->value);
+    f_value_free_contents(&entry->value, vm);
     free(entry);
     return true;
 }

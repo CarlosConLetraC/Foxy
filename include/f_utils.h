@@ -26,4 +26,5 @@
 
     void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count);
     void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count);
+    bool f_utils_dump_bytecode_to_file(const FoxInstruction *bytecode, size_t code_count, const FoxyVM *vm, const char *filepath);
 #endif // F_UTILS_H

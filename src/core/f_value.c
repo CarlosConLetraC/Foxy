@@ -66,35 +66,33 @@ const char* f_value_get_char_array_data(const FoxyValue *val) {
     return NULL;
 }
 
-void f_value_free_contents(FoxyValue *val) {
+void f_value_free_contents(FoxyValue *val, FoxyVM *vm) {
     if (!val) return;
 
     switch (val->type) {
         case FOXY_VAL_ARRAY:
-            if (val->as.array->items) {
-                free(val->as.array->items);
-            }
+            if (val->as.array->items) free(val->as.array->items);
             free(val->as.array);
             val->as.array = NULL;
             break;
 
         case FOXY_VAL_OBJECT:
             if (val->as.obj) {
-                f_object_free(val->as.obj);
+                f_object_free(val->as.obj, vm);
                 val->as.obj = NULL;
             }
             break;
 
         case FOXY_VAL_FUNCTION:
             if (val->as.func) {
-                f_function_free(val->as.func);
+                f_function_free(val->as.func, vm);
                 val->as.func = NULL;
             }
             break;
 
         case FOXY_VAL_DICT:
             if (val->as.dict) {
-                f_dict_free(val->as.dict);
+                f_dict_free(val->as.dict, vm);
                 val->as.dict = NULL;
             }
             break;

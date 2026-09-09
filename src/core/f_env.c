@@ -19,9 +19,9 @@ void f_env_free(FoxyEnv *env) {
     // Nota: La memoria interna de env (como bindings) es gestionada y rastreada por el Garbage Collector
 }
 
-void f_env_set(FoxyEnv *env, const char *name, FoxyValue value) {
+void f_env_set(FoxyEnv *env, const char *name, FoxyValue value, FoxyVM *vm) {
     if (!env || !name || !env->bindings) return;
-    f_dict_set(env->bindings, name, value);
+    f_dict_set(env->bindings, name, value, vm);
 }
 
 bool f_env_get(FoxyEnv *env, const char *name, FoxyValue *out_value) {
@@ -29,9 +29,7 @@ bool f_env_get(FoxyEnv *env, const char *name, FoxyValue *out_value) {
 
     FoxyEnv *current = env;
     while (current != NULL) {
-        if (current->bindings && f_dict_get(current->bindings, name, out_value)) {
-            return true;
-        }
+        if (current->bindings && f_dict_get(current->bindings, name, out_value)) return true;
         current = current->parent;
     }
 

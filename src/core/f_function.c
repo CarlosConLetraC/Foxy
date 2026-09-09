@@ -4,6 +4,7 @@
 #include <string.h>
 #include "f_function.h"
 #include "f_gc.h"
+#include "f_vm.h" // Se incluye para resolver la estructura completa de FoxyVM
 
 const char * const FOXY_FUNCTION_TYPE_NAMES[] = {
     #define X(type_enum, type_str) [type_enum] = type_str,
@@ -11,8 +12,15 @@ const char * const FOXY_FUNCTION_TYPE_NAMES[] = {
     #undef X
 };
 
+// Wrapper para adaptar la firma al destructor esperado por el GC: void (*)(void *)
+static void f_function_gc_free(void *ptr) {
+    if (!ptr) return;
+    f_function_free((FoxyFunction *)ptr, NULL);
+}
+
 FoxyFunction* f_function_create(const char *name, uint8_t arity) {
-    FoxyFunction *func = (FoxyFunction*)f_gc_allocate(FOXY_HEAP_FUNCTION, sizeof(FoxyFunction), (void(*)(void*))f_function_free);
+    // Se pasa el wrapper f_function_gc_free para eliminar el warning de cast incompatible
+    FoxyFunction *func = (FoxyFunction*)f_gc_allocate(FOXY_HEAP_FUNCTION, sizeof(FoxyFunction), f_function_gc_free);
     if (!func) return NULL;
 
     func->name = name ? strdup(name) : NULL;
@@ -35,7 +43,7 @@ FoxyFunction* f_function_create(const char *name, uint8_t arity) {
 }
 
 FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNativeFn native_ptr) {
-    FoxyFunction *func = (FoxyFunction*)f_gc_allocate(FOXY_HEAP_FUNCTION, sizeof(FoxyFunction), (void(*)(void*))f_function_free);
+    FoxyFunction *func = (FoxyFunction*)f_gc_allocate(FOXY_HEAP_FUNCTION, sizeof(FoxyFunction), f_function_gc_free);
     if (!func) return NULL;
 
     func->name = name ? strdup(name) : NULL;
@@ -46,29 +54,28 @@ FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNati
     return func;
 }
 
-void f_function_free(FoxyFunction *fn) {
-    if (!fn) return;
+void f_function_free(FoxyFunction *func, FoxyVM *vm) {
+    if (!func) return;
 
-    if (fn->name) {
-        free(fn->name);
-        fn->name = NULL;
+    if (func->name) {
+        free((void *)func->name);
+        func->name = NULL;
     }
 
-    if (fn->type == FOXY_FUNCTION_USER) {
-        if (fn->as.user.code) {
-            free(fn->as.user.code);
-            fn->as.user.code = NULL;
+    if (func->type == FOXY_FUNCTION_USER) {
+        // Solo liberar constants si no es el puntero global compartido de la VM
+        if (func->as.user.constants && (!vm || func->as.user.constants != vm->constants)) {
+            free(func->as.user.constants);
+            func->as.user.constants = NULL;
         }
-        if (fn->as.user.constants) {
-            for (size_t i = 0; i < fn->as.user.constants_count; i++) {
-                f_value_free_contents(&fn->as.user.constants[i]);
-            }
-            free(fn->as.user.constants);
-            fn->as.user.constants = NULL;
+
+        if (func->as.user.code) {
+            free((void *)func->as.user.code);
+            func->as.user.code = NULL;
         }
     }
 
-    free(fn);
+    free(func);
 }
 
 void f_function_add_constant(FoxyFunction *func, FoxyValue value) {

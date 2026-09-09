@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Array de nombres para f_ast_node_type_to_string
 const char * const FOXY_AST_NODE_TYPE_NAMES[] = {
 #define F(node_type, name_str) name_str,
     FOXY_AST_NODE_LIST(F)
@@ -18,7 +17,6 @@ const char* f_ast_node_type_to_string(FoxyASTNodeType type) {
     return FOXY_AST_NODE_TYPE_NAMES[type];
 }
 
-// Memory Allocation Helper
 FoxyASTNode* f_ast_node_new(FoxyASTNodeType type) {
     FoxyASTNode *node = (FoxyASTNode*)calloc(1, sizeof(FoxyASTNode));
     if (!node) {
@@ -29,142 +27,68 @@ FoxyASTNode* f_ast_node_new(FoxyASTNodeType type) {
     return node;
 }
 
-// Memory Deallocation Function
-void f_ast_node_free(FoxyASTNode *node) {
+void f_ast_node_free(FoxyASTNode *node, FoxyVM *vm) {
     if (!node) return;
 
     switch (node->type) {
         case FOXY_AST_NODE_PROGRAM:
             if (node->as.program_node.statements) {
                 for (size_t i = 0; i < node->as.program_node.count; i++) {
-                    f_ast_node_free(node->as.program_node.statements[i]);
+                    f_ast_node_free(node->as.program_node.statements[i], vm);
                 }
                 free(node->as.program_node.statements);
             }
             break;
-
-        case FOXY_AST_NODE_INCLUDE:
-            if (node->as.include_node.path) {
-                free(node->as.include_node.path);
-            }
-            break;
-
-        case FOXY_AST_NODE_EXPR_STMT:
-            f_ast_node_free(node->as.expr_stmt_node.expression);
-            break;
-
-        case FOXY_AST_NODE_CALL:
-            if (node->as.call_node.callee_name) {
-                free(node->as.call_node.callee_name);
-            }
-            if (node->as.call_node.arguments) {
-                for (size_t i = 0; i < node->as.call_node.arg_count; i++) {
-                    f_ast_node_free(node->as.call_node.arguments[i]);
-                }
-                free(node->as.call_node.arguments);
-            }
-            break;
-
-        case FOXY_AST_NODE_LITERAL:
-            f_value_free_contents(&node->as.literal_node.value);
-            break;
-
-        case FOXY_AST_NODE_IDENTIFIER:
-            if (node->as.identifier_node.name) {
-                free(node->as.identifier_node.name);
-            }
-            break;
-
         case FOXY_AST_NODE_BLOCK:
             if (node->as.block_node.statements) {
                 for (size_t i = 0; i < node->as.block_node.count; i++) {
-                    f_ast_node_free(node->as.block_node.statements[i]);
+                    f_ast_node_free(node->as.block_node.statements[i], vm);
                 }
                 free(node->as.block_node.statements);
             }
             break;
-
         case FOXY_AST_NODE_BINARY_OP:
-            f_ast_node_free(node->as.binary_node.left);
-            f_ast_node_free(node->as.binary_node.right);
-            break;
-
-        case FOXY_AST_NODE_VAR_DECL:
-            if (node->as.var_decl_node.name) {
-                free(node->as.var_decl_node.name);
-            }
-            f_ast_node_free(node->as.var_decl_node.initializer);
-            break;
-
         case FOXY_AST_NODE_ASSIGN:
-            if (node->as.assign_node.name) {
-                free(node->as.assign_node.name);
-            }
-            f_ast_node_free(node->as.assign_node.value);
+            f_ast_node_free(node->as.binary_node.left, vm);
+            f_ast_node_free(node->as.binary_node.right, vm);
             break;
-
-        case FOXY_AST_NODE_IF:
-            f_ast_node_free(node->as.if_node.condition);
-            f_ast_node_free(node->as.if_node.then_branch);
-            f_ast_node_free(node->as.if_node.else_branch);
+        case FOXY_AST_NODE_LITERAL:
+            f_value_free_contents(&node->as.literal_node.value, vm);
             break;
-
-        case FOXY_AST_NODE_WHILE:
-            f_ast_node_free(node->as.while_node.condition);
-            f_ast_node_free(node->as.while_node.body);
+        case FOXY_AST_NODE_IDENTIFIER:
+            if (node->as.identifier_node.name) free(node->as.identifier_node.name);
             break;
-
         case FOXY_AST_NODE_FUNCTION:
-            if (node->as.function_node.name) {
-                free(node->as.function_node.name);
-            }
+            if (node->as.function_node.name) free(node->as.function_node.name);
             if (node->as.function_node.param_names) {
                 for (size_t i = 0; i < node->as.function_node.param_count; i++) {
                     free(node->as.function_node.param_names[i]);
                 }
                 free(node->as.function_node.param_names);
             }
-            f_ast_node_free(node->as.function_node.body);
+            if (node->as.function_node.body) f_ast_node_free(node->as.function_node.body, vm);
             break;
-
-        case FOXY_AST_NODE_FOR:
-            f_ast_node_free(node->as.for_node.init);
-            f_ast_node_free(node->as.for_node.condition);
-            f_ast_node_free(node->as.for_node.increment);
-            f_ast_node_free(node->as.for_node.body);
-            break;
-
         case FOXY_AST_NODE_RETURN:
-            f_ast_node_free(node->as.return_node.value);
+            if (node->as.return_node.value) f_ast_node_free(node->as.return_node.value, vm);
             break;
-
-        case FOXY_AST_NODE_ENV_CREATE:
-            f_ast_node_free(node->as.env_create_node.name_expr);
+        case FOXY_AST_NODE_VAR_DECL:
+            if (node->as.var_decl_node.name) free(node->as.var_decl_node.name);
+            if (node->as.var_decl_node.initializer) f_ast_node_free(node->as.var_decl_node.initializer, vm);
             break;
-
-        case FOXY_AST_NODE_ENV_BIND:
-            f_ast_node_free(node->as.env_bind_node.process_expr);
-            f_ast_node_free(node->as.env_bind_node.env_expr);
+        case FOXY_AST_NODE_CALL:
+            if (node->as.call_node.callee_name) free(node->as.call_node.callee_name);
+            if (node->as.call_node.arguments) {
+                for (size_t i = 0; i < node->as.call_node.arg_count; i++) {
+                    f_ast_node_free(node->as.call_node.arguments[i], vm);
+                }
+                free(node->as.call_node.arguments);
+            }
             break;
-
-        case FOXY_AST_NODE_POPEN:
-            f_ast_node_free(node->as.popen_node.callback_expr);
-            f_ast_node_free(node->as.popen_node.name_expr);
-            f_ast_node_free(node->as.popen_node.env_expr);
-            break;
-
-        case FOXY_AST_NODE_ENV:
-            // Sin campos asignables dinámicamente
-            break;
-
         default:
             break;
     }
-
     free(node);
 }
-
-// AST Builders Implementation
 
 FoxyASTNode* f_ast_create_program(void) {
     FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_PROGRAM);
@@ -253,14 +177,13 @@ FoxyASTNode* f_ast_create_var_decl(const char *name, FoxyASTNode *initializer) {
     return node;
 }
 
-FoxyASTNode* f_ast_create_assign(FoxyASTNode *left, FoxyASTNode *right) {
+FoxyASTNode* f_ast_create_assign(FoxyASTNode *left, FoxyASTNode *right, FoxyVM *vm) {
     FoxyASTNode *node = f_ast_node_new(FOXY_AST_NODE_ASSIGN);
     if (!node) return NULL;
     
-    // Extraer identificador si el LHS es un nodo IDENTIFIER
     if (left && left->type == FOXY_AST_NODE_IDENTIFIER) {
         node->as.assign_node.name = left->as.identifier_node.name ? strdup(left->as.identifier_node.name) : NULL;
-        f_ast_node_free(left);
+        f_ast_node_free(left, vm);
     } else {
         node->as.assign_node.name = NULL;
     }

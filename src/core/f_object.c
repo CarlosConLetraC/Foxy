@@ -4,8 +4,13 @@
 #include "f_object.h"
 #include "f_gc.h"
 
+static void f_object_gc_free(void *ptr) {
+    if (!ptr) return;
+    f_object_free((FoxyObject *)ptr, NULL);
+}
+
 FoxyObject* f_object_new(FoxyClass *klass) {
-    FoxyObject *obj = (FoxyObject*)f_gc_allocate(FOXY_HEAP_OBJECT, sizeof(FoxyObject), (void(*)(void*))f_object_free);
+    FoxyObject *obj = (FoxyObject*)f_gc_allocate(FOXY_HEAP_OBJECT, sizeof(FoxyObject), f_object_gc_free);
     if (!obj) return NULL;
 
     obj->klass = klass;
@@ -16,21 +21,22 @@ FoxyObject* f_object_new(FoxyClass *klass) {
     return obj;
 }
 
-void f_object_free(FoxyObject *obj) {
+void f_object_free(FoxyObject *obj, FoxyVM *vm) {
     if (!obj) return;
     for (size_t i = 0; i < obj->field_count; i++) {
         if (obj->fields[i].name) free(obj->fields[i].name);
-        f_value_free_contents(&obj->fields[i].value);
+        f_value_free_contents(&obj->fields[i].value, vm);
     }
     if (obj->fields) free(obj->fields);
+    free(obj);
 }
 
-void f_object_set_field(FoxyObject *obj, const char *name, FoxyValue val) {
+void f_object_set_field(FoxyObject *obj, const char *name, FoxyValue val, FoxyVM *vm) {
     if (!obj || !name) return;
 
     for (size_t i = 0; i < obj->field_count; i++) {
         if (obj->fields[i].name && strcmp(obj->fields[i].name, name) == 0) {
-            f_value_free_contents(&obj->fields[i].value);
+            f_value_free_contents(&obj->fields[i].value, vm);
             obj->fields[i].value = val;
             return;
         }

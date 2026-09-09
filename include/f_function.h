@@ -55,6 +55,6 @@
 
     FoxyFunction* f_function_create(const char *name, uint8_t arity);
     FoxyFunction* f_function_create_native(const char *name, uint8_t arity, FoxyNativeFn native_ptr);
-    void f_function_free(FoxyFunction *fn);
+    void f_function_free(FoxyFunction *func, FoxyVM *vm);
     void f_function_add_constant(FoxyFunction *func, FoxyValue value);
 #endif // F_FUNCTION_H

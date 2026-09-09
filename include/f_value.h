@@ -13,16 +13,16 @@
     typedef struct FoxyProcess FoxyProcess;
 
     #define FOXY_VALUE_TYPE_LIST(F) \
-        F(FOXY_VAL_NULL,                "null")     /*[0]*/\
-        F(FOXY_VAL_VOID,                "void")     /*[1]*/\
-        F(FOXY_VAL_BOOL,                "bool")     /*[2]*/\
-        F(FOXY_VAL_CHAR,                "char")     /*[3]*/\
-        F(FOXY_VAL_INT,                 "int")      /*[4]*/\
-        F(FOXY_VAL_NUMBER,              "number")   /*[5]*/\
-        F(FOXY_VAL_FLOAT,               "float")    /*[6]*/\
-        F(FOXY_VAL_DOUBLE,              "double")   /*[7]*/\
-        F(FOXY_VAL_LONG,                "long")     /*[8]*/\
-        F(FOXY_VAL_LONG_LONG,           "llong")    /*[9]*/\
+        F(FOXY_VAL_NULL,                "null")     /*[00]*/\
+        F(FOXY_VAL_VOID,                "void")     /*[01]*/\
+        F(FOXY_VAL_BOOL,                "bool")     /*[02]*/\
+        F(FOXY_VAL_CHAR,                "char")     /*[03]*/\
+        F(FOXY_VAL_INT,                 "int")      /*[04]*/\
+        F(FOXY_VAL_NUMBER,              "number")   /*[05]*/\
+        F(FOXY_VAL_FLOAT,               "float")    /*[06]*/\
+        F(FOXY_VAL_DOUBLE,              "double")   /*[07]*/\
+        F(FOXY_VAL_LONG,                "long")     /*[08]*/\
+        F(FOXY_VAL_LONG_LONG,           "llong")    /*[09]*/\
         F(FOXY_VAL_UNSIGNED_LONG_LONG,  "ullong")   /*[10]*/\
         F(FOXY_VAL_ARRAY,               "array")    /*[11]*/\
         F(FOXY_VAL_DICT,                "dict")     /*[12]*/\
@@ -49,7 +49,6 @@
             double fval;
             double dval;
             const char *sval;
-            const char *string;
             void *ptr;
             FoxyObject *obj;
             FoxyArray *array;
@@ -66,7 +65,7 @@
     const char* f_value_type_to_char_array(FoxyValueType type);
     FoxyValue f_value_create_char_array(const char *str, size_t len);
     const char* f_value_get_char_array_data(const FoxyValue *val);
-    void f_value_free_contents(FoxyValue *val);
+    void f_value_free_contents(FoxyValue *val, FoxyVM *vm);
 
     bool f_value_is_numeric(const FoxyValue *val);
     bool f_value_is_pure_integer(const FoxyValue *val);

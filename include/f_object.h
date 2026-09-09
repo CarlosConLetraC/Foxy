@@ -6,6 +6,8 @@
     #include "f_value.h"
     #include "f_class.h"
 
+    typedef struct FoxyVM FoxyVM;
+
     typedef struct FoxyField {
         char *name;
         FoxyValue value;
@@ -19,7 +21,7 @@
     };
 
     FoxyObject* f_object_new(FoxyClass *klass);
-    void f_object_free(FoxyObject *obj);
-    void f_object_set_field(FoxyObject *obj, const char *name, FoxyValue val);
+    void f_object_free(FoxyObject *obj, FoxyVM *vm);
+    void f_object_set_field(FoxyObject *obj, const char *name, FoxyValue val, FoxyVM *vm);
     bool f_object_get_field(FoxyObject *obj, const char *name, FoxyValue *out_val);
 #endif // F_OBJECT_H
