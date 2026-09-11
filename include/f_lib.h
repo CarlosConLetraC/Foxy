@@ -2,16 +2,21 @@
 #ifndef F_LIB_H
     #define F_LIB_H
 
+    #include "f_settings.h"
+    #include <stdbool.h>
+    #include <dlfcn.h>
     #include "uthash.h"
     #include "f_settings.h"
+    #include "f_gc.h"
 
-    typedef struct FoxyLib {
-        const void *ptr_id;     // Clave por puntero/nombre de la librería
-        void *handle;           // Manejador si es .so (dlopen)
-        char path[FOXY_MAX_MODULE_NAME_SIZE]; // Ruta del módulo requerida por f_init.c
+    typedef struct FoxyState FoxyState;
+    typedef struct FoxyModule {
+        char name[FOXY_MAX_MODULE_NAME_SIZE];
+        FoxyGCHandle *handle;
+        bool is_loaded;
         UT_hash_handle hh;
-    } FoxyLib;
+    } FoxyModule;
 
-    FoxyLib* f_lib_new(const void *ptr_id, void *handle);
-    void f_lib_free(FoxyLib *lib);
+    void f_lib_load_nativelib(FoxyState *F, const char* path); // modulos de f_include/ y derivados.
+    void f_lib_load_userlib(FoxyState *F, const char* path);   // miModulo.foxy
 #endif // F_LIB_H

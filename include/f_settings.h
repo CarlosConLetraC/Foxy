@@ -96,9 +96,6 @@
     #define FOXY_COMPILER_SUPPORTS_XMACROS 0
 #endif
 
-/** Macro literal para representar el valor NULL por defecto en FoxyValue. */
-#define FOXY_NULL_VALUE ((FoxyValue){ .type = FOXY_VAL_NULL, .numeric_subtype = 0, .like.f_object = NULL })
-
 /** Separador de rutas para las variables de entorno de módulos. */
 #define FOXY_PATH_SEP ";"
 

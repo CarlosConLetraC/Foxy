@@ -1,0 +1,33 @@
+include "sys/out/println" @ para no cargar todo el entorno con sys/out/*, en práctica únicamente se debe importar lo que es realmente necesario.
+include "string"
+
+string nombre = "David" @ foxy hace internamente string("David")
+if (nombre decendantof string) {
+    println("es un tipo de objeto heredado de string.")
+}
+
+class Vector3 {
+    function __new(float x, float y, float z);
+        @ foxy asigna implícitamente los parámetros a las propiedades
+        @ mediante 'self.x = x', 'self.y = y', 'self.z = z'
+        @@ lo que hace AST internamente:
+        function __new(float x, float y, float z) {
+            self.x = x;
+            self.y = y;
+            self.z = z;
+        }
+        @@
+}
+
+class Vector4 from Vector3 {
+    function __new(float x, float y, float z, float w) {
+        super.__new(x, y, z); @ Invocación al constructor de la clase base ABC/Vector3
+        self.w = w;           @ Acceso explícito al objeto instanciado
+    }
+}
+
+Vector4 pos = Vector4(4.9f, 2.3f, 10.0f, 1.0f)
+
+if (Vector3 ancestorof pos) {
+    println("pos hereda de la clase base Vector3")
+}

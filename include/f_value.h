@@ -109,4 +109,9 @@ FoxyValue f_value_new_number(double val, FoxyValueType subtype);
 #define f_value_is_numeric(v)       ((v).type >= (FOXY_VAL_BOOL) && (v).type <= (FOXY_VAL_NUMBER))
 #define f_value_type_to_string(t)   (((t) >= 0 && (t) < (FOXY_VAL_COUNT)) ? FOXY_VALUE_TYPE_NAMES[(t)] : "unknown")
 
+
+/* Operaciones de inspección de tipos y herencia */
+bool f_value_is_ancestor_of(FoxyValue parent, FoxyValue child);
+bool f_value_is_descendant_of(FoxyValue child, FoxyValue parent);
+
 #endif // F_VALUE_H
