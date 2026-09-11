@@ -1,14 +1,26 @@
+#include "f_settings.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "f_value.h"
 #include "f_status.h"
 #include "f_runtime.h"
 
+#if FOXY_COMPILER_SUPPORTS_XMACROS
 const char * const FOXY_VALUE_TYPE_NAMES[] = {
     #define F(type_enum, type_str) type_str,
     FOXY_VALUE_TYPE_LIST(F)
     #undef F
 };
+#else
+const char * const FOXY_VALUE_TYPE_NAMES[] = {
+    "null", "bool", "char", "uchar", "short",
+    "ushort", "int", "uint", "long", "ulong",
+    "llong", "ullong", "float", "double",
+    "ldouble", "number", "array", "dict",
+    "object", "struct", "class", "function",
+    "enum"
+};
+#endif
 
 FoxyValue f_value_new_number(double val, FoxyValueType subtype) {
     FoxyValue v;
@@ -90,9 +102,7 @@ FoxyValue f_value_new_number(double val, FoxyValueType subtype) {
             );
             exit(FOXY_STATUS_ERROR_TYPE_MISMATCH);
     }
-
     return v;
-
 #endif
 }
 

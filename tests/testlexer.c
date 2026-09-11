@@ -2,6 +2,38 @@
 #include <stdlib.h>
 #include "f_lexer.h"
 
+static char *read_file(const char *path);
+
+int main(int argc, char **argv) {
+    const char *filepath = (argc > 1) ? argv[1] : "foo.foxy";
+
+    char *source = read_file(filepath);
+    if (!source) return 1;
+
+    FoxyLexer lexer;
+    f_lexer_init(&lexer, source, filepath);
+
+    printf("=== ANALIZANDO: %s ===\n", filepath);
+
+    FoxyToken token;
+    do {
+        token = f_lexer_next_token(&lexer);
+        
+        printf("[%s:%05u:%05u] Cat: %03u | Tipo: %-3u | Lexema: %.*s\n",
+               token.pos.filename ? token.pos.filename : filepath,
+               token.pos.line,
+               token.pos.column,
+               token.type_category,
+               token.type,
+               (int)token.length,
+               token.start);
+
+    } while (token.type != FOX_TOKEN_EOF && token.type != FOX_TOKEN_ERROR);
+
+    free(source);
+    return 0;
+}
+
 static char *read_file(const char *path) {
     FILE *file = fopen(path, "rb");
     if (!file) {
@@ -25,33 +57,4 @@ static char *read_file(const char *path) {
 
     fclose(file);
     return buffer;
-}
-
-int main(int argc, char **argv) {
-    const char *filepath = (argc > 1) ? argv[1] : "foo.foxy";
-
-    char *source = read_file(filepath);
-    if (!source) return 1;
-
-    FoxyLexer lexer;
-    f_lexer_init(&lexer, source, filepath);
-
-    printf("=== ANALIZANDO: %s ===\n", lexer.filename);
-
-    FoxyToken token;
-    do {
-        token = f_lexer_next_token(&lexer);
-        
-        printf("[%s:%u:%u] Token Tipo: %-3d | Lexema: %.*s\n",
-               token.pos.filename,
-               token.pos.line,
-               token.pos.column,
-               token.type,
-               token.length,
-               token.start);
-
-    } while (token.type != FOX_TOKEN_EOF && token.type != FOX_TOKEN_ERROR);
-
-    free(source);
-    return 0;
 }

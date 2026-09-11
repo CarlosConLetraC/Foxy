@@ -1,10 +1,11 @@
 #ifndef F_VALUE_H
 #define F_VALUE_H
 
+#include "f_settings.h" 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "f_foxmode.h"
+#include "f_foxmode.h" // aqui vienen todos los mask / macros para trabajar con la lista maestra de bytecode.
 
 /**
  * ============================================================================
@@ -27,6 +28,7 @@ typedef struct FoxyEnum FoxyEnum;
  * Define la lista maestra de tipos soportados en Foxy Runtime.
  * Mantiene la correspondencia directa entre la etiqueta enum y su nombre como cadena.
  */
+#if FOXY_COMPILER_SUPPORTS_XMACROS
 #define FOXY_VALUE_TYPE_LIST(F) \
     F(FOXY_VAL_NULL,                "null")     /* [00] Literal nulo / Omisión */ \
     F(FOXY_VAL_BOOL,                "bool")     /* [01] Booleano (true/false) */ \
@@ -59,6 +61,34 @@ typedef enum {
     #undef F
     FOXY_VAL_COUNT
 } FoxyValueType;
+#else
+typedef enum {
+    FOXY_VAL_NULL,                /* [00] Literal nulo / Omisión */
+    FOXY_VAL_BOOL,                /* [01] Booleano (true/false) */
+    FOXY_VAL_CHAR,                /* [02] Entero con signo de 8 bits */
+    FOXY_VAL_UCHAR,               /* [03] Entero sin signo de 8 bits */
+    FOXY_VAL_SHORT,               /* [04] Entero con signo de 16 bits */
+    FOXY_VAL_USHORT,              /* [05] Entero sin signo de 16 bits */
+    FOXY_VAL_INT,                 /* [06] Entero con signo nativo */
+    FOXY_VAL_UINT,                /* [07] Entero sin signo nativo */
+    FOXY_VAL_LONG,                /* [08] Entero largo con signo */
+    FOXY_VAL_ULONG,               /* [09] Entero largo sin signo */
+    FOXY_VAL_LLONG,               /* [10] Entero de 64 bits con signo */
+    FOXY_VAL_ULLONG,              /* [11] Entero de 64 bits sin signo */
+    FOXY_VAL_FLOAT,               /* [12] Coma flotante de precisión simple */
+    FOXY_VAL_DOUBLE,              /* [13] Coma flotante de doble precisión */
+    FOXY_VAL_LDOUBLE,             /* [14] Coma flotante extendida */
+    FOXY_VAL_NUMBER,              /* [15] Metatipo numérico dinámico */
+    FOXY_VAL_ARRAY,               /* [16] Arreglo dinámico en Heap */
+    FOXY_VAL_DICT,                /* [17] Tabla hash / Diccionario en Heap */
+    FOXY_VAL_OBJECT,              /* [18] Instancia de clase en Heap */
+    FOXY_VAL_STRUCT,              /* [19] Estructura de datos simple en Heap */
+    FOXY_VAL_CLASS,               /* [20] Metaclas de Foxy en Heap */
+    FOXY_VAL_FUNCTION,            /* [21] Objeto función / Closure en Heap */
+    FOXY_VAL_ENUM,                /* [22] Enumeración en Heap */
+    FOXY_VAL_COUNT
+} FoxyValueType;
+#endif
 
 /**
  * @brief Estructura de valor dinámico principal (Tagged Union).

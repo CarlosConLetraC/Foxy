@@ -2,7 +2,7 @@ include "sys/out/println" @ para no cargar todo el entorno con sys/out/*, en pr√
 include "string"
 
 string nombre = "David" @ foxy-lang hace internamente string("David")
-if (nombre decendantof string) {
+if (nombre descendantof string) {
     println("es un tipo de objeto heredado de string.")
 }
 

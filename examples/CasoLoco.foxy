@@ -4,7 +4,7 @@ include "sys/out/printf" @ solo carga printf al scope.
 class Vector3 {
     float x, y, z @ foxy-lang no necesita definir explícitamente
                   @ las variables cuando son definidas en el constructor / constructor lógico '__new'.
-    function __new(float x, y, z); @ equivalente a function __new(float x, float y, float z);
+    function __new(float x, float y, float z); @ equivalente a function __new(float x, float y, float z);
     @@ el constructor logico internamente hace esto:
     function __new(float x, y, z) {
         self.x = x
@@ -32,7 +32,7 @@ class Vector3 {
 }
 
 class Color {
-    function __new(int r, g, b); @ crear los miembros public int r :: public int g :: public int b. . .
+    function __new(int r, int g, int b); @ crear los miembros public int r :: public int g :: public int b. . .
 }
 
 @ Uso en código

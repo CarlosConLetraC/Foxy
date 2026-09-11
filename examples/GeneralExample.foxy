@@ -225,7 +225,7 @@ status somethingThatWillThrowException = YIELD
 @@@
 
 use status.*
-switch(result) {
+switch (result) {
     case OK:
         println("OK")
         break
@@ -254,7 +254,7 @@ function foo() {
 foo()
 
 @ foxy maneja los tipos de parámetros necesitando solo un tipo de dato.
-function simpleAddition(number x, y, z) { @ igual que `function simpleAddition(number x, number y, number z)`.
+function simpleAddition(number x, number y, number z) { @ igual que `function simpleAddition(number x, number y, number z)`.
     return x + y + z
 } 
 printf("result: %T\n", simpleAddition(5, 10, 15))

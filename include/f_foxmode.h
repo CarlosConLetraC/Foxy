@@ -56,7 +56,7 @@
  */
 
 /** @brief Tipo de dato nativo para representar una instrucción de bytecode de 32 bits. */
-typedef uint32_t FoxyInstruction;
+// typedef uint32_t FoxyInstruction;
 
 #if FOXY_COMPILER_SUPPORTS_XMACROS
 
