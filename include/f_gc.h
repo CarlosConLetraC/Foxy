@@ -4,7 +4,7 @@
     #include "f_settings.h"
     #include <stdbool.h>
     #include <stddef.h>
-    // #include <dlfcn.h>
+    #include <stdint.h>
     #include "f_value.h"
 
     #if FOXY_COMPILER_SUPPORTS_XMACROS
@@ -27,16 +27,22 @@
     #endif
 
     typedef struct FoxyValue FoxyValue;
-
+    typedef struct FoxyState FoxyState;
     typedef struct FoxyGCHandle {
-        FoxyValueType type;          // Tipo de valor gestionado por el GC (cadena, objeto, etc.)
-        FoxyGCColor color;           // Estado de marcado para el GC
-        bool is_pinned;              // Flag para evitar recolección (GC Root temporal)
-        
-        void *data;                  // Puntero al bloque de datos en heap
-        size_t size;                 // Tamaño asignado en bytes (para métricas del GC)
+        /* Bloque 1: Punteros de 64-bit (16 bytes) */
+        struct FoxyGCHandle *next;   // Puntero a la lista global del GC (8 bytes)
+        void *data;                  // Puntero al bloque real en heap (8 bytes)
 
-        struct FoxyGCHandle *next;   // Lista enlazada de todos los objetos en el GC
+        /* Bloque 2: Entero de 64-bit (8 bytes) */
+        size_t size;                 // Tamaño asignado en bytes (8 bytes)
+
+        /* Bloque 3: Campo de bits de 32-bit (4 bytes) */
+        uint32_t type      : 8;      // Guardado como entero de 8 bits (FoxyValueType)
+        uint32_t color     : 2;      // Estado tricolor: WHITE (0), GRAY (1), BLACK (2)
+        uint32_t is_pinned : 1;      // Flag para GC Root temporal
+        uint32_t reserved  : 21;     // Reservado para uso futuro
+
+        /* Nota: Se agregarán 4 bytes de padding final para redondear a 32 bytes */
     } FoxyGCHandle;
 
     // Inicialización y destrucción de handles

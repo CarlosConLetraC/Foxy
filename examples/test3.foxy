@@ -4,15 +4,15 @@ class Gato {
     function __new(char nombre[], int edad); @ constructor lógico
 }
 
-dict si = (dict){
+dict si = {
     nombre = "David", @ ESTO es un char array, no un string
     edad = (int)22, @ si no se utiliza el casteo int, el dato primitivo number se usa por defecto a nivel de C
-    mascota = Gato("Mango", 2)
+    mascota = Gato("Mango", 2) @ en caso de argumentos, foxy-lang mueve el tipo de dato a tipo FoxyValue.like.f_int automáticamente. . .
 }
 
-si.foreach((k, v) -> {
+foreach ((k, v) : si) {
     printf("[%s]: %T\n", k, v)
-})
+}
 @@
 salida:
 [nombre]: David

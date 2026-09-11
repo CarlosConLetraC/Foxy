@@ -118,13 +118,13 @@ int packedInt[] = (int[])pos
 
 @@@
 este ciclo también es compatible:
-for (number n : nums) {
+foreach (number n : nums) {
     println(n)
 }
 
 también estos tipos de ciclos for:
 for (int i = 0; i < #nums; i++) println(nums[i])
-for (number n : nums) println(n)
+foreach (number n : nums) println(n)
 
 int i = 0
 for (; i < 10; i++); @ es importante usar ';' para cerrar el cuerpo del ciclo.
@@ -261,7 +261,7 @@ printf("result: %T\n", simpleAddition(5, 10, 15))
 
 function tupleAddition(number nums...) { 
     number result = 0
-    for (number n : nums)
+    foreach (number n : nums)
         result += n
     return result
 }
@@ -335,8 +335,8 @@ class Animal {
     }
 
     @@@
-    al igual que las metatags de Lua, foxy tiene múltiples métodos marcados por defecto si no se definen.
-
+    al igual que las metatags de Lua, foxy tiene múltiples "flagged methods".
+    function __cast(dict value); @ @ @ @ llamado cuando se hace casting, retornando un valor definido por el desarrollador. Donde: dict value = { abstract_type = <char[]>, type = <char[]>, value = <funcion que castina de foo.> ? NULL }
     function __tostring(); @ @ @ @ @ @ @ retorna un arreglo de char (no un string).
     function __add(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '+'. Ejemplo: A + B
     function __sub(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '-'. Ejemplo: A - B
@@ -365,7 +365,7 @@ class Animal {
     para mejorar el rendimiento, foxy-lang no sobrecarga todos estos métodos al instanciar, el
     desarrollador es el único que puede crear un método marcado.
 
-    por ahora, string es la única clase del sistema que tiene algunos métodos marcados definidos en C.
+    por ahora, string es la única clase del sistema que tiene algunos flagged methods definidos en C.
     @@@
 }
 
@@ -505,7 +505,8 @@ else goto anotherLabel
 
 @@
 foxy-lang puede usar 2 tipos de etiquetas goto, la primera es útil para
-trabajar cuando necesitas acotar variables localmente.
+trabajar cuando necesitas acotar variables localmente. Así el programa puede
+limpiar tipos de dato abstracto en el tiempo de ejecución.
 @@
 
 

@@ -179,14 +179,15 @@ typedef struct {
     uint32_t column;
 } FoxyLocation;
 
+/**
+ * @brief Token individual escaneado por el Lexer.
+ */
+
 typedef struct {
     const char *start;          // Puntero directo al texto del lexema
-    uint32_t length;            // Longitud del lexema
-    
     uint16_t type_category : 4; // Categoría (1-15)
     uint16_t subtype       : 12;// Subtipo del enum (0-4095)
-
-    FoxyLocation loc;           // Ubicación en código fuente
+    uint32_t length;            // Longitud del lexema
 } FoxyToken;
 
 typedef struct {

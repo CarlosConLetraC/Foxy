@@ -1,0 +1,7 @@
+@@ En el lado de foxy-lang: @@
+include "sys/out/println"
+println("lambda un poco raro:", ((int x) => x**2)(3))
+
+@@ En el lado de C se traduce así: @@
+include "sys/out/println"
+println("lambda un poco raro:", 3**2)

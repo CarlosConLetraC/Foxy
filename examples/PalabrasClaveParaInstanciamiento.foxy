@@ -1,14 +1,14 @@
 include "sys/out/println" @ para no cargar todo el entorno con sys/out/*, en práctica únicamente se debe importar lo que es realmente necesario.
 include "string"
 
-string nombre = "David" @ foxy hace internamente string("David")
+string nombre = "David" @ foxy-lang hace internamente string("David")
 if (nombre decendantof string) {
     println("es un tipo de objeto heredado de string.")
 }
 
 class Vector3 {
     function __new(float x, float y, float z);
-        @ foxy asigna implícitamente los parámetros a las propiedades
+        @ foxy-lang asigna implícitamente los parámetros a las propiedades
         @ mediante 'self.x = x', 'self.y = y', 'self.z = z'
         @@ lo que hace AST internamente:
         function __new(float x, float y, float z) {

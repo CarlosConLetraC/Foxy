@@ -1,0 +1,15 @@
+include "sys/out/println"
+
+char mensaje[] = "hola"
+dict aux = (dict)mensaje @ crea un diccionario estilo tabla lua, sus índices se pueden iniciar/crear/borrar.
+                         @ como se castea de un arreglo, todos sus índices son numéricos (0,1,2,3)
+
+short offset = #mensaje @ retorna 4
+char textoNuevo[] = " mundo"
+
+foreach (char c : textoNuevo) {
+  aux[offset++] = c
+}
+
+char mensajeFinal[] = (char[])aux
+println(mensajeFinal) @ hola mundo

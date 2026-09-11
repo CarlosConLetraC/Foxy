@@ -1,0 +1,57 @@
+@@@
+foxy-lang trabaja únicamente con 2 tipos de datos principales:
+    primitivos: únicamente numéricos (desde una perspectiva en C), pero en el lenguaje serían:
+        NULL
+        true | false   @ bool
+        signed char := char
+        unsigned char := uchar
+        signed short := short
+        unsigned short := ushort
+        signed int := int
+        unsigned int := uint
+        signed long := long
+        unsigned long := ulong
+        signed long long := llong
+        unsigned long long := ullong
+        float := float
+        double := double
+        long double := ldouble
+    
+    abstractos:
+        arreglos := DATATYPE foo[]
+        diccionarios := dict foo
+        objetos := NombreClase foo
+        estructuras := struct foo { ... }
+        clases := class foo { ... }
+        funciones := function foo(DATATYPE argv...) { <CUERPO> } | function foo(DATATYPE x) { <CUERPO> } | (DATATYPE argv...) => <CUERPO> | (DATATYPE x) => <CUERPO>
+        enumeraciones := enum { ... }
+@@@
+include "sys/out/printf"
+include "math"
+
+@ manera tradicional:
+
+function sumar(number nums...) {
+    number x = 0
+    foreach (number n : nums)
+        x += n
+    return x
+}
+
+printf("suma de tipo de dato <number>: %T\n", sumar(4.2f, 6.5, 99l, true @@esto es 1 en un mapa de bits : 1.@@, 'a' @@ esto es 97. @@)) @ 207.7 tipo double, debido
+                                                                                                                                        @ al 6.5 que por defecto es double.
+
+
+@ manera "híbrida":
+function sumaHibrida(nums...) { @ el scope de foxy deja abierto FoxyValue foo a todo tipo de dato y no limita a un mapeo específico.
+    x = 0 @ registrado como un bool, ya que es el rango más pequeño accesible para este tipo de dato.
+    foreach (n : nums) @ 'n' abierto al scope de un FoxyValue que maneja todo tipo de dato.
+        x += n
+    return x
+}
+
+printf("suma hibrida: %T\n", sumaHibrida(4.2f, 6.5, 99l, true @@esto es 1 en un mapa de bits : 1.@@, 'a' @@ esto es 97. @@)) @ 207.7 tipo double, igual que arriba.
+@@
+tome en cuenta que debido al nivel de casteo que se realiza internamente en C para el modo híbrido, deberá definir reglas de seguridad
+más estrictas.
+@@
