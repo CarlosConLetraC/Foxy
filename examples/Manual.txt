@@ -12,7 +12,7 @@ FOXY_HASH_MAP := {
 cada proceso dentro del FOXY_HASH_MAP tendrá su propio entorno de ejecución. Ejemplo:
 
 ```
-include "sys/process"
+include "sys/process/*" @ carga clases, metodos y todo lo que sea un FOXY_VALUE al entorno foxy-lang.
 
 @@@
 +==================================+
@@ -70,24 +70,22 @@ hilos. Gracias a esto el manejo de datos que requieren de ejecución continua.
 
 En caso de requerir compartir información por cada instancia de processes, se necesita hacer lo siguiente:
 ```
-include "sys"  @ se importan todas librerías de sys (sys/out, sys/process, sys/io, sys/input).
+include "sys/*"  @ se importan todas librerías de sys (sys/out, sys/process, sys/io, sys/in). Creando referencias globales de funciones de los módulos y submódulos
 include "string"
 
 SharedEnv env = env.createEnvironment((dict){
-    name = "pruebaEntorno"
+    name = (char[])string.format("pruebaEntorno en versión %s", FOXY_VERSION), @ de parte de sys/FOXY_VERSION.h
+    status = "waiting",
+    currentInput = KeyCode(0) @ (de parte de sys/in), caracter ascii nulo, es decir que no se preciona nada
 })
-env.data = (dict){
-    status = (string)"waiting",
-    currentInput = KeyCode(0) @ (de parte de sys/input), caracter ascii nulo, es decir que no se preciona nada
-}
 
 Process p1 = popen({ @ de parte de sys/process.
     callback = function() {
-        data.status = (string)"running"
+        data.status = "running"
         while (true) {
             @ algo que renderiza fotogramas. . .
         }
-        data.status = (string)"closed"
+        data.status = "closed"
     },
     pname = "render",
     environment = env
@@ -101,7 +99,7 @@ Process p2 = popen({ @ de parte de sys/process.
             env.currentInput = kCode
         }
     },
-    pname = "input",
+    pname = "input", @ ATENCIÓN: esto es un arreglo de caracteres `(char[])`
     environment = env
 })
 ```
@@ -125,14 +123,6 @@ FOXY_HASH_MAP := {
 }
 
 
-OR_LOOP := for (int i = x; i < y; i++) | for(;;) | for(...)
-FOR_LOOP_RAGE_BASED := for (DATATYPE foo : FOXY_VAL_ARRAY) | 
-FOREACH_LOOP_ := jsonValue.foreach(function(k, v) { ... }) | jsonValue.foreach((k, v) -> { ... }) | jsonValue.foreach(println) | forEach(jsonValue, function(k, v) { ... }) | forEach(jsonValue, (k, v) -> { ... }) | forEach(jsonValue, println)
-WHILE_LOOP := while (CONDITION_ES_TRUE)  | while (CONDITION_ES_UN_FOXY_VAL_NUMBER_MAYOR_A_CERO) | while (DECLARATION_IN_CONDITION)
-DO_WHILE_LOOP := do {CUERPO_BUCLE} while (CONDITION_INVERSA_DE_WHILE_LOOP)
-
-sys/ := maneja funciones de sistema que requieran trabajo pesado. (leer input, escribir/leer/mover/eliminar archivos, obtener la variable de entorno en la que está ejecutando foxy, ec)
-sys/out := las típicas funciones de stdout...
-sys/input := las típicas funciones de stdin...
-sys/stderr := las típicas funciones de stderr... (NO CONFUNDIR CON EXCEPTION HANDLING)
-string/ := AQUI SI, clase que se usa para crear tipos de dato "string" en foxy.
+#################################################################################################################
+# Por ahora, f_protocol.h | f_protocol.c no existen, por lo que f_include/sys/process no existe por el momento. #
+#################################################################################################################

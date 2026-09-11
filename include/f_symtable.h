@@ -27,9 +27,9 @@
     FoxySymbolTable* f_symtable_new(void);
     void f_symtable_free(FoxySymbolTable *table);
 
-    // Operaciones estilo SQL / CRUD optimizadas en memoria
     uint32_t f_symtable_insert(FoxySymbolTable *table, uint32_t id_module, const char *name, FoxyValue value);
     FoxySymbolRow* f_symtable_find_by_name(FoxySymbolTable *table, const char *name);
     FoxySymbolRow* f_symtable_find_by_id(FoxySymbolTable *table, uint32_t id_symbol);
+    const char* f_symtable_get_name_by_value(const FoxySymbolTable *table, const FoxyValue *val);
     bool f_symtable_delete_by_module(FoxySymbolTable *table, uint32_t id_module); // Cascada ON DELETE CASCADE
 #endif // F_SYMTABLE_H

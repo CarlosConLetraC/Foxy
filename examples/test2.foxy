@@ -1,5 +1,5 @@
 @ Test script con valores directos estables @
-include "sys/out"
+include "sys/out/*"
 
 char mensaje[] = "¡Hola desde Foxy-lang con tipado estricto y explícito!"
 int a = 40
@@ -11,4 +11,3 @@ int resultado = calcular_total(a, b) @ 42
 
 printf("mensaje: %s\n", mensaje) @ mensaje: ¡Hola desde Foxy-lang con tipado estricto y explícito!
 printf("resultado: %d\n", resultado) @ resultado: 42
-printf("ok")

@@ -1,64 +1,163 @@
-include "sys/out"
+include "sys/out/*" @ carga print, printf, println y cualquier otra cosa que esté en sys/out/*.so.
 include "math"
 include "string"
 
-@ single-line coments will be declared like this.
+@ los comentarios de una sola línea se declaran así.
 @@
-    multiple coments will use 2 or more '@'
-    and close with the same amount of '@'
-    that were used to open the specific
-    multi-line comment.
+    los comentarios múltiples usarán 2 o más '@'
+    y se cierran con la misma cantidad de '@'
+    que se usaron para abrir el comentario
+    multilínea específico.
 @@
 
-@ number is a primitive type to hold int, float, decimal, long, ..., all C numeric types.
-number nums[] = {1, math.pi, (float)2.718281, 20, -12, (long)100, (long long)9223372036854775807, (unsigned long long)9223372036854775807}
-                  @ math.pi is a double.
+@ Definición de un arreglo heterogéneo de tipos numéricos bajo el contenedor unificado 'number'
+number nums[] = {
+    true,                         @ bool (representación numérica interna: 1)
+    (char)97,                     @ signed char ('a')
+    (uchar)129,                   @ unsigned char
+    -12,                          @ signed int por defecto
+    1,                            @ signed int
+    (uint)20,                     @ unsigned int
+    math.pi,                      @ double (constante de librería estándar)
+    (float)5.5,                   @ float de precisión simple
+    (double)2.718281,             @ double de precisión doble
+    (ldouble)1.414213562373095,   @ long double de alta precisión
+    (short)32767,                 @ signed short
+    (ushort)65535,                @ unsigned short
+    (long)100,                    @ signed long
+    (ulong)101,                   @ unsigned long
+    (llong)9223372036854775807,   @ signed long long (INT64_MAX)
+    (ullong)18446744073709551617, @ unsigned long long (UINT64_MAX)
+    
+    (number)123,                  @ valor numérico dinámico nativo de foxy:
+                                  @ inicialmente se aloja como signed short en este caso, pero escala 
+                                  @ automáticamente a ushort / int / ... / ullong si el valor desborda.
+                                  @ foxy-lang se encarga de verificar el valor registrado y comprueba si
+                                  @ está en el rango permitido del tipo de dato numérico de C.
+                                  @ Esto puede variar según el number casteado, por lo que el subtipo
+                                  @ interno inicia desde bool (0, 1) hasta ullong (UINT64_MAX)
+
+    @ Literales con sufijos tipados nativos de foxy-lang
+    4i,                           @ signed int explícito
+    5ui,                          @ unsigned int explícito
+    6l,                           @ signed long explícito
+    7ul,                          @ unsigned long explícito
+    8ll,                          @ signed long long explícito
+    9ull,                         @ unsigned long long explícito
+    10f,                          @ float explícito
+    11d,                          @ double explícito
+    12ld,                         @ long double explícito
+    13n                           @ number dinámico nativo explícito
+}
+@@
+    Al final de ese scope, foxy-lang castea todos sus valores al tipo de dato number. Sin embargo el lenguaje
+    guarda en memoria el subtipo registrado.
+@@
 
 for (int i = 0; i < #nums; i++) {
     println(nums[i])
 }
 
+(int, int) sumar = (int a, int b) => a + b
+printf("la suma es de: %d\n", sumar(5, 8))
+
+float nums1[] = {5.4f, 3.1f, 9.3f}
+double nums2[] = (double[])nums1 @ adiós a ciclos for para castear T[i]. . .
+                                 @ foxy puede castear arreglos de un tipo a otro.
+
 @@@
-this loop is also supported:
+casos NO validos de casteo:
+
+@ @ @ INICIO DE CASO 1 @ @ @
+include "string"
+
+funcion_nativa = string.format @ utilizando el modo híbrido.
+uint bits[] = {4ui, 8ui, 16ui, 32ui, 128ui}
+string casteoNoPermitido[] = (funcion_nativa)bits @ error. no se puede castear un tipo de dato primitivo de una variable que
+                                                  @ no es explícitamente un tipo de dato foxy. Si se trabaja con arreglos, entonces
+                                                  @ se utiliza:
+                                                  @    ARREGLO_A ::CASTEO:: ARERGLO_B
+                                                  @    DATO_PRIMITIVO_A ::CASTEO:: DATO_PRIMITIVO_B
+                                                  @    CLASE_FOXY ::CASTEO:: OBJETO_INSTANCIADO
+@ @ @ FIN DE CASO 1 @ @ @
+@ @ @ INICIO DE CASO 2 @ @ @
+include "./myDirectorioConClases/*" @ "." representa el $PWD actual en sistemas POSIX, HOME en el caso para Windows.
+
+NombreClaseA foo1 = NombreClaseA()
+NombreClaseB foo2 = NombreClaseB()
+NombreClaseC foo3 = (NombreClaseA)NombreClaseB @ error, no se puede cambiar el comportamiento de una clase, ya que funciona como firma
+                                               @ para definir comportamientos declarados por el desarrollador. @ @ @ FIN DE CASO 2 @ @ @
+@ @ @ INICIO DE CASO 3 @ @ @
+include "sys/out/printf" @ únicamente carga printf al entorno foxy-lang.
+printf("esto no funciona [%T]...\n", (int)printf) @ error, no se pueden castear tipos de dato function a cualquier otro tipo de dato.
+@ @ @ FIN DE CASO 3 @ @ @
+
+@ @ @ INICIO DE CASO 4 @ @ @
+include "sys/out" @ carga un dict de foxy en entorno global.
+out.printf("esto no funciona [%T]...\n", (ullong)out) @ error, no se pueden castear tipos de dato dict a cualquier otro tipo de dato.
+@ @ @ FIN DE CASO 4 @ @ @
+
+
+@@@
+
+class Vector3 {
+    function __new(float x, y, z); @ esto en foxy es equivalente a function __new(float x, float y, float z);
+                                   @ y por su puesto, es un constructor lógico.
+
+    function __cast(dict info) {
+        if (info.type == "double" && info.abstract_type == "array") @ donde info.abstract_type := "array", "dict", "class", "object", etc.
+            return {(double)self.x, (double)self.y, (double)self.z}
+        elseif (info.type == "int" && info.abstract_type == "array")
+            return {(int)self.x, (int)self.y, (int)self.z}
+    }
+}
+
+Vector3 pos = Vector3(5.3f, 8.6f, 14.7f)
+double packedDouble[] = (double[])pos
+int packedInt[] = (int[])pos
+
+@@@
+este ciclo también es compatible:
 for (number n : nums) {
     println(n)
 }
 
-also these types of for-loops:
+también estos tipos de ciclos for:
 for (int i = 0; i < #nums; i++) println(nums[i])
 for (number n : nums) println(n)
 
 int i = 0
-for (; i < 10; i++); @ important to use ';' close the loop body.
+for (; i < 10; i++); @ es importante usar ';' para cerrar el cuerpo del ciclo.
 @@@
 
 printf("example of printf on %s\n", "foxy-lang")
 
 @@@
-unlike most low-level languages like C/C++, foxy can automatically handle array size,
-being dinamically resizable if theres no size parameter on DATATYPE VARNAME[SIZE].
+a diferencia de la mayoría de los lenguajes de bajo nivel como C/C++, foxy puede manejar automáticamente el tamaño de los arreglos,
+pudiendo redimensionarse dinámicamente si no hay un parámetro de tamaño en DATATYPE VARNAME[SIZE].
 @@@
 
 dict foxy_dictionary = {
-    name = (string)"David", @ this in foxy doesn't automatically as a string by default, we use the system class "string" to cast it.
-                            @ with no casting, this makes an array of characters.
+    name = string("David"), @ esto en foxy no se convierte automáticamente como string por defecto, usamos la clase del sistema "string" para hacer el cast.
+                            @ sin casting, esto crea un arreglo de caracteres.
+                            @ Como resultado: `foxy_dictionary.name` es ahora un objeto instanciado de la clase 'string' de la librería del sistema.
     age = 22,
-    sex = "male" @ THIS is a character array!
+    sex = "male" @ ¡ESTO es un arreglo de caracteres!
 }
 
-foxy_dictionary.foreach((key, value) -> {
-    printf("[%s]: %T", key, value) @ on foxy-lang, %T represents any datatype, useful to cast %d, %s, ..., and %f on one type.
+foreach ((key, value) : foxy_dictionary) {
+    printf("[%s]: %T", key, value) @ en foxy-lang, %T representa cualquier tipo de dato, útil para hacer cast a %d, %s, ..., y %f en un solo tipo.
     @@@
-    On foxy-lang, the key for any dictionary cast an array of characters,
-    avoiding instances from the library "string".
+    En foxy-lang, la clave para cualquier diccionario hace cast a un arreglo de caracteres,
+    evitando instancias de la librería "string".
     @@@
-})
+}
 
 string something = "hello world"
 char thisIsNotAString[] = "not a string"
 
 printf("string object: %s\ncharacter array: %s\n", something, thisIsNotAString)
-@ %s can handle string objects and also character arrays.
+@ %s puede manejar objetos string y también arreglos de caracteres.
 
 enum status {
     OK,
@@ -68,13 +167,13 @@ enum status {
     FINISHED
 }
 
-status result = status.RUNNING @ like Java enums
+status result = status.RUNNING @ como los enums de Java
 
 @@@
-if you want to avoid typing status.* for each enumeration, you can
-use the following types:
+si quieres evitar escribir status.* para cada enumeración, puedes
+usar los siguientes tipos:
 
-1st type:
+1er tipo:
 export enum status {
     OK,
     RUNNING,
@@ -86,7 +185,7 @@ export enum status {
 status result = YIELD
 
 
-2nd type:
+2do tipo:
 enum status {
     OK,
     RUNNING,
@@ -101,10 +200,10 @@ status result = FINISHED
 
 
 @@@
-internally, the first type of enum exports the whole enumeration to the environment.
-The second one uses the enumeration only on the current process environment/field.
+internamente, el primer tipo de enum exporta toda la enumeración al entorno.
+El segundo usa la enumeración solo en el entorno/ámbito del proceso actual.
 
-For example:
+Por ejemplo:
 
 enum status {
     OK,
@@ -118,11 +217,11 @@ function foo() {
     use status.*
     status result = FINISHED
     printf("status: %s\n", result == FINISHED ? "FINISHED" : "no idea lol")
-    @ code above works fine
+    @ el código anterior funciona bien
 }
 
 status somethingThatWillThrowException = YIELD
-@ this doesn't work, since use keyword only works on the current process's field.
+@ esto no funciona, ya que la palabra clave use solo funciona en el ámbito del proceso actual.
 @@@
 
 use status.*
@@ -143,53 +242,51 @@ switch(result) {
         println("finished")
         break
     default:
-        println("Somehow this line executed. . .")
+        println("De alguna manera se ejecutó esta línea. . .")
         break
 }
 
-@ now some functions from foxy-lang. . .
+@ ahora algunas funciones de foxy-lang. . .
 
 function foo() {
-    print("I'm like println, but I don't use \\n at the end.\n")
+    print("Soy como println, pero no uso \\n al final.\n")
 }
 foo()
 
-@ foxy handles parameter types only needing one data-type.
-function simpleAddition(number x, y) { @ same as `function simpleAddition(number x, number y)`.
-    return x + y
+@ foxy maneja los tipos de parámetros necesitando solo un tipo de dato.
+function simpleAddition(number x, y, z) { @ igual que `function simpleAddition(number x, number y, number z)`.
+    return x + y + z
 } 
-printf("result: %T\n", simpleAddition(5, 10))
+printf("result: %T\n", simpleAddition(5, 10, 15))
 
 function tupleAddition(number nums...) { 
     number result = 0
-    for (number n : number[]{...}) @ just like Java anonymous arrays
+    for (number n : nums)
         result += n
     return result
 }
 printf("result: %T\n", tupleAddition(5, 3.141592, 16, 123))
 
 
-
-
-@ foxy-lang POO:
+@ POO en foxy-lang:
 
 class Animal {
     function __new(string name, int age) {
         self.name = name
         self.age = age
-    } @ this is a constructor but in lua-style.
-      @ no need to define `public string name` or `public int age` above constructor,
-      @ foxy-lang automatically asigns the variables as public once initialized.
+    } @ este es un constructor pero al estilo de Lua.
+      @ no hay necesidad de definir `public string name` o `public int age` arriba del constructor,
+      @ foxy-lang asigna automáticamente las variables como públicas una vez inicializadas.
     
     @@
-    this is also an alternative for the code from above (logical constructor):
-    function __new(string name, int age); @ the program initialize the object
-                                          @ using the logic from the first constructor.
+    esta también es una alternativa para el código de arriba (constructor lógico):
+    function __new(string name, int age); @ el programa inicializa el objeto
+                                          @ usando la lógica del primer constructor.
     @@
 
     @@
-    since foxy-lang automatically asigns the variables as public once initialized, we can
-    use the following syntax to define specific variables as private, protected or even public:
+    dado que foxy-lang asigna automáticamente las variables como públicas una vez inicializadas, podemos
+    usar la siguiente sintaxis para definir variables específicas como privadas, protegidas o incluso públicas:
 
     function __new(string name, int age) {
         (private)self.name = name
@@ -206,7 +303,7 @@ class Animal {
         (public)self.age = age
     }
 
-    @ or just like the classic style:
+    @ o al estilo clásico:
     protected string name
     protected int age
 
@@ -215,46 +312,60 @@ class Animal {
         self.age = age
     }
 
-    @ to use a logical constructor with access modifiers, we must follow this syntax:
+    @ para usar un constructor lógico con modificadores de acceso, debemos seguir esta sintaxis:
     function __new((private)string name, (private)int age);
     function __new((protected)string name, (protected)int age);
-    function __new((public)string name, (public)int age); @ default logical constructor used
+    function __new((public)string name, (public)int age); @ constructor lógico por defecto utilizado
     @@
 
-    @ to override function behaviour on foxy-lang, you must use the following syntax:
+    @ para anular el comportamiento de una función en foxy-lang, debes usar la siguiente sintaxis:
     overrule function speak(string message) {
-        printf("animal said: %s\n", message)
+        printf("el animal dijo: %s\n", message)
     }
-    @ this allows the program to use the default
-    @ speak function if no new behaviour is defined
-    @ on the inherited class.
+    @ esto le permite al programa usar la función
+    @ speak por defecto si no se define un nuevo comportamiento
+    @ en la clase heredada.
 
     function move() {
-        printf("%s moved.\n", self.name)
+        printf("%s se movió.\n", self.name)
+    }
+
+    function __tostring() {
+        return self.name
     }
 
     @@@
-    like lua metatags, foxy does have multiple flagged methods by default if not defined.
+    al igual que las metatags de Lua, foxy tiene múltiples métodos marcados por defecto si no se definen.
 
-    function __tostring(); @ returns a char array (not a string).
-    function __add(DATATYPE value); @ called when the arithmetic operator '+' is used.
-    function __sub(DATATYPE value); @ called when the arithmetic operator '-' is used.
-    function __mul(DATATYPE value); @ called when the arithmetic operator '*' is used.
-    function __div(DATATYPE value); @ called when the arithmetic operator '/' is used.
-    function __pow(DATATYPE value); @ called when the arithmetic operator '**' is used.
-    function __band(DATATYPE value); @ called when the logic operator '&' is used.
-    function __bor(DATATYPE value);  @ called when the logic operator '|' is used.
-    function __bnot(DATATYPE value); @ called when the logic operator '~' is used.
-    function __bxor(DATATYPE value); @ called when the logic operator '^' is used.
-    function __lshift(DATATYPE value); @ called when the logic operator '<<' is used.
-    function __rshift(DATATYPE value); @ called when the logic operator '>>' is used.
-    function __closed() @ called when the foxy-lang's current field is closed (garbage collector).
-    function __len() @ called when the length operator '#' is called.
+    function __tostring(); @ @ @ @ @ @ @ retorna un arreglo de char (no un string).
+    function __add(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '+'. Ejemplo: A + B
+    function __sub(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '-'. Ejemplo: A - B
+    function __mul(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '*'. Ejemplo: A * B
+    function __div(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '/'. Ejemplo: A / B
+    function __pow(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '**'. Ejemplo: A ** B
+    function __mod(DATATYPE value);@ @ @ llamado cuando se usa el operador aritmético '%'. Ejemplo: A % B
+    function __unm(DATATYPE value);@ @ @ llamado cuando se usa el operador unario '-'. Ejemplo: -A
+    function __not(DATATYPE value);@ @ @ llamado cuando se usa el operador lógico '!'. Ejemplo: !A
+    function __eq(DATATYPE value); @ @ @ llamado cuando se usa el operador lógico '=='. Ejemplo: A == B
+    function __neq(DATATYPE value);@ @ @ llamado cuando se usa el operador lógico '!='. Ejemplo: A != B
+    function __lt(DATATYPE value); @ @ @ llamado cuando se usa el operador lógico '<'. Ejemplo: A > B
+    function __gt(DATATYPE value); @ @ @ llamado cuando se usa el operador lógico '>'. Ejemplo: A < B
+    function __le(DATATYPE value); @ @ @ llamado cuando se usa el operador lógico '<='. Ejemplo: A <= B
+    function __ge(DATATYPE value); @ @ @ llamado cuando se usa el operador lógico '>='. Ejemplo: A >= B
+    function __band(DATATYPE value); @ @ llamado cuando se usa el operador a nivel de bits '&'. Ejemplo: A & B
+    function __bor(DATATYPE value);@ @ @ llamado cuando se usa el operador a nivel de bits '|'. Ejemplo: A | B
+    function __bnot(); @ @ @ @ @ @ @ @ @ llamado cuando se usa el operador a nivel de bits '~'. Ejemplo: ~A
+    function __bxor(DATATYPE value); @ @ llamado cuando se usa el operador a nivel de bits '^'. Ejemplo: A ^ B
+    function __lshift(DATATYPE value); @ llamado cuando se usa el operador a nivel de bits '<<'. Ejemplo: A << B
+    function __rshift(DATATYPE value); @ llamado cuando se usa el operador a nivel de bits '>>'. Ejemplo: A >> B
+    function __foreach(dict value);@ @ @ llamado cuando se itera en un objeto instanciado de la clase mediante el ciclo 'foreach'.
+    function __closed() @ llamado cuando el ámbito actual de foxy-lang se cierra (recolector de basura).
+    function __len() @ llamado cuando se usa el operador de longitud '#'. Ejemplo: #A
 
-    to improve performance, foxy-lang doesn't overload all these methods when instanced, the
-    developer is the only one who can create a flagged method.
+    para mejorar el rendimiento, foxy-lang no sobrecarga todos estos métodos al instanciar, el
+    desarrollador es el único que puede crear un método marcado.
 
-    for now, string is the only system class that has a few flagged methods defined on C.
+    por ahora, string es la única clase del sistema que tiene algunos métodos marcados definidos en C.
     @@@
 }
 
@@ -264,14 +375,15 @@ class Cat from Animal {
         self.type = "cat"
     }
 
-    @ now, to override the 'speak' behaviour:
+    @ ahora, para anular el comportamiento de 'speak':
     function speak(string message) {
-        printf("[%s]%s said: %s\n", self.type, self.name, message)
+        printf("[%s]%s dijo: %s\n", self.type, self.name, message)
     }
 }
 
 class Dog from Animal {
-    function __new(string name, int age); @ uses the superclass constructor by default.
+    function __new(string name, int age); @ usa el constructor de la superclase por defecto. Nótese que 'Dog' no tiene
+                                          @ un miembro llamado 'type' como 'Cat'.
 }
 
 Animal creature = Animal("Creature", 5)
@@ -282,15 +394,20 @@ creature.move()
 feline.move()
 canine.move()
 
-creature.speak("greetings")
-feline.speak("meow")
-canine.speak("woof")
-@ creature and canine have the same behaviour on method 'speak'.
+printf("%T dice: ", creature)
+creature.speak("saludos")
+
+printf("%T dice: ", feline)
+feline.speak("miau")
+
+printf("%T dice: ", canine)
+canine.speak("guau")
+@ creature y canine tienen el mismo comportamiento en el método 'speak'.
 
 
 @@@
-foxy-lang supports structures like C!, meant to improve performance
-on massive data. Useful to make a List of Nodes.
+¡foxy-lang soporta estructuras como en C!, destinadas a mejorar el rendimiento
+en datos masivos. Útil para hacer una Lista de Nodos.
 @@@
 
 struct Node {
@@ -309,10 +426,10 @@ function createNode(int value) {
     return newNode
 }
 
-List createList() {
+function createList() {
     List newList = List()
-    list->head = NULL
-    return list
+    newList->head = NULL
+    return newList
 }
 
 function insertToStart(List l, int value) {
@@ -332,9 +449,9 @@ function insertToEnd(List l, int value) {
     currentNode->next = newNode
 }
 
-function insertIntoPosition(List l, int value, number position) {
-    if (position <= 0 || !l->head)
-        return insertToStart(l, value) @ foxy-lang can cast void functions to return nothing.
+function insertIntoPosition(List l, int value, position) { @ permitido, foxy-lang hace cast de position como int debido a la expresión anterior.
+    if (position <= 0 || !l->head) @ se activa si position es menor a 0 o l->head == NULL
+        return insertToStart(l, value) @ foxy-lang puede hacer cast de funciones void para que no retornen nada.
     
     Node currentNode = l->head
     for (int i = 0; currentNode && i < position-1; ++i)
@@ -368,4 +485,38 @@ insertToEnd(moreNumbers, 30)
 showList(moreNumbers)
 
 
-@ unlike C/C++, C#, Java, Go and Rust: foxy-lang does not need a main function to run.
+@ a diferencia de C/C++, C#, Java, Go y Rust: foxy-lang no necesita una función main para ejecutarse.
+
+
+@@
+breve ejemplo de sentencias goto.
+@@
+
+int waves = 0
+<myLabel> {
+    for (int i = 0; i < 10; i++)
+        printf("[%d]: %s\n", i, i%2 ? "par" : "impar")
+}
+
+if (waves < 10) goto myLabel
+else goto anotherLabel
+
+<anotherLabel> println("¡Funciona bien!")
+
+@@
+foxy-lang puede usar 2 tipos de etiquetas goto, la primera es útil para
+trabajar cuando necesitas acotar variables localmente.
+@@
+
+
+@ Manejando errores en foxy:
+try {
+    printf("Palabra %s\n", "hola" + println )
+} catch {
+    println("Esto ejecuta, pero no se sabe el motivo.")
+@ aqui pueden ir más catch si son necesarios. . . @
+} except (char mensaje_error[]) { @ tambien se puede usar string mensaje_error.
+    printf("Motivo de error de ejecución: %s\n", mensaje_error)
+} final {
+    println("Esto siempre ejecuta sin importar si hubo error o no.")
+}

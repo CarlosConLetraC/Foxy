@@ -1,0 +1,30 @@
+include "sys/out/printf" @ Carga exclusivamente printf al scope local
+include "string"
+
+function sumaHibrida(nums...) { @ Tupla híbrida: empaqueta argumentos en array de FoxyValue
+    number x = 0
+
+    foreach (v : nums) { @ Modo híbrido: v toma el struct FoxyValue en runtime
+        @ Verificación de tipo array de caracteres primitivo (char[] / uchar[])
+        if (typeof(v) == "array" && (typeof(v[0]) == "char" || typeof(v[0]) == "uchar")) {
+            @ Desempaqueta el buffer v a una tupla de números mediante unpacking variádico
+            x += sumaHibrida((number...)v)
+        } elseif (string.isstring(v)) {
+            try {
+                x += string.tonumber(v) @ Devuelve number o lanza excepción si falla la conversión
+            } except (char err[]) {
+                printf("error al sumar: %s\n", err)
+            }
+        } else {
+            x += (number)v @ Promoción implícita/explícita a number
+        }
+    }
+
+    return x
+}
+
+@ Invocación con tipos heterogéneos y casting explícito de string a char[]
+number resultado = sumaHibrida(3, 4.5d, "33", 9, (char[])string("3.141592f"))
+
+@ Expresión de formato %T para inspección dinámica de FoxyValue
+printf("suma: %T\n", resultado)

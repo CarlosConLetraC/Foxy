@@ -13,6 +13,7 @@
 #include "f_object.h"
 #include "f_dict.h"
 #include "f_function.h"
+#include "f_struct.h"
 
 // --- Manejo de Errores ---
 
@@ -99,8 +100,8 @@ const char* f_utils_get_string_from_constant(FoxyValue constant) {
 }
 
 long f_utils_get_long_from_constant(FoxyValue constant) {
-    if (constant.type == FOXY_VAL_INT || constant.type == FOXY_VAL_LONG || constant.type == FOXY_VAL_LONG_LONG)
-        return (long)constant.as.ival;
+    if (constant.type == FOXY_VAL_INT || constant.type == FOXY_VAL_LONG || constant.type == FOXY_VAL_LLONG)
+        return (long)constant.like.ival;
     return 0L;
 }
 
@@ -123,19 +124,19 @@ void f_utils_print_constant_dynamic(FoxyValue constant, int precision) {
             break;
 
         case FOXY_VAL_CHAR:
-            buffer[0] = constant.as.cval;
+            buffer[0] = constant.like.cval;
             f_utils_syswrite(1, buffer, 1);
             break;
 
         case FOXY_VAL_INT:
         case FOXY_VAL_LONG:
-        case FOXY_VAL_LONG_LONG:
-            len = snprintf(buffer, sizeof(buffer), "%" PRId64, constant.as.ival);
+        case FOXY_VAL_LLONG:
+            len = snprintf(buffer, sizeof(buffer), "%" PRId64, constant.like.ival);
             if (len > 0) f_utils_syswrite(1, buffer, (size_t)len);
             break;
 
         case FOXY_VAL_FLOAT: {
-            double val = constant.as.fval;
+            double val = constant.like.fval;
             if (precision >= 0 && precision <= 99) {
                 len = snprintf(buffer, sizeof(buffer), "%.*f", precision, val);
             } else {
@@ -147,7 +148,7 @@ void f_utils_print_constant_dynamic(FoxyValue constant, int precision) {
 
         case FOXY_VAL_DOUBLE:
         case FOXY_VAL_NUMBER: {
-            double val = constant.as.dval;
+            double val = constant.like.dval;
             if (precision >= 0 && precision <= 99) {
                 len = snprintf(buffer, sizeof(buffer), "%.*f", precision, val);
             } else {
@@ -158,17 +159,17 @@ void f_utils_print_constant_dynamic(FoxyValue constant, int precision) {
         }
 
         case FOXY_VAL_BOOL:
-            if (constant.as.bval || constant.as.boolean)
+            if (constant.like.bval || constant.like.boolean)
                 f_utils_syswrite(1, "true", 4);
             else
                 f_utils_syswrite(1, "false", 5);
             break;
 
         case FOXY_VAL_ARRAY:
-            if (constant.as.array) {
+            if (constant.like.array) {
                 const char *str_data = f_value_get_char_array_data(&constant);
                 if (str_data) {
-                    f_utils_syswrite(1, str_data, constant.as.array->count);
+                    f_utils_syswrite(1, str_data, constant.like.array->count);
                     free((void*)str_data);
                 } else {
                     f_utils_syswrite(1, "[array]", 7);
@@ -183,8 +184,8 @@ void f_utils_print_constant_dynamic(FoxyValue constant, int precision) {
             break;
 
         case FOXY_VAL_OBJECT:
-            if (constant.as.obj && constant.as.obj->klass && constant.as.obj->klass->name) {
-                len = snprintf(buffer, sizeof(buffer), "<instance %s>", constant.as.obj->klass->name);
+            if (constant.like.obj && constant.like.obj->klass && constant.like.obj->klass->name) {
+                len = snprintf(buffer, sizeof(buffer), "<instance %s>", constant.like.obj->klass->name);
                 f_utils_syswrite(1, buffer, (size_t)len);
             } else {
                 f_utils_syswrite(1, "<object>", 8);
@@ -192,8 +193,8 @@ void f_utils_print_constant_dynamic(FoxyValue constant, int precision) {
             break;
 
         case FOXY_VAL_CLASS:
-            if (constant.as.klass) {
-                FoxyClass *klass = (FoxyClass*)constant.as.klass;
+            if (constant.like.klass) {
+                FoxyClass *klass = (FoxyClass*)constant.like.klass;
                 len = snprintf(buffer, sizeof(buffer), "<class %s>", klass->name ? klass->name : "anonymous");
                 f_utils_syswrite(1, buffer, (size_t)len);
             } else {
@@ -202,8 +203,8 @@ void f_utils_print_constant_dynamic(FoxyValue constant, int precision) {
             break;
 
         case FOXY_VAL_FUNCTION:
-            if (constant.as.func && constant.as.func->name) {
-                len = snprintf(buffer, sizeof(buffer), "<fn %s>", constant.as.func->name);
+            if (constant.like.func && constant.like.func->name) {
+                len = snprintf(buffer, sizeof(buffer), "<fn %s>", constant.like.func->name);
                 f_utils_syswrite(1, buffer, (size_t)len);
             } else {
                 f_utils_syswrite(1, "<fn>", 4);
@@ -424,9 +425,9 @@ void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count) {
     printf("============================================================\n");
 }
 
-void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count) {
+void f_utils_dump_bytecode(const FoxmodeInstruction *bytecode, size_t count) {
     printf("\n=== [DEBUG] BYTECODE GENERADO (%zu instrucciones / %zu bytes) ===\n", 
-           count, count * sizeof(FoxInstruction));
+           count, count * sizeof(FoxmodeInstruction));
     for (size_t i = 0; i < count; i++) {
         printf("%08X ", bytecode[i]);
         if ((i + 1) % 8 == 0) printf("\n");
@@ -435,7 +436,7 @@ void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count) {
     printf("============================================================\n\n");
 }
 
-bool f_utils_dump_bytecode_to_file(const FoxInstruction *bytecode, size_t code_count, const FoxyVM *vm, const char *filepath) {
+bool f_utils_dump_bytecode_to_file(const FoxmodeInstruction *bytecode, size_t code_count, const FoxyVM *vm, const char *filepath) {
     if (!bytecode || code_count == 0 || !filepath) return false;
 
     FILE *file = fopen(filepath, "w");
@@ -446,71 +447,75 @@ bool f_utils_dump_bytecode_to_file(const FoxInstruction *bytecode, size_t code_c
 
     fprintf(file, "======================================================================\n");
     fprintf(file, " FOXY-LANG BYTECODE DUMP\n");
-    fprintf(file, " Instrucciones: %zu | Tamaño total: %zu bytes\n", code_count, code_count * sizeof(FoxInstruction));
+    fprintf(file, " Instrucciones: %zu | Tamaño total: %zu bytes\n", code_count, code_count * sizeof(FoxmodeInstruction));
     fprintf(file, "======================================================================\n\n");
 
-    // 1. Exportación del Pool de Constantes desde la VM
+    // 1. Exportación del Pool de Constantes
     if (vm && vm->constants && vm->constants_count > 0) {
         fprintf(file, "--- CONSTANT POOL (%zu elementos) ---\n", vm->constants_count);
         for (size_t i = 0; i < vm->constants_count; i++) {
             const FoxyValue *val = &vm->constants[i];
             const char *type_name = f_value_type_to_char_array(val->type);
+
             fprintf(file, "[%04zu] Type: %-10s (0x%02X) | Value: ", i, type_name, val->type);
 
             switch (val->type) {
+                case FOXY_VAL_NULL:
+                    fprintf(file, "<ptr (nil)>");
+                    break;
+
                 case FOXY_VAL_INT:
                 case FOXY_VAL_LONG:
                 case FOXY_VAL_LONG_LONG:
                     fprintf(file, "%" PRId64, val->as.ival);
                     break;
+
                 case FOXY_VAL_FLOAT:
-                    fprintf(file, "%f", val->as.fval);
-                    break;
                 case FOXY_VAL_DOUBLE:
                 case FOXY_VAL_NUMBER:
                     fprintf(file, "%.6f", val->as.dval);
                     break;
+
                 case FOXY_VAL_BOOL:
                     fprintf(file, "%s", (val->as.bval || val->as.boolean) ? "true" : "false");
                     break;
+
                 case FOXY_VAL_CHAR:
                     fprintf(file, "'%c'", val->as.cval);
                     break;
+
                 case FOXY_VAL_ARRAY: {
                     const char *str_data = f_value_get_char_array_data(val);
                     if (str_data) {
                         fprintf(file, "\"%s\"", str_data);
                         free((void*)str_data);
                     } else if (val->as.array) {
-                        fprintf(file, "[Array: count=%zu, length=%zu]", val->as.array->count, val->as.array->length);
+                        fprintf(file, "[Array: count=%zu]", val->as.array->count);
                     } else {
                         fprintf(file, "[]");
                     }
                     break;
                 }
-                case FOXY_VAL_OBJECT: {
-                    FoxyObject *obj = val->as.obj;
-                    if (obj && obj->klass && obj->klass->name) {
-                        fprintf(file, "<instance %s @ %p>", obj->klass->name, (void*)obj);
-                    } else {
-                        fprintf(file, "<object @ %p>", (void*)obj);
-                    }
-                    break;
-                }
-                case FOXY_VAL_CLASS: {
-                    FoxyClass *klass = (FoxyClass*)val->as.klass;
-                    fprintf(file, "<class %s>", (klass && klass->name) ? klass->name : "anonymous");
-                    break;
-                }
+
                 case FOXY_VAL_FUNCTION: {
                     FoxyFunction *func = val->as.func;
-                    fprintf(file, "<fn %s (arity %d)>", (func && func->name) ? func->name : "anonymous", func ? func->arity : 0);
+                    fprintf(file, "<fn %s (arity %d)>", 
+                            (func && func->name) ? func->name : "anonymous", 
+                            func ? func->arity : 0);
                     break;
                 }
+
                 default:
                     fprintf(file, "<ptr %p>", val->as.ptr);
                     break;
             }
+
+            // Búsqueda del nombre de variable asignado desde vm->symtable
+            if (vm->symtable) {
+                const char *var_name = f_symtable_get_name_by_value(vm->symtable, val);
+                fprintf(file, " | variable name: %s", var_name ? var_name : "<UNKNOWN>");
+            }
+
             fprintf(file, "\n");
         }
         fprintf(file, "\n");
@@ -518,30 +523,30 @@ bool f_utils_dump_bytecode_to_file(const FoxInstruction *bytecode, size_t code_c
 
     // 2. Exportación de Instrucciones del Bytecode
     fprintf(file, "--- INSTRUCTION STREAM ---\n");
-    fprintf(file, " INDEX  | OFFSET | HEX CODE   | OPCODE | REG A | ARG BX / CONST\n");
-    fprintf(file, "--------+--------+------------+--------+-------+----------------\n");
+    fprintf(file, " INDEX  | OFFSET | HEX CODE   | OPCODE | REG A | ARG BX | ANNOTATION\n");
+    fprintf(file, "--------+--------+------------+--------+-------+--------+------------------------\n");
 
     for (size_t i = 0; i < code_count; i++) {
-        FoxInstruction inst = bytecode[i];
+        FoxmodeInstruction inst = bytecode[i];
 
-        uint8_t opcode = (uint8_t)(inst & 0xFF);
-        uint8_t reg_a  = (uint8_t)((inst >> 8) & 0xFF);
-        uint16_t arg_bx = (uint16_t)((inst >> 16) & 0xFFFF);
+        FOXY_FOXCODE opcode = GET_FOXCODE(inst);
+        int reg_a           = GETARG_A(inst);
+        int arg_bx          = GETARG_Bx(inst);
 
-        fprintf(file, " %06zu | %06zu | 0x%08X | %-6u | %-5u | %-14u",
-                i, i * sizeof(FoxInstruction), inst, opcode, reg_a, arg_bx);
+        fprintf(file, " %06zu | %06zu | 0x%08X | %-6u | %-5d | %-6d",
+                i, i * sizeof(FoxmodeInstruction), inst, (unsigned int)opcode, reg_a, arg_bx);
 
-        // Vista previa si arg_bx apunta a una constante válida en vm->constants
-        if (vm && vm->constants && arg_bx < vm->constants_count) {
+        if (vm && vm->constants && arg_bx >= 0 && (size_t)arg_bx < vm->constants_count) {
             const FoxyValue *c_val = &vm->constants[arg_bx];
+
             if (c_val->type == FOXY_VAL_ARRAY) {
                 const char *str = f_value_get_char_array_data(c_val);
                 if (str) {
-                    fprintf(file, " ; Const[%u] = \"%s\"", arg_bx, str);
+                    fprintf(file, " ; Const[%d] = \"%s\"", arg_bx, str);
                     free((void*)str);
                 }
             } else if (f_value_is_pure_integer(c_val)) {
-                fprintf(file, " ; Const[%u] = %" PRId64, arg_bx, c_val->as.ival);
+                fprintf(file, " ; Const[%d] = %" PRId64, arg_bx, c_val->as.ival);
             }
         }
 

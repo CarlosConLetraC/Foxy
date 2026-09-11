@@ -1,0 +1,57 @@
+├── examples
+│   ├── functions.foxy
+│   ├── GeneralExample.foxy
+│   ├── Manual.txt
+│   ├── test1.foxy
+│   ├── test2.foxy
+│   ├── test3.foxy
+│   └── test4.foxy
+├── f_include
+│   └── sys
+│       └── out
+├── include
+│   ├── f_array.h <--------------- firmas para manejar los arreglos de foxy, char letras[], int numeros_primos[], etc.
+│   ├── f_ast.h <----------------- firmas para trabajar con el código fuente ya aprovado por f_lexer.h.
+│   ├── f_callstack.h <----------+ firmas para poder crear instancias foxy-lang que permitan ejecutar distintos
+│   │                            └ subprocesos y no dejar todo en un stack (subprocesos) y el stack principal.
+│   ├── f_class.h <--------------- firmas para trabajar con tipos de dato class de foxy-lang.
+│   ├── f_codegen.h <------------- firmas para generar el bytecode mediante f_foxmode.h. 
+│   ├── f_constant.h <-----------+ firmas para poder guardar valores inmutables (ejemplo: println("Hola") := la
+│   │                            ├ cadena de caracteres char[] (no es un 'string' por cierto) se guarda en las constantes
+│   │                            └ registradas por el lenguaje para optimización)
+│   ├── f_dict.h <---------------- firmas para trabajar con tipos de dato dict de foxy-lang.
+│   ├── f_env.h <----------------- firmas para definir el entorno de foxy-lang (similar a _ENV de lua pero no lo mismo.)
+│   ├── f_foxcode.h <------------- cabecera con lista maestra de foxcode (opcode).
+│   ├── f_foxmode.h <------------- cabecera con lista maestra de instrucciones de 32 bits.
+│   ├── f_function.h <------------ firmas para trabajar con tipos de dato function de foxy-lang.
+│   ├── f_gc.h <------------------ firmas para utilizar garbage collector que limpian tipos de datos complejos (class, dict, class-object, function)
+│   ├── f_lexer.h <--------------- firmas para manejar y aprovar un archivo .foxy-lang.
+│   ├── f_lib.h <----------------- firmas para cargar librerías nativas de C que trabajen junto a foxy-lang (math, sys/*, string, os, etc)
+│   ├── f_methods.h <------------- firmas para construir los methods de un tipo de dato class de foxy-lang (incluidos los flagged-method (__new, __tostring, etc)).
+│   ├── f_object.h <-------------- firmas para instanciar un objeto foxy-lang de un tipo de dato class de foxy-lang.
+│   ├── f_parser.h <-------------- firmas para trabajar con el "cerebro gramatical" para construir el AST.
+│   ├── f_process.h <------------- firmas para tranajar procesos internos que controlen la ejecución de una function/método/flagged-method.
+│   ├── f_protocol.h <------------ no estoy seguro si sea necesario o se deba implementar.
+│   ├── f_runtime.h <------------- no estoy seguro si sea necesario o se deba implementar.
+│   ├── f_settings.h <-----------+ firmas para poder crear macros que definir la versión del compilador, valores máximos par f(x), 
+│   │                            ├ rutas de entorno (necesarios para trabajar con f_lib.h) para saber dónde buscar librerías *.so
+│   │                            └ para foxy-lang.
+│   ├── f_status.h <-------------- firmas para poder definir el código de salida del programa, process, vm, etc.
+│   ├── f_struct.h <-------------- firmas para trabajar con tipos de dato struct de foxy-lang.
+│   ├── f_symtable.h <-----------+ firmas para poder usar representaciones de una entidad de símbolo relacional (Fila), tipo MySQL.
+│   │                            ├ Así como MySQL utiliza este método para acelerar consultas, será utilizado para trabajar con bytecode
+│   │                            ├ en memoria ram/disco duro y el manejo de variables, evitando sobrecargar con algoritmos pesados buscar
+│   │                            └ dicha variable / valores inmutables.
+│   ├── f_token.h <--------------- firmas para generar los tokens para f_lexer.h 
+│   ├── f_utils.h <--------------+ firmas para poder utilizar funciones prácticas para trabajar en cualquier .h | .c (ejemplo: leer un archivo,
+|   |                            └ compartir f_utils_syswrite con print.c, printf.c, println.c, etc.),
+│   ├── f_value.h <--------------- firmas para poder crear una estructura que maneje los tipos de dato foxy-lang.
+│   ├── f_vm.h <------------------ firmas para trabajar con la maquina virtual de foxy-lang.
+│   └── uthash.h <---------------- header para crear hashmaps necesarios que optimicen la busqueda de valores en memoria.
+├── Makefile <-------------------- configuraciones y procesos a seguir para compilar foxy-lang.
+└── src
+    ├── compiler <---------------- versión compilador de foxy-lang.
+    ├── core <-------------------- cuerpo de otras firmas f_*.c para optimizar el tipado de interpreter/compiler.
+    └── interpreter <------------- versión interprete de foxy-lang.
+        ├── f_vm.c <-------------- cuerpo de f_vm.c que inicia las firmas de su header.
+        └── main_foxy.c <--------- interprete de foxy-lang.

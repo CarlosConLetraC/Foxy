@@ -9,12 +9,12 @@
     #include "f_foxcode.h"
     #include "f_foxmode.h"
     #include "f_ast.h"
+    #include "f_symtable.h"
 
     typedef struct FoxyVM FoxyVM;
 
     #define FOXY_GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
-    #define FOXY_GROW_ARRAY(type, pointer, oldCount, newCount) \
-        ((type*)realloc((pointer), sizeof(type) * (newCount)))
+    #define FOXY_GROW_ARRAY(type, pointer, oldCount, newCount) ((type*)realloc((pointer), sizeof(type) * (newCount)))
 
     typedef struct FoxyCodegenLocal {
         char name[FOXY_MAX_IDENTIFIER_LEN];
@@ -24,7 +24,7 @@
     } FoxyCodegenLocal;
 
     typedef struct FoxyCodegen {
-        FoxInstruction *bytecode;
+        FoxmodeInstruction *bytecode;
         size_t code_count;
         size_t code_capacity;
 
@@ -36,15 +36,19 @@
         size_t locals_count;
         uint32_t scope_depth;
 
+        // Integración con el subsistema relacional de símbolos
+        FoxySymbolTable *symtable;
+        uint32_t current_module_id;
+
         struct FoxyCodegen *parent;
     } FoxyCodegen;
 
-    void f_codegen_init(FoxyCodegen *cg);
-    FoxyCodegen* f_codegen_create(void);
+    void f_codegen_init(FoxyCodegen *cg, FoxySymbolTable *symtable, uint32_t module_id);
+    FoxyCodegen* f_codegen_create(FoxySymbolTable *symtable, uint32_t module_id);
     void f_codegen_free(FoxyCodegen *cg, FoxyVM *vm);
 
-    size_t f_codegen_emit(FoxyCodegen *cg, FoxInstruction inst);
-    size_t f_codegen_add_constant(FoxyCodegen *cg, FoxyValue val, FoxyVM *vm);
+    size_t f_codegen_emit(FoxyCodegen *cg, FoxmodeInstruction inst);
+    uint32_t f_codegen_add_constant(FoxyVM *vm, FoxyValue val) ;
 
     int f_codegen_resolve_local(FoxyCodegen *cg, const char *name);
     int f_codegen_add_local(FoxyCodegen *cg, const char *name, size_t name_len);

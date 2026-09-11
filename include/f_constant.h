@@ -8,11 +8,13 @@
     
     typedef struct {
         FoxyValue *values;
+        char **var_names;
         size_t count;
         size_t capacity;
     } FoxyConstantPool;
 
     void f_constant_pool_init(FoxyConstantPool *pool);
     size_t f_constant_pool_add(FoxyConstantPool *pool, FoxyValue value);
+    size_t f_constant_pool_add_named(FoxyConstantPool *pool, FoxyValue value, const char *var_name);
     void f_constant_pool_free(FoxyConstantPool *pool, FoxyVM *vm);
 #endif // F_CONSTANT_H

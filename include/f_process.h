@@ -19,7 +19,7 @@
     #define FOXY_PROCESS_STATE_LIST(F) \
         F(FOXY_PROCESS_READY,   "READY")   \
         F(FOXY_PROCESS_RUNNING, "RUNNING") \
-        F(FOXY_PROCESS_WAITING, "WAITING") \
+        F(FOXY_PROCESS_FROZE,   "FROZE")   \
         F(FOXY_PROCESS_DEAD,    "DEAD")
 
     #define F(name, str) name,

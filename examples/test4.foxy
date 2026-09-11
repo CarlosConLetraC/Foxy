@@ -1,4 +1,4 @@
-include "sys/out"
+include "sys/out/*"
 
 @@ --- Test 1: Caracteres de Escape y Literales CHAR --- @@
 char c_char = 'A'

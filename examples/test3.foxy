@@ -1,4 +1,4 @@
-include "sys/out"
+include "sys/out/*"
 
 class Gato {
     function __new(char nombre[], int edad); @ constructor lógico

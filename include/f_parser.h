@@ -13,8 +13,8 @@
         bool had_error;
     } FoxyParser;
 
+    // Prototipos de funciones expuestas:
     void f_parser_init(FoxyParser *parser, FoxyLexer *lexer);
     char* f_parser_token_to_string(FoxyToken *token);
     FoxyASTNode* f_parser_parse(FoxyParser *parser, FoxyVM *vm);
-    //FoxyASTNode* f_parser_parse_env_create(FoxyParser *parser, FoxyVM *vm)
 #endif // F_PARSER_H

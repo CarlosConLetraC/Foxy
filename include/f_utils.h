@@ -25,6 +25,6 @@
     void f_utils_write_runtime_error(struct FoxyVM *vm, FoxyErrorType err_type, const char *format, ...);
 
     void f_utils_dump_constant_pool(const FoxyValue *constants, size_t count);
-    void f_utils_dump_bytecode(const FoxInstruction *bytecode, size_t count);
-    bool f_utils_dump_bytecode_to_file(const FoxInstruction *bytecode, size_t code_count, const FoxyVM *vm, const char *filepath);
+    void f_utils_dump_bytecode(const FoxmodeInstruction *bytecode, size_t count);
+    bool f_utils_dump_bytecode_to_file(const FoxmodeInstruction *bytecode, size_t code_count, const FoxyVM *vm, const char *filepath);
 #endif // F_UTILS_H

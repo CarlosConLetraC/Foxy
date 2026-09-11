@@ -1,193 +1,104 @@
-#include "f_settings.h"
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include "f_function.h"
-#include "f_object.h"
-#include "f_dict.h"
-#include "f_class.h"
 #include "f_value.h"
-#include "f_array.h"
+#include "f_status.h"
+#include "f_runtime.h"
 
 const char * const FOXY_VALUE_TYPE_NAMES[] = {
-    #define X(type_enum, type_str) [type_enum] = type_str,
-    FOXY_VALUE_TYPE_LIST(X)
-    #undef X
+    #define F(type_enum, type_str) type_str,
+    FOXY_VALUE_TYPE_LIST(F)
+    #undef F
 };
 
-const char* f_value_type_to_char_array(FoxyValueType type) {
-    if ((unsigned int)type >= FOXY_VAL_COUNT) return "unknown";
-    return FOXY_VALUE_TYPE_NAMES[type];
-}
+FoxyValue f_value_new_number(double val, FoxyValueType subtype) {
+    FoxyValue v;
+    v.type = FOXY_VAL_NUMBER;
 
-FoxyValue f_value_create_char_array(const char *str, size_t len) {
-    FoxyValue val;
-    val.type = FOXY_VAL_ARRAY;
+#if USE_COMPUTED_GOTO
 
-    FoxyArray *arr = (FoxyArray*)malloc(sizeof(FoxyArray));
-    if (!arr) {
-        val.as.array = NULL;
-        return val;
-    }
+    /* Tabla de dispatch basada en etiquetas para Direct Threaded Code */
+    static const void* const dispatch_table[] = {
+        [FOXY_VAL_CHAR]               = &&F_CHAR,
+        [FOXY_VAL_UCHAR]              = &&F_UCHAR,
+        [FOXY_VAL_SHORT]              = &&F_SHORT,
+        [FOXY_VAL_USHORT]             = &&F_USHORT,
+        [FOXY_VAL_INT]                = &&F_INT,
+        [FOXY_VAL_UINT]               = &&F_UINT,
+        [FOXY_VAL_LONG]               = &&F_LONG,
+        [FOXY_VAL_ULONG]              = &&F_ULONG,
+        [FOXY_VAL_LLONG]              = &&F_LLONG,
+        [FOXY_VAL_ULLONG]             = &&F_ULLONG,
+        [FOXY_VAL_FLOAT]              = &&F_FLOAT,
+        [FOXY_VAL_DOUBLE]             = &&F_DOUBLE,
+        [FOXY_VAL_LDOUBLE]            = &&F_LDOUBLE
+    };
 
-    arr->array_type = FOXY_VAL_CHAR;
-    arr->count = len;
-    arr->length = len > 0 ? len : 1;
-    arr->items = (FoxyValue*)calloc(arr->length, sizeof(FoxyValue));
+    /* Validación de rangos para evitar un salto de puntero fuera de límites */
+    if (subtype < FOXY_VAL_CHAR || subtype > FOXY_VAL_LONG_DOUBLE || !dispatch_table[subtype])
+        goto F_DEFAULT;
 
-    if (!arr->items) {
-        free(arr);
-        val.as.array = NULL;
-        return val;
-    }
+    /* Salto directo sin la sobrecarga de un branch table tradicional */
+    goto *dispatch_table[subtype];
 
-    if (str && len > 0) {
-        for (size_t i = 0; i < len; i++) {
-            arr->items[i].type = FOXY_VAL_CHAR;
-            arr->items[i].as.cval = str[i];
-        }
-    }
+    F_CHAR:    v.like.f_char    = (signed char)val;        return v;
+    F_UCHAR:   v.like.f_uchar   = (unsigned char)val;      return v;
+    F_SHORT:   v.like.f_short   = (signed short)val;       return v;
+    F_USHORT:  v.like.f_ushort  = (unsigned short)val;     return v;
+    F_INT:     v.like.f_int     = (signed int)val;         return v;
+    F_UINT:    v.like.f_uint    = (unsigned int)val;       return v;
+    F_LONG:    v.like.f_long    = (signed long)val;        return v;
+    F_ULONG:   v.like.f_ulong   = (unsigned long)val;      return v;
+    F_LLONG:   v.like.f_llong   = (signed long long)val;   return v;
+    F_ULLONG:  v.like.f_ullong  = (unsigned long long)val; return v;
+    F_FLOAT:   v.like.f_float   = (float)val;              return v;
+    F_DOUBLE:  v.like.f_double  = (double)val;             return v;
+    F_LDOUBLE: v.like.f_ldouble = (long double)val;        return v;
+    F_DEFAULT:
+        f_runtime_error(
+            NULL,
+            FOXY_STATUS_ERROR_TYPE_MISMATCH,
+            "Subtipo numérico inválido '%s' (%d) en f_value_new_number()",
+            f_value_type_to_string(subtype),
+            subtype
+        );
+        exit(FOXY_STATUS_ERROR_TYPE_MISMATCH);
 
-    val.as.array = arr;
-    return val;
-}
+#else
 
-const char* f_value_get_char_array_data(const FoxyValue *val) {
-    if (!val || val->type != FOXY_VAL_ARRAY || !val->as.array) return NULL;
-    FoxyArray *arr = val->as.array;
-    if (arr->array_type == FOXY_VAL_CHAR && arr->items) {
-        char *buffer = (char*)malloc(arr->count + 1);
-        if (!buffer) return NULL;
-        for (size_t i = 0; i < arr->count; i++) {
-            buffer[i] = arr->items[i].as.cval;
-        }
-        buffer[arr->count] = '\0';
-        return buffer;
-    }
-    return NULL;
-}
-
-void f_value_free_contents(FoxyValue *val, FoxyVM *vm) {
-    if (!val) return;
-
-    switch (val->type) {
-        case FOXY_VAL_ARRAY:
-            if (val->as.array->items) free(val->as.array->items);
-            free(val->as.array);
-            val->as.array = NULL;
-            break;
-
-        case FOXY_VAL_OBJECT:
-            if (val->as.obj) {
-                f_object_free(val->as.obj, vm);
-                val->as.obj = NULL;
-            }
-            break;
-
-        case FOXY_VAL_FUNCTION:
-            if (val->as.func) {
-                f_function_free(val->as.func, vm);
-                val->as.func = NULL;
-            }
-            break;
-
-        case FOXY_VAL_DICT:
-            if (val->as.dict) {
-                f_dict_free(val->as.dict, vm);
-                val->as.dict = NULL;
-            }
-            break;
-
-        case FOXY_VAL_CLASS:
-            if (val->as.klass) {
-                f_class_free(val->as.klass);
-                val->as.klass = NULL;
-            }
-            break;
-
+    /* Fallback portable con switch-case (C99 Estándar) */
+    switch (subtype) {
+        case FOXY_VAL_CHAR:               v.like.f_char = (signed char)val;          break;
+        case FOXY_VAL_UCHAR:              v.like.f_uchar = (unsigned char)val;       break;
+        case FOXY_VAL_SHORT:              v.like.f_short = (signed short)val;        break;
+        case FOXY_VAL_USHORT:             v.like.f_ushort = (unsigned short)val;     break;
+        case FOXY_VAL_INT:                v.like.f_int = (signed int)val;            break;
+        case FOXY_VAL_UINT:               v.like.f_uint = (unsigned int)val;         break;
+        case FOXY_VAL_LONG:               v.like.f_long = (signed long)val;          break;
+        case FOXY_VAL_ULONG:              v.like.f_ulong = (unsigned long)val;       break;
+        case FOXY_VAL_LLONG:              v.like.f_llong = (signed long long)val;    break;
+        case FOXY_VAL_ULLONG:             v.like.f_ullong = (unsigned long long)val; break;
+        case FOXY_VAL_FLOAT:              v.like.f_float = (float)val;               break;
+        case FOXY_VAL_DOUBLE:             v.like.f_double = (double)val;             break;
+        case FOXY_VAL_LDOUBLE:            v.like.f_ldouble = (long double)val;       break;
         default:
-            break;
+            f_runtime_error(
+                NULL,
+                FOXY_STATUS_ERROR_TYPE_MISMATCH,
+                "Subtipo numérico inválido '%s' (%d) en f_value_new_number()",
+                f_value_type_to_string(subtype),
+                subtype
+            );
+            exit(FOXY_STATUS_ERROR_TYPE_MISMATCH);
     }
 
-    val->type = FOXY_VAL_NULL;
+    return v;
+
+#endif
 }
 
-bool f_value_is_numeric(const FoxyValue *val) {
-    if (!val) return false;
-    switch (val->type) {
-        case FOXY_VAL_INT:
-        case FOXY_VAL_NUMBER:
-        case FOXY_VAL_FLOAT:
-        case FOXY_VAL_DOUBLE:
-        case FOXY_VAL_LONG:
-        case FOXY_VAL_LONG_LONG:
-        case FOXY_VAL_UNSIGNED_LONG_LONG:
-        case FOXY_VAL_CHAR:
-            return true;
-        default:
-            return false;
-    }
-}
-
-bool f_value_is_pure_integer(const FoxyValue *val) {
-    if (!val) return false;
-    return (val->type == FOXY_VAL_INT || 
-            val->type == FOXY_VAL_LONG || 
-            val->type == FOXY_VAL_LONG_LONG || 
-            val->type == FOXY_VAL_UNSIGNED_LONG_LONG || 
-            val->type == FOXY_VAL_CHAR);
-}
-
-double f_value_as_double(const FoxyValue *val) {
-    if (!val) return 0.0;
-    switch (val->type) {
-        case FOXY_VAL_INT:
-        case FOXY_VAL_LONG:
-        case FOXY_VAL_LONG_LONG:
-            return (double)val->as.ival;
-        case FOXY_VAL_UNSIGNED_LONG_LONG:
-            return (double)((uint64_t)val->as.ival);
-        case FOXY_VAL_FLOAT:
-        case FOXY_VAL_DOUBLE:
-        case FOXY_VAL_NUMBER:
-            return val->as.dval;
-        case FOXY_VAL_CHAR:
-            return (double)val->as.cval;
-        default:
-            return 0.0;
-    }
-}
-
-#define FOXY_VALUE_CMP_LIST(F) \
-    F(FOXY_VAL_NULL,                true) \
-    F(FOXY_VAL_VOID,                true) \
-    F(FOXY_VAL_BOOL,                a->as.bval == b->as.bval) \
-    F(FOXY_VAL_CHAR,                a->as.cval == b->as.cval) \
-    F(FOXY_VAL_INT,                 a->as.ival == b->as.ival) \
-    F(FOXY_VAL_NUMBER,              a->as.fval == b->as.fval) \
-    F(FOXY_VAL_FLOAT,               a->as.fval == b->as.fval) \
-    F(FOXY_VAL_DOUBLE,              a->as.dval == b->as.dval) \
-    F(FOXY_VAL_LONG,                a->as.lval == b->as.lval) \
-    F(FOXY_VAL_LONG_LONG,           a->as.ival == b->as.ival) \
-    F(FOXY_VAL_UNSIGNED_LONG_LONG,  a->as.ival == b->as.ival) \
-    F(FOXY_VAL_ARRAY,               a->as.array == b->as.array) \
-    F(FOXY_VAL_DICT,                a->as.dict == b->as.dict) \
-    F(FOXY_VAL_OBJECT,              a->as.obj == b->as.obj) \
-    F(FOXY_VAL_STRUCT,              a->as.ptr == b->as.ptr) \
-    F(FOXY_VAL_CLASS,               a->as.klass == b->as.klass) \
-    F(FOXY_VAL_FUNCTION,            a->as.func == b->as.func)
-
-bool f_value_equals(const FoxyValue *a, const FoxyValue *b) {
-    if (!a || !b) return false;
-    if (a->type != b->type) return false;
-
-    switch (a->type) {
-    #define EXPAND_CMP_CASE(val_type, cmp_expr) \
-        case val_type: return (cmp_expr);
-        
-        FOXY_VALUE_CMP_LIST(EXPAND_CMP_CASE)
-        
-    #undef EXPAND_CMP_CASE
-        default:
-            return a->as.ptr == b->as.ptr;
-    }
-}
+// const char *f_value_type_to_string(FoxyValueType type) {
+//     if (type >= 0 && type < FOXY_VAL_COUNT) {
+//         return FOXY_VALUE_TYPE_NAMES[type];
+//     }
+//     return "desconocido";
+// }

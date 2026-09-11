@@ -33,7 +33,7 @@
 
         union {
             struct {
-                FoxInstruction *code;
+                FoxmodeInstruction *code;
                 size_t code_size;
                 size_t code_capacity;
 

@@ -3,7 +3,7 @@
     Demuestra declaración de funciones, tipos number y operadores avanzados.
 @@
 
-include "sys/out"
+include "sys/out/println"
 
 @ Función simple para calcular el cuadrado usando el operador de potencia '**'
 function calcular_cuadrado(number x) {

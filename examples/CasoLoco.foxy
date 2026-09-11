@@ -1,0 +1,56 @@
+include "sys/out/println" @ solo carga println al scope.
+include "sys/out/printf" @ solo carga printf al scope.
+
+class Vector3 {
+    float x, y, z @ foxy-lang no necesita definir explícitamente
+                  @ las variables cuando son definidas en el constructor / constructor lógico '__new'.
+    function __new(float x, y, z); @ equivalente a function __new(float x, float y, float z);
+    @@ el constructor logico internamente hace esto:
+    function __new(float x, y, z) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+    @@
+
+    function __cast(dict info) {
+        if (info.abstract_type == "class") {
+            @ Si el objetivo es la clase Color
+            if (info.type == "Color") {
+                @ Usamos los componentes x, y, z como r, g, b para instanciar la clase
+                return info.value((int)self.x, (int)self.y, (int)self.z)
+            }
+        } elseif (info.abstract_type == "array") {
+            if (info.type == "double")
+                return {(double)self.x, (double)self.y, (double)self.z}
+        } elseif (info.abstract_type == "function") {
+            if (info.type == "int")
+                return function(int _x, _y) { return _x + _y }
+        }
+
+    }
+}
+
+class Color {
+    function __new(int r, g, b); @ crear los miembros public int r :: public int g :: public int b. . .
+}
+
+@ Uso en código
+Vector3 vec = Vector3(255.0f, 128.0f, 0.0f)
+
+@ Invocación de __cast: info.type = "Color", info.abstract_type = "class", info.value = Color
+Color c = (Color)vec
+(int) foo = (int x) => x**2
+
+println(foo(3)) @ 9
+
+@ Iteración idiomática con asignación compuesta en índice
+int numeros[] = {3, 6, 9, 12, 15, 18, 21, 24, 27, 30}
+
+for (int i = 0; i < #numeros;) {
+    println(numeros[i += 2]) @ 3, 9, 15, 21, 27
+}
+
+for (int i = 0; i < #numeros;) {
+    println(numeros[(i += 2)]) @ 9, 15, 21, 27
+}
