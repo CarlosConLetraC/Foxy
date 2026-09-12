@@ -8,7 +8,7 @@ short offset = #mensaje @ retorna 4
 char textoNuevo[] = " mundo"
 
 foreach (char c : textoNuevo) {
-  aux[offset++] = c
+    aux[offset++] = c
 }
 
 char mensajeFinal[] = (char[])aux

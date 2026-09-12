@@ -27,7 +27,6 @@ foxy-lang trabaja únicamente con 2 tipos de datos principales:
         enumeraciones := enum { ... }
 @@@
 include "sys/out/printf"
-include "math"
 
 @ manera tradicional:
 
