@@ -1,4 +1,4 @@
-include "sys/out/printf" @ Carga exclusivamente printf al scope local
+include "sys/out/printf" @ Carga exclusivamente printf al scope global
 include "string"
 
 function sumaHibrida(nums...) { @ Tupla híbrida: empaqueta argumentos en array de FoxyValue
