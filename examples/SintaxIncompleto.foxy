@@ -1,0 +1,17 @@
+include "sys/out"
+
+@ Caso 1
+out.printf("%T\n", (dict){
+    nombre = "Carlos" @ aquí falta una coma
+    lineaQueTiraError = true
+})
+
+@ Caso 2
+for (int i =; i < 10; i++) {
+    out.prinf("i: %d\n", i)
+}
+
+@ Caso 3:
+function() @@ falta literal para la función. . . @@ {
+    out.println("Hola")
+}

@@ -1,0 +1,346 @@
+include "sys/out/*"
+include "math"
+include "string"
+include "utils/peektuple" @ Módulo nativo en C para inspección/extracción de tuplas (estilo select de Lua)
+
+@ ============================================================================
+@ 1. ESPECIFICADORES DE VARIABLES, ÁMBITO Y CONSTANTES
+@ Orden de modificadores: [global | static] [const] [DATATYPE?] VAR_NAME = VALOR
+@ ============================================================================
+
+@ Variable global híbrida (dinámica)
+global foo_hibrido = true
+
+@ Variable global explícitamente tipada
+global int foo_int = 123
+
+@ Mutación dinámica de tipo en modo híbrido: bool a int (resultado = 0)
+foo_hibrido &= 10
+
+@ Constante local híbrida
+const foo_constante = "no se puede modificar a partir del siguiente scope"
+
+@ Constante global con tipo explícito (arreglo de enteros)
+global const foo_constante_global = (int[]){5, 10, 15}
+
+function demostracionStatic() {
+    @ Variable estática con ámbito limitado a la función (mantiene valor entre llamadas)
+    static int llamadas = 0
+    static const float PI_LOCAL = 3.14159f
+    llamadas++
+    printf("Llamada numero: %d\n", llamadas)
+}
+
+@ ============================================================================
+@ 2. DECLARACIÓN DE COMENTARIOS Y TIPOS PRIMITIVOS (FOX_TOKEN_KW_*)
+@ ============================================================================
+
+@ Comentario de una sola línea
+
+@@
+  Comentario multilínea usando dos '@'
+@@
+
+@@@
+  Comentario multilínea delimitado por tres '@'
+@@@
+
+@ Arreglo de datos heterogéneos bajo el tipo unificado 'number'
+number demo_primitivos[] = {
+    true,                         @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (true)
+    false,                        @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (false)
+    NULL,                         @ FOX_TOKEN_KW_NULL / FOX_TOKEN_LIT_NULL
+    (char)97,                     @ FOX_TOKEN_KW_CHAR
+    (uchar)255,                   @ FOX_TOKEN_KW_UCHAR
+    (short)-32768,                @ FOX_TOKEN_KW_SHORT
+    (ushort)65535,                @ FOX_TOKEN_KW_USHORT
+    (int)-2147483648,             @ FOX_TOKEN_KW_INT
+    (uint)4294967295,             @ FOX_TOKEN_KW_UINT
+    (long)-100000l,               @ FOX_TOKEN_KW_LONG
+    (ulong)100000ul,              @ FOX_TOKEN_KW_ULONG
+    (llong)-9223372036854775807ll,@ FOX_TOKEN_KW_LLONG
+    (ullong)18446744073709551615ull, @ FOX_TOKEN_KW_ULLONG
+    (float)3.14159f,              @ FOX_TOKEN_KW_FLOAT
+    (double)2.7182818284d,        @ FOX_TOKEN_KW_DOUBLE
+    (ldouble)1.4142135623ld,      @ FOX_TOKEN_KW_LDOUBLE
+    (number)100n                  @ FOX_TOKEN_KW_NUMBER / FOX_TOKEN_LIT_NUMBER
+}
+
+@ Literales con sufijos explícitos
+int lit_i = 10i
+uint lit_ui = 20ui
+long lit_l = 30l
+ulong lit_ul = 40ul
+llong lit_ll = 50ll
+ullong lit_ull = 60ull
+float lit_f = 70.5f
+double lit_d = 80.9d
+ldouble lit_ld = 90.1ld
+number lit_n = 100n
+
+@ ============================================================================
+@ 3. ESTRUCTURAS DE CONTROL, BUCLES Y MANEJO DE FLUJO
+@ ============================================================================
+
+int contador = 0
+
+@ Bucle 'for' condicional y operador de longitud '#'
+for (int i = 0; i < #demo_primitivos; i++) {
+    contador += 1
+}
+
+@ Bucle 'foreach' sobre arreglo
+foreach (number val : demo_primitivos) {
+    if (val == NULL) {
+        continue @ FOX_TOKEN_KW_CONTINUE
+    } else {
+        break @ FOX_TOKEN_KW_BREAK
+    }
+}
+
+@ Estructuras relacionales y condicionales (if, elseif, else)
+if (contador > 0 && contador <= 100) {
+    printf("Contador en rango valido\n")
+} elseif (contador == 0 || !true) {
+    printf("Contador en cero\n")
+} else {
+    printf("Otro caso\n")
+}
+
+@ Uso de 'goto' y etiquetas
+int salto_idx = 0
+<miEtiqueta> {
+    salto_idx++
+}
+if (salto_idx < 3) goto miEtiqueta
+
+@ Enums y sentencia 'switch'
+export enum EstadoApp {
+    INIT,
+    PROCESANDO,
+    FIN
+}
+
+EstadoApp estadoActual = EstadoApp.PROCESANDO
+
+switch (estadoActual) {
+    case INIT:
+        println("Inicializando...")
+        break
+    case PROCESANDO:
+        println("Procesando datos...")
+        break
+    case FIN:
+        println("Finalizado")
+        break
+    default:
+        println("Estado desconocido")
+        break
+}
+
+@ Uso de 'use' para ámbitos de enumeración
+enum Modos { MODO_A, MODO_B }
+function probarUsoEnum() {
+    use Modos.*
+    Modos m = MODO_A
+}
+
+@ ============================================================================
+@ 4. OPERADORES ARITMÉTICOS, LÓGICOS, DE BITS Y ASIGNACIONES
+@ ============================================================================
+
+int a = 10
+int b = 3
+int c = 0
+
+@ Aritmética básica y potencia
+c = a + b @ FOX_TOKEN_OP_ADD
+c = a - b @ FOX_TOKEN_OP_SUB
+c = a * b @ FOX_TOKEN_OP_MUL
+c = a / b @ FOX_TOKEN_OP_DIV
+c = a % b @ FOX_TOKEN_OP_MOD
+c = a ** b @ FOX_TOKEN_OP_POW (potencia)
+
+@ Asignaciones compuestas
+a += 2 @ FOX_TOKEN_OP_ADD_ASSIGN
+a -= 1 @ FOX_TOKEN_OP_SUB_ASSIGN
+a *= 2 @ FOX_TOKEN_OP_MUL_ASSIGN
+a /= 2 @ FOX_TOKEN_OP_DIV_ASSIGN
+a %= 3 @ FOX_TOKEN_OP_MOD_ASSIGN
+a **= 2 @ FOX_TOKEN_OP_POW_ASSIGN
+
+@ Operadores de desplazamiento y a nivel de bits
+int bit1 = 0b1100
+int bit2 = 0b1010
+int bit_res = 0
+
+bit_res = bit1 & bit2   @ FOX_TOKEN_OP_BAND (AND a nivel de bits)
+bit_res = bit1 | bit2   @ FOX_TOKEN_OP_BOR (OR a nivel de bits)
+bit_res = bit1 ^ bit2   @ FOX_TOKEN_OP_BXOR (XOR a nivel de bits)
+bit_res = ~bit1         @ FOX_TOKEN_OP_BNOT (NOT a nivel de bits)
+bit_res = bit1 << 2     @ FOX_TOKEN_OP_LSHIFT (Desplazamiento a la izquierda)
+bit_res = bit1 >> 1     @ FOX_TOKEN_OP_RSHIFT (Desplazamiento a la derecha)
+
+bit1 <<= 1 @ FOX_TOKEN_OP_LSHIFT_ASSIGN
+bit1 >>= 1 @ FOX_TOKEN_OP_RSHIFT_ASSIGN
+bit1 &= bit2 @ FOX_TOKEN_OP_BAND_ASSIGN
+bit1 |= bit2 @ FOX_TOKEN_OP_BOR_ASSIGN
+bit1 ^= bit2 @ FOX_TOKEN_OP_BXOR_ASSIGN
+
+@ Operadores relacionales y de igualdad
+bool es_igual = (a == b)   @ FOX_TOKEN_OP_EQ
+bool es_distinto = (a != b) @ FOX_TOKEN_OP_NEQ
+bool es_menor = (a < b)    @ FOX_TOKEN_OP_LT
+bool es_mayor = (a > b)    @ FOX_TOKEN_OP_GT
+bool es_menorigual = (a <= b) @ FOX_TOKEN_OP_LE
+bool es_mayorigual = (a >= b) @ FOX_TOKEN_OP_GE
+
+@ Operadores unarios de incremento/decrecimiento
+a++ @ FOX_TOKEN_OP_INC
+a-- @ FOX_TOKEN_OP_DEC
+++a
+--a
+
+@ Operador ternario
+string eval_ternaria = (a > b) ? "mayor" : "menor"
+
+@ ============================================================================
+@ 5. DICCIONARIOS, OBJETOS Y OPERADORES DE HERENCIA / ANCESTRÍA
+@ ============================================================================
+
+dict mapa = {
+    clave = "valor",
+    numero = 42
+}
+
+foreach ((k, v) : mapa) {
+    printf("Clave: %s, Valor: %T\n", k, v)
+}
+
+@ Clases, modificadores de acceso, constructores y métodos marcados (flagged methods)
+class BaseFigura {
+    protected string nombre
+
+    function __new(string nombre) {
+        self.nombre = nombre
+    }
+
+    overrule function calcularArea() {
+        return 0.0f
+    }
+
+    @ Definición de métodos sobrecargados / marcados
+    function __tostring() {
+        return self.nombre
+    }
+
+    function __add(BaseFigura otra) { return 0 }
+    function __sub(BaseFigura otra) { return 0 }
+    function __mul(BaseFigura otra) { return 0 }
+    function __div(BaseFigura otra) { return 0 }
+    function __pow(BaseFigura otra) { return 0 }
+    function __mod(BaseFigura otra) { return 0 }
+    function __concat(BaseFigura otra, bool first) { return "" }
+    function __unm() { return self }
+    function __not() { return false }
+    function __eq(BaseFigura otra) { return false }
+    function __neq(BaseFigura otra) { return true }
+    function __lt(BaseFigura otra) { return false }
+    function __gt(BaseFigura otra) { return false }
+    function __le(BaseFigura otra) { return false }
+    function __ge(BaseFigura otra) { return false }
+    function __band(BaseFigura otra) { return 0 }
+    function __bor(BaseFigura otra) { return 0 }
+    function __bnot() { return self }
+    function __bxor(BaseFigura otra) { return 0 }
+    function __lshift(int n) { return 0 }
+    function __rshift(int n) { return 0 }
+    function __foreach(dict val) {}
+    function __closed() {}
+    function __cast() {}
+    function __len() { return 1 }
+}
+
+class Cuadrado from BaseFigura {
+    private float lado
+
+    function __new(string nombre, float lado) {
+        super(nombre)
+        self.lado = lado
+    }
+
+    function calcularArea() {
+        return self.lado ** 2
+    }
+}
+
+Cuadrado c1 = Cuadrado("Cuadrado1", 4.0f)
+
+@ Verificación de herencia y tipos mediante 'ancestorof' y 'descendantof'
+if (BaseFigura ancestorof c1) {
+    println("BaseFigura es ancestro de c1")
+}
+
+if (c1 descendantof BaseFigura) {
+    println("c1 es descendiente de BaseFigura")
+}
+
+@ ============================================================================
+@ 6. ESTRUCTURAS MEDIANTE 'struct' Y ACCESO A MIEMBROS POR PUNTERO
+@ ============================================================================
+
+struct Punto {
+    int x
+    int y
+}
+
+Punto p = Punto()
+p->x = 10
+p->y = 20
+
+printf("Punto: x=%d, y=%d\n", p->x, p->y)
+
+@ ============================================================================
+@ 7. FUNCIONES, LAMBDAS, MODO HÍBRIDO Y TUPLAS
+@ ============================================================================
+
+@ Expresión Lambda / Anónima
+(int, int) sumarLambda = (int x, int y) => x + y
+int res_lambda = sumarLambda(5, 10)
+
+@ Función variádica usando el módulo nativo peektuple
+function sumarMultiples(valores...) {
+    number total = 0
+    int total_elementos = peektuple.count(valores)
+    
+    for (int idx = 0; idx < total_elementos; idx++) {
+        total += (number)peektuple.get(valores, idx)
+    }
+    return total
+}
+
+number mis_numeros[] = {1, 2, 3, 4, 5}
+number suma_total = sumarMultiples((number...)mis_numeros)
+
+@ Modo híbrido con asignación local
+function procesamientoDinamico(datos...) {
+    resultado_temporal = 0
+    foreach (item : datos) {
+        resultado_temporal += item
+    }
+    return resultado_temporal
+}
+
+@ ============================================================================
+@ 8. MANEJO DE EXCEPCIONES (try, catch, except, final)
+@ ============================================================================
+
+try {
+    int resultado_error = 10 / 0
+} catch {
+    println("Se capturo un error generico sin datos.")
+} except (char err[]) {
+    printf("Excepcion capturada con mensaje: %s\n", err)
+} final {
+    println("Bloque finalizado correctamente.")
+}

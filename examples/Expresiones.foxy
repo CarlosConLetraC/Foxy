@@ -1,0 +1,24 @@
+@ Forma idiomática en foxy-lang usando expresión de asignación en el argumento
+include "sys/out"
+
+int numeros[] = {3, 6, 9, 12, 15, 18, 21, 24, 27, 30}
+for (int i = 0; i < #numeros;) {
+    out.println(numeros[i += 2]) @ retorna valor de i, luego hace incremento especificado.
+}
+@@salida:
+3
+9
+15
+21
+27
+@@
+
+for (int i = 0; i < #numeros;) {
+    out.println(numeros[(i += 2)]) @ se hace incremento especificado, luego retorna valor de i.
+}
+@@salida:
+9
+15
+21
+27
+@@

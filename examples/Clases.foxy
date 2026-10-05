@@ -1,0 +1,37 @@
+include "sys/out" @ carga out como diccionario y se utiliza out.print, out.println, ...
+
+
+@ caso 1
+class Vector3 {
+    private float x, y, z
+    function __new(float x, float y, float z); @ constructor lógico, se deben seguir explicitamente el mismo nombre de firmas en caso de tener que inicializar miembros non-public.
+    function modificarAccesos() {
+        (public)self.x
+        (public)self.y
+        (public)self.z
+    }
+}
+
+Vector3 pos = Vector3(19f, 3.1f, 20f)
+pos.modificarAccesos()
+out.println(pos.x, pos.y, pos.z) @ 19f   3.1f    20f
+
+@ caso 2
+class Vector2 {
+    function __new(float x, float y, float z) { @ si no se verifica FOX_TOKEN_KW_PUBLIC|FOX_TOKEN_KW_PROTECTED|FOX_TOKEN_KW_PRIVATE al no definir de manera tradicional los miembros de la clase, entonces se usa FOX_TOKEN_MOD_*.
+        (private)self.x = x
+        (private)self.y = y
+        (private)self.z = z
+    }
+}
+
+short i = 0
+<testLabelConCuerpo> {
+    out.printf("[testLabelConCuerpo]i: %d\n", i++)
+}
+if (i < 10) goto testLabelConCuerpo
+
+i = 0
+<testlabelSinCuerpo>
+out.printf("[testlabelSinCuerpo]i: %d\n", i++)
+if (i < 10) goto testlabelSinCuerpo

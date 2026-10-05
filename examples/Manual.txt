@@ -1,0 +1,128 @@
+bytecode de foxy: se genera un arreglo de caracteres que almacena las instrucciones de foxy para una VM, pero para poder crear múltiples instancias foxy en uno solo, se creará un tipo de hashmap que ayude a apuntar a las instrucciones para ejecutar.
+
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {}
+    processes := {
+        process1 := {}
+        process2 := {}
+        process3 := {}
+    }
+}
+cada proceso dentro del FOXY_HASH_MAP tendrá su propio entorno de ejecución. Ejemplo:
+
+```
+include "sys/process/*" @ carga clases, metodos y todo lo que sea un FOXY_VALUE al entorno foxy-lang.
+
+@@@
++==================================+
+|    iniciando subprocesos. . .    |
++==================================+
+@@@
+
+Process process1 = popen(function() {
+    @ código. . .
+}, "proceso 1") @ los nombres son opcionales.
+
+Process process2 = popen(function() {
+    @ código. . .
+}, "proceso 2")
+
+Process process3 = popen(function() {
+    @ código. . .
+}, "proceso 3")
+
+@@
+foxy esperará a que todos los processN terminen de ejecutar
+@@
+```
+
+Por defecto, foxy deja un solo process en el FOXY_HASH_MAP de la siguiente manera:
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {}
+    processes := {
+        process1 := {}
+    }
+}
+
+La maquina virtual de foxy utilizará un entorno compartido en cuanto a librerías de sistema
+en el momento que un process la incluya, asi se evita crear duplicación de datos. Pero para
+evitar que se sobrecarguen al instante las librerías, primero se verificará si dicho proceso
+la incluye, sino no se cargará al entorno de ejecución de O(n).
+
+los "loadedlibs" únicamente almacenan librerías de sistema, si el usuario hace su propia librería
+deberá cargarse dentro del processN.
+
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {}
+    processes := {
+        process1 := {
+            locallibs := {}
+        }
+    }
+}
+
+Una ventaja de los processes de foxy es que puede ejecutar todos los processes sin yield, es decir: maneja
+cada instancia foxy en diferentes contenedores, a diferencia de Lua que únicamente crea corutinas para simular
+hilos. Gracias a esto el manejo de datos que requieren de ejecución continua.
+
+En caso de requerir compartir información por cada instancia de processes, se necesita hacer lo siguiente:
+```
+include "sys/*"  @ se importan todas librerías de sys (sys/out, sys/process, sys/io, sys/in). Creando referencias globales de funciones de los módulos y submódulos
+include "string"
+
+SharedEnv env = env.createEnvironment((dict){
+    name = (char[])string.format("pruebaEntorno en versión %s", FOXY_VERSION), @ de parte de sys/FOXY_VERSION.h
+    status = "waiting",
+    currentInput = KeyCode(0) @ (de parte de sys/in), caracter ascii nulo, es decir que no se preciona nada
+})
+
+Process p1 = popen({ @ de parte de sys/process.
+    callback = function() {
+        data.status = "running"
+        while (true) {
+            @ algo que renderiza fotogramas. . .
+        }
+        data.status = "closed"
+    },
+    pname = "render",
+    environment = env
+})
+
+Process p2 = popen({ @ de parte de sys/process.
+    callback = function() {
+        @ algo que lee el input del usuario. . .
+        while (true) {
+            KeyCode kCode = readKeyCode()  @ de parte de sys/io.
+            env.currentInput = kCode
+        }
+    },
+    pname = "input", @ ATENCIÓN: esto es un arreglo de caracteres `(char[])`
+    environment = env
+})
+```
+
+Al final de esto, el hashmap de foxy termina así:
+FOXY_HASH_MAP := {
+    loadedlibs := {}
+    protocols := {
+        pruebaEntorno := {}
+    }
+    processes := {
+        render := {
+            locallibs := {}
+            protocol := pruebaEntorno
+        }
+        input := {
+            locallibs := {}
+            protocol := pruebaEntorno
+        }
+    }
+}
+
+
+#################################################################################################################
+# Por ahora, f_protocol.h | f_protocol.c no existen, por lo que f_include/sys/process no existe por el momento. #
+#################################################################################################################
