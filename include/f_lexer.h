@@ -1,6 +1,8 @@
 #pragma once
 
 #include "f_settings.h"
+#include "f_foxcode.h"
+#include "f_foxmode.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,7 +20,7 @@
 #define FOXY_TOKEN_CAT_ERROR       7
 
 /* ========================================================================= */
-/* 2. ENUMERADO GLOBAL DE TIPOS DE TOKEN (0-4095) [12 bits]                  */
+/* 2. ENUMERADO GLOBAL DE TIPOS DE TOKEN EN CRUDO                             */
 /* ========================================================================= */
 #if FOXY_COMPILER_SUPPORTS_XMACROS
 #define FOXY_TOKEN_LIST(F) \
@@ -96,6 +98,8 @@
     F(FOX_TOKEN_KW_SELF) \
     F(FOX_TOKEN_KW_ANCESTOROF) \
     F(FOX_TOKEN_KW_DESCENDANTOF) \
+    F(FOX_TOKEN_KW_PARENTOF) \
+    F(FOX_TOKEN_KW_CHILDOF) \
     F(FOX_TOKEN_KW_TYPEOF) \
     F(FOX_TOKEN_KW_TRUE) \
     F(FOX_TOKEN_KW_FALSE) \
@@ -149,11 +153,11 @@
     F(FOX_TOKEN_SLASH_ASSIGN) \
     F(FOX_TOKEN_PERCENT_ASSIGN) \
     F(FOX_TOKEN_POWER_ASSIGN) \
-    F(FOX_TOKEN_AND_ASSIGN)      /* &=  */ \
-    F(FOX_TOKEN_OR_ASSIGN)       /* |=  */ \
-    F(FOX_TOKEN_XOR_ASSIGN)      /* ^=  */ \
-    F(FOX_TOKEN_LSHIFT_ASSIGN)   /* <<= */ \
-    F(FOX_TOKEN_RSHIFT_ASSIGN)   /* >>= */ \
+    F(FOX_TOKEN_AND_ASSIGN) \
+    F(FOX_TOKEN_OR_ASSIGN) \
+    F(FOX_TOKEN_XOR_ASSIGN) \
+    F(FOX_TOKEN_LSHIFT_ASSIGN) \
+    F(FOX_TOKEN_RSHIFT_ASSIGN) \
     F(FOX_TOKEN_INC) \
     F(FOX_TOKEN_DEC) \
     F(FOX_TOKEN_EQ) \
@@ -196,14 +200,10 @@ typedef enum FOXY_PACKED {
 #undef F
 #else
 typedef enum FOXY_PACKED {
-    /* Control y Errores */
     FOX_TOKEN_EOF = 0,
     FOX_TOKEN_ERROR,
-
-    /* Identificadores y Etiquetas */
     FOX_TOKEN_IDENTIFIER,
     FOX_TOKEN_LABEL,
-
     /* Literales */
     FOX_TOKEN_INT_LITERAL,
     FOX_TOKEN_UINT_LITERAL,
@@ -217,13 +217,10 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_NUMBER_LITERAL,
     FOX_TOKEN_CHAR_LITERAL,
     FOX_TOKEN_STRING_LITERAL,
-
-    /* Palabras clave de modificadores / especificadores */
+    /* Palabras clave */
     FOX_TOKEN_KW_GLOBAL,
     FOX_TOKEN_KW_STATIC,
     FOX_TOKEN_KW_CONST,
-
-    /* Palabras Reservadas / Tipos de Datos Primitivos */
     FOX_TOKEN_KW_NULL,
     FOX_TOKEN_KW_BOOL,
     FOX_TOKEN_KW_CHAR,
@@ -242,8 +239,7 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_KW_NUMBER,
     FOX_TOKEN_KW_DICT,
     FOX_TOKEN_KW_OBJECT,
-
-    /* Control de Flujo y Sentencias */
+    /* Control de Flujo */
     FOX_TOKEN_KW_IF,
     FOX_TOKEN_KW_ELSE,
     FOX_TOKEN_KW_ELSEIF,
@@ -261,8 +257,7 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_KW_CATCH,
     FOX_TOKEN_KW_EXCEPT,
     FOX_TOKEN_KW_FINAL,
-
-    /* POO, Estructuras y Módulos */
+    /* POO */
     FOX_TOKEN_KW_CLASS,
     FOX_TOKEN_KW_STRUCT,
     FOX_TOKEN_KW_ENUM,
@@ -276,19 +271,18 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_KW_SELF,
     FOX_TOKEN_KW_ANCESTOROF,
     FOX_TOKEN_KW_DESCENDANTOF,
+    FOX_TOKEN_KW_PARENTOF,
+    FOX_TOKEN_KW_CHILDOF,
     FOX_TOKEN_KW_TYPEOF,
     FOX_TOKEN_KW_TRUE,
     FOX_TOKEN_KW_FALSE,
     FOX_TOKEN_KW_PRIVATE,
     FOX_TOKEN_KW_PROTECTED,
     FOX_TOKEN_KW_PUBLIC,
-
-    /* Modificadores de Acceso */
     FOX_TOKEN_MOD_PRIVATE,
     FOX_TOKEN_MOD_PROTECTED,
     FOX_TOKEN_MOD_PUBLIC,
-
-    /* Métodos Marcados / Flagged Methods */
+    /* Métodos Marcados */
     FOX_TOKEN_METHOD_NEW,
     FOX_TOKEN_METHOD_CAST,
     FOX_TOKEN_METHOD_TOSTRING,
@@ -316,8 +310,7 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_METHOD_FOREACH,
     FOX_TOKEN_METHOD_CLOSED,
     FOX_TOKEN_METHOD_LEN,
-
-    /* Operadores Aritméticos, Lógicos y Bitwise */
+    /* Operadores y Delimitadores */
     FOX_TOKEN_PLUS,
     FOX_TOKEN_MINUS,
     FOX_TOKEN_STAR,
@@ -331,12 +324,12 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_STAR_ASSIGN,
     FOX_TOKEN_SLASH_ASSIGN,
     FOX_TOKEN_PERCENT_ASSIGN,
+    FOX_TOKEN_POWER_ASSIGN,
     FOX_TOKEN_AND_ASSIGN,
     FOX_TOKEN_OR_ASSIGN,
     FOX_TOKEN_XOR_ASSIGN,
     FOX_TOKEN_LSHIFT_ASSIGN,
     FOX_TOKEN_RSHIFT_ASSIGN,
-    FOX_TOKEN_POWER_ASSIGN,
     FOX_TOKEN_INC,
     FOX_TOKEN_DEC,
     FOX_TOKEN_EQ,
@@ -354,8 +347,6 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_CARET,
     FOX_TOKEN_LSHIFT,
     FOX_TOKEN_RSHIFT,
-
-    /* Operadores Especiales y Delimitadores */
     FOX_TOKEN_ARROW,
     FOX_TOKEN_FAT_ARROW,
     FOX_TOKEN_PTR_ARROW,
@@ -376,8 +367,12 @@ typedef enum FOXY_PACKED {
 #endif
 
 /* ========================================================================= */
-/* 3. ESTRUCTURAS DE POSICIÓN Y TOKEN                                        */
+/* 3. ESTRUCTURAS Y COMPOSICIÓN BITWISE DEL LEXER                             */
 /* ========================================================================= */
+
+static inline uint16_t f_lexer_compose_type(uint16_t category, FoxyTokenType subtype) {
+    return f_foxmode_compose_type(category, (uint16_t)subtype);
+}
 
 typedef struct {
     const char *filename;
@@ -385,21 +380,18 @@ typedef struct {
     uint32_t column;
 } FoxySourcePos;
 
-/**
- * @brief Token individual escaneado por el Lexer optimizado con campos de bits.
- */
 typedef struct {
-    FoxyTokenType type;          // Subtipo / FoxyTokenType (0-4095)
-    const char *start;           // Puntero directo al texto del lexema
-    uint32_t length;             // Longitud del lexema
-    uint16_t type_category : 4;  // Categoría principal (1-15)
-    FoxySourcePos pos;           // Ubicación exacta para reporte de errores
+    FoxyTokenType type;
+    const char *start;
+    uint32_t length;
+    uint16_t type_category : 4;
+    FoxySourcePos pos;
 } FoxyToken;
 
 typedef struct {
-    const char *text;            // Texto reservado
-    uint16_t category : 4;       // Categoría
-    uint16_t subtype  : 12;      // Subtipo asignado
+    const char *text;
+    uint16_t category : 4;
+    uint16_t subtype  : 12;
 } FoxyKeywordMap;
 
 extern const FoxyKeywordMap FOXY_KEYWORD_TABLE[];
@@ -416,12 +408,149 @@ typedef struct {
     bool is_eof : 1;
 } FoxyLexer;
 
-/* API Principal del Lexer */
-// void f_lexer_init(FoxyLexer *lexer, const char *source, const char *filename);
+/* ========================================================================= */
+/* 4. FUNCIONES PÚBLICAS                                                    */
+/* ========================================================================= */
 void f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename);
 FoxyToken f_lexer_next_token(FoxyLexer *lexer);
 FoxyToken f_lexer_peek_token(FoxyLexer *lexer);
-
-/* Helpers y Diagnóstico */
 const char *f_lexer_token_type_to_string(FoxyTokenType type);
 void f_lexer_print_token(const FoxyToken *token);
+
+/* ========================================================================= */
+/* 5. MÁSCARAS BITWISE PARA TOKENS DE EXPRESIONES (LEXER / PARSER)               */
+/* ========================================================================= */
+
+/* --- Primary / Literales & Identificadores --- */
+#define FOXY_MASK_PRIMARY_0 ( \
+    FOXY_BIT(FOX_TOKEN_IDENTIFIER - 0)   | \
+    FOXY_BIT(FOX_TOKEN_INT_LITERAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL - 0)| \
+    FOXY_BIT(FOX_TOKEN_STRING_LITERAL - 0)| \
+    FOXY_BIT(FOX_TOKEN_TRUE - 0)         | \
+    FOXY_BIT(FOX_TOKEN_FALSE - 0)        | \
+    FOXY_BIT(FOX_TOKEN_NIL - 0)            \
+)
+
+#define FOXY_MASK_PRIMARY_1 (0ULL)
+
+/* --- Postfix (Op. Postfijos: Acceso, Llamada, Incrementos) --- */
+#define FOXY_MASK_POSTFIX_0 ( \
+    FOXY_BIT(FOX_TOKEN_LEFT_PAREN - 0)   | \
+    FOXY_BIT(FOX_TOKEN_LEFT_BRACKET - 0) | \
+    FOXY_BIT(FOX_TOKEN_DOT - 0)          | \
+    FOXY_BIT(FOX_TOKEN_INC - 0)          | \
+    FOXY_BIT(FOX_TOKEN_DEC - 0)            \
+)
+#define FOXY_MASK_POSTFIX_1 (0ULL)
+
+/* --- Unary (Op. Unarios Pre-fijos) --- */
+#define FOXY_MASK_UNARY_0 ( \
+    FOXY_BIT(FOX_TOKEN_MINUS - 0)        | \
+    FOXY_BIT(FOX_TOKEN_BANG - 0)         | \
+    FOXY_BIT(FOX_TOKEN_TILDE - 0)        | \
+    FOXY_BIT(FOX_TOKEN_INC - 0)          | \
+    FOXY_BIT(FOX_TOKEN_DEC - 0)            \
+)
+#define FOXY_MASK_UNARY_1 (0ULL)
+
+/* --- Multiplicative (*, /, %) --- */
+#define FOXY_MASK_MULTIPLICATIVE_0 ( \
+    FOXY_BIT(FOX_TOKEN_STAR - 0)         | \
+    FOXY_BIT(FOX_TOKEN_SLASH - 0)        | \
+    FOXY_BIT(FOX_TOKEN_PERCENT - 0)        \
+)
+#define FOXY_MASK_MULTIPLICATIVE_1 (0ULL)
+
+/* --- Additive (+, -) --- */
+#define FOXY_MASK_ADDITIVE_0 ( \
+    FOXY_BIT(FOX_TOKEN_PLUS - 0)         | \
+    FOXY_BIT(FOX_TOKEN_MINUS - 0)          \
+)
+#define FOXY_MASK_ADDITIVE_1 (0ULL)
+
+/* --- Relational (<, <=, >, >=) --- */
+#define FOXY_MASK_RELATIONAL_0 ( \
+    FOXY_BIT(FOX_TOKEN_LESS - 0)         | \
+    FOXY_BIT(FOX_TOKEN_LESS_EQUAL - 0)   | \
+    FOXY_BIT(FOX_TOKEN_GREATER - 0)      | \
+    FOXY_BIT(FOX_TOKEN_GREATER_EQUAL - 0)\
+)
+#define FOXY_MASK_RELATIONAL_1 (0ULL)
+
+/* --- Equality (==, !=) --- */
+#define FOXY_MASK_EQUALITY_0 ( \
+    FOXY_BIT(FOX_TOKEN_EQUAL_EQUAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_BANG_EQUAL - 0)     \
+)
+#define FOXY_MASK_EQUALITY_1 (0ULL)
+
+/* --- Logical (&&, ||, and, or) --- */
+#define FOXY_MASK_LOGICAL_0 ( \
+    FOXY_BIT(FOX_TOKEN_AMP_AMP - 0)      | \
+    FOXY_BIT(FOX_TOKEN_PIPE_PIPE - 0)    | \
+    FOXY_BIT(FOX_TOKEN_KW_AND - 0)       | \
+    FOXY_BIT(FOX_TOKEN_KW_OR - 0)          \
+)
+#define FOXY_MASK_LOGICAL_1 (0ULL)
+
+/* --- Assignment (=, +=, -=, *=, /=, %=, etc.) --- */
+#define FOXY_MASK_ASSIGNMENT_0 ( \
+    FOXY_BIT(FOX_TOKEN_EQUAL - 0)        | \
+    FOXY_BIT(FOX_TOKEN_PLUS_EQUAL - 0)   | \
+    FOXY_BIT(FOX_TOKEN_MINUS_EQUAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_STAR_EQUAL - 0)   | \
+    FOXY_BIT(FOX_TOKEN_SLASH_EQUAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_PERCENT_EQUAL - 0)\
+)
+#define FOXY_MASK_ASSIGNMENT_1 ( \
+    FOXY_BIT(FOX_TOKEN_AMP_EQUAL - 64)   | \
+    FOXY_BIT(FOX_TOKEN_PIPE_EQUAL - 64)  | \
+    FOXY_BIT(FOX_TOKEN_CARET_EQUAL - 64)   \
+)
+
+static inline bool f_token_is_in_mask(uint32_t token_type, uint64_t mask0, uint64_t mask1) {
+    uint32_t idx = token_type / 64;
+    uint64_t bit = 1ULL << (token_type % 64);
+
+    if (idx == 0) return (mask0 & bit) != 0ULL;
+    if (idx == 1) return (mask1 & bit) != 0ULL;
+    return false;
+}
+
+/* Predicados de conveniencia */
+static inline bool f_token_is_primary(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_PRIMARY_0, FOXY_MASK_PRIMARY_1);
+}
+
+static inline bool f_token_is_postfix(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_POSTFIX_0, FOXY_MASK_POSTFIX_1);
+}
+
+static inline bool f_token_is_unary(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_UNARY_0, FOXY_MASK_UNARY_1);
+}
+
+static inline bool f_token_is_multiplicative(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_MULTIPLICATIVE_0, FOXY_MASK_MULTIPLICATIVE_1);
+}
+
+static inline bool f_token_is_additive(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_ADDITIVE_0, FOXY_MASK_ADDITIVE_1);
+}
+
+static inline bool f_token_is_relational(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_RELATIONAL_0, FOXY_MASK_RELATIONAL_1);
+}
+
+static inline bool f_token_is_equality(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_EQUALITY_0, FOXY_MASK_EQUALITY_1);
+}
+
+static inline bool f_token_is_logical(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_LOGICAL_0, FOXY_MASK_LOGICAL_1);
+}
+
+static inline bool f_token_is_assignment(uint32_t type) {
+    return f_token_is_in_mask(type, FOXY_MASK_ASSIGNMENT_0, FOXY_MASK_ASSIGNMENT_1);
+}

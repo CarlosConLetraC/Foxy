@@ -6,41 +6,41 @@
 
 /**
  * ============================================================================
- * FOXY BYTECODE ARCHITECTURE (FOX_INST / FOX_OP)
+ * FOXY BYTECODE ARCHITECTURE (FOX_INST / FOX_OP): Tabla maestra de OpCode.
  * ============================================================================
- * 
+ *
  * Todas las instrucciones de Foxy Bytecode son palabras fijas de 32 bits (uint32_t)
  * alineadas en memoria, diseñadas para un modelo de Máquina Virtual basada en Registros.
- * 
+ *
  * ----------------------------------------------------------------------------
  * LAYOUT DE MEMORIA A NIVEL DE BITS (32 BITS)
  * ----------------------------------------------------------------------------
  * Los 20 bits superiores (Opcode, Registro Destino A, y Banderas) permanecen en
- * posiciones strictly FIJAS en todos los formatos. Esto permite al ciclo de
+ * posiciones estrictamente FIJAS en todos los formatos. Esto permite al ciclo de
  * despacho (dispatch loop) de la VM extraer Opcode, A y Flags en una sola pasada
  * sin importar la variante de la instrucción.
- * 
+ *
  * FORMATO 1: iABC (Operaciones Aritméticas, Comparaciones y Lógica R-R / R-R-R)
  * 31       24 23       16 15   12 11    8 7          0
  * +----------+----------+--------+-------+-----------+
  * |  Opcode  |    A     | Flags  |   B   |     C     |
  * |  (8 bits)| (8 bits) |(4 bits)|(4b/r) | (8 bits)  |
  * +----------+----------+--------+-------+-----------+
- * 
+ *
  * FORMATO 2: iABx (Cargas de Constantes, Literales, Ámbitos Globales/Upvalues)
  * 31       24 23       16 15   12 11                 0
  * +----------+----------+--------+-------------------+
  * |  Opcode  |    A     | Flags  |        Bx         |
  * |  (8 bits)| (8 bits) |(4 bits)| (12 bits Unsigned)|
  * +----------+----------+--------+-------------------+
- * 
+ *
  * FORMATO 3: iAsBx (Saltos Condicionales / Incondicionales con Offset)
  * 31       24 23       16 15   12 11                 0
  * +----------+----------+--------+-------------------+
  * |  Opcode  |    A     | Flags  |        sBx        |
  * |  (8 bits)| (8 bits) |(4 bits)|  (12 bits Signed) |
  * +----------+----------+--------+-------------------+
- * 
+ *
  * ----------------------------------------------------------------------------
  * DESGLOSE DE CAMPOS
  * ----------------------------------------------------------------------------
@@ -55,7 +55,7 @@
  */
 
 /** @brief Tipo de dato nativo para representar una instrucción de bytecode de 32 bits. */
-// typedef uint32_t FoxyInstruction;
+typedef uint32_t FoxyInstruction;
 
 #if FOXY_COMPILER_SUPPORTS_XMACROS
 
@@ -111,30 +111,51 @@
 
 /**
  * ============================================================================
+ * ORDENAMIENTO POR BITS Y PREVENCIÓN DE OVERFLOW
+ * ============================================================================
+ */
+
+/**
+ * @brief Ordena y empaqueta los bits de categoría (4 bits) y subtipo (12 bits)
+ *        para asegurar un mapeo acotado en 16 bits sin overflow de offsets al castear a signed.
+ */
+static inline uint16_t f_foxmode_compose_type(uint16_t category, uint16_t subtype) {
+    return (uint16_t)(((category & FOXMODE_MASK_4BIT) << 12) | (subtype & FOXMODE_MASK_12BIT));
+}
+
+/**
+ * ============================================================================
  * EXTRACCIÓN DE CAMPOS EN TIEMPO DE DESPACHO (DISPATCH HELPERS)
  * ============================================================================
  */
 
 /** @brief Extrae el Opcode (8 bits superiores: 31-24) de la instrucción. */
-#define FOXMODE_GET_OPCODE(i)   ((uint8_t)(((i) >> FOXMODE_SHIFT_OPCODE) & FOXMODE_MASK_8BIT))
+#define FOXMODE_GET_OPCODE(i)   ((uint8_t)(((uint32_t)(i) >> FOXMODE_SHIFT_OPCODE) & FOXMODE_MASK_8BIT))
 
 /** @brief Extrae el registro destino A (8 bits: 23-16) de la instrucción. */
-#define FOXMODE_GET_A(i)        ((uint8_t)(((i) >> FOXMODE_SHIFT_A) & FOXMODE_MASK_8BIT))
+#define FOXMODE_GET_A(i)        ((uint8_t)(((uint32_t)(i) >> FOXMODE_SHIFT_A) & FOXMODE_MASK_8BIT))
 
 /** @brief Extrae las banderas de ejecución (4 bits: 15-12) de la instrucción. */
-#define FOXMODE_GET_FLAGS(i)    ((uint8_t)(((i) >> FOXMODE_SHIFT_FLAGS) & FOXMODE_MASK_4BIT))
+#define FOXMODE_GET_FLAGS(i)    ((uint8_t)(((uint32_t)(i) >> FOXMODE_SHIFT_FLAGS) & FOXMODE_MASK_4BIT))
 
 /** @brief Extrae el registro fuente B (4 bits: 11-8) en formato iABC. */
-#define FOXMODE_GET_B_4B(i)     ((uint8_t)(((i) >> FOXMODE_SHIFT_B) & FOXMODE_MASK_4BIT))
+#define FOXMODE_GET_B_4B(i)     ((uint8_t)(((uint32_t)(i) >> FOXMODE_SHIFT_B) & FOXMODE_MASK_4BIT))
 
 /** @brief Extrae el registro fuente C o inmediato corto (8 bits: 7-0) en formato iABC. */
-#define FOXMODE_GET_C(i)        ((uint8_t)((i) & FOXMODE_MASK_8BIT))
+#define FOXMODE_GET_C(i)        ((uint8_t)((uint32_t)(i) & FOXMODE_MASK_8BIT))
 
 /** @brief Extrae el operando sin signo Bx de 12 bits (11-0) en formato iABx. */
-#define FOXMODE_GET_BX(i)       ((uint16_t)((i) & FOXMODE_MASK_12BIT))
+#define FOXMODE_GET_BX(i)       ((uint16_t)((uint32_t)(i) & FOXMODE_MASK_12BIT))
 
-/** @brief Extrae el desplazamiento con signo sBx de 12 bits (11-0) restando el sesgo SBX_BIAS. */
-#define FOXMODE_GET_SBX(i)      ((int16_t)((int32_t)((i) & FOXMODE_MASK_12BIT) - FOXMODE_SBX_BIAS))
+/**
+ * @brief Extrae el desplazamiento con signo sBx de 12 bits (11-0) evitando desbordamiento (underflow/overflow).
+ */
+static inline int16_t f_foxmode_get_sbx(uint32_t i) {
+    int32_t raw_bx = (int32_t)(i & FOXMODE_MASK_12BIT);
+    return (int16_t)(raw_bx - FOXMODE_SBX_BIAS);
+}
+
+#define FOXMODE_GET_SBX(i) f_foxmode_get_sbx((uint32_t)(i))
 
 /**
  * ============================================================================
@@ -144,11 +165,6 @@
 
 /**
  * @brief Crea una instrucción en formato iABC (R-R / R-R-R).
- * @param op Opcode (8 bits)
- * @param a Registro destino A (8 bits)
- * @param flags Banderas de ejecución (4 bits)
- * @param b Registro fuente B (4 bits)
- * @param c Registro fuente C o inmediato corto (8 bits)
  */
 #define FOXMODE_CREATE_iABC(op, a, flags, b, c) \
     (((uint32_t)(op)    << FOXMODE_SHIFT_OPCODE) | \
@@ -159,10 +175,6 @@
 
 /**
  * @brief Crea una instrucción en formato iABx (Índices a tablas de constantes/upvalues).
- * @param op Opcode (8 bits)
- * @param a Registro destino A (8 bits)
- * @param flags Banderas de ejecución (4 bits)
- * @param bx Índice o inmediato de 12 bits sin signo (0 a 4095)
  */
 #define FOXMODE_CREATE_iABx(op, a, flags, bx) \
     (((uint32_t)(op)     << FOXMODE_SHIFT_OPCODE) | \
@@ -172,16 +184,20 @@
 
 /**
  * @brief Crea una instrucción en formato iAsBx (Saltos condicionales/incondicionales).
- * @param op Opcode (8 bits)
- * @param a Registro destino o evaluador A (8 bits)
- * @param flags Banderas de ejecución (4 bits)
- * @param sbx Desplazamiento relativo de salto con signo (-2047 a +2047)
  */
+static inline uint32_t f_foxmode_create_iAsBx(uint8_t op, uint8_t a, uint8_t flags, int16_t sbx) {
+    int32_t biased_sbx = (int32_t)sbx + FOXMODE_SBX_BIAS;
+    if (biased_sbx < 0) biased_sbx = 0;
+    if (biased_sbx > (int32_t)FOXMODE_MASK_12BIT) biased_sbx = (int32_t)FOXMODE_MASK_12BIT;
+
+    return (((uint32_t)op << FOXMODE_SHIFT_OPCODE) |
+            ((uint32_t)a  << FOXMODE_SHIFT_A) |
+            (((uint32_t)flags & FOXMODE_MASK_4BIT) << FOXMODE_SHIFT_FLAGS) |
+            ((uint32_t)biased_sbx & FOXMODE_MASK_12BIT));
+}
+
 #define FOXMODE_CREATE_iAsBx(op, a, flags, sbx) \
-    (((uint32_t)(op)    << FOXMODE_SHIFT_OPCODE) | \
-     ((uint32_t)(a)     << FOXMODE_SHIFT_A) | \
-     (((uint32_t)(flags) & FOXMODE_MASK_4BIT) << FOXMODE_SHIFT_FLAGS) | \
-     ((uint32_t)((int32_t)(sbx) + FOXMODE_SBX_BIAS) & FOXMODE_MASK_12BIT))
+    f_foxmode_create_iAsBx((uint8_t)(op), (uint8_t)(a), (uint8_t)(flags), (int16_t)(sbx))
 
 /**
  * ============================================================================
@@ -190,28 +206,45 @@
  */
 
 /** @brief Genera una máscara de bit de 64 bits para la posición especificada por f_type. */
-#define FOXY_BIT(f_type) (1ULL << (f_type))
+#define FOXY_BIT(f_type) ((f_type) < 64 ? (1ULL << (f_type)) : 0ULL)
 
 /** @brief Máscara conteniendo todos los tipos numéricos y primitivos acelerados. */
 #define FOXY_MASK_PRIMITIVE_NUMERIC \
-    (FOXY_BIT(FOXY_VAL_BOOL)   | FOXY_BIT(FOXY_VAL_CHAR)    | FOXY_BIT(FOXY_VAL_UCHAR)  | \
-     FOXY_BIT(FOXY_VAL_SHORT)  | FOXY_BIT(FOXY_VAL_USHORT)  | FOXY_BIT(FOXY_VAL_INT)    | \
-     FOXY_BIT(FOXY_VAL_UINT)   | FOXY_BIT(FOXY_VAL_LONG)    | FOXY_BIT(FOXY_VAL_ULONG)  | \
-     FOXY_BIT(FOXY_VAL_LLONG)  | FOXY_BIT(FOXY_VAL_ULLONG)  | FOXY_BIT(FOXY_VAL_FLOAT)  | \
-     FOXY_BIT(FOXY_VAL_DOUBLE) | FOXY_BIT(FOXY_VAL_LDOUBLE))
+    (FOXY_BIT(FOXY_VAL_BOOL)   | \
+     FOXY_BIT(FOXY_VAL_CHAR)   | \
+     FOXY_BIT(FOXY_VAL_UCHAR)  | \
+     FOXY_BIT(FOXY_VAL_SHORT)  | \
+     FOXY_BIT(FOXY_VAL_USHORT) | \
+     FOXY_BIT(FOXY_VAL_INT)    | \
+     FOXY_BIT(FOXY_VAL_UINT)   | \
+     FOXY_BIT(FOXY_VAL_LONG)   | \
+     FOXY_BIT(FOXY_VAL_ULONG)  | \
+     FOXY_BIT(FOXY_VAL_LLONG)  | \
+     FOXY_BIT(FOXY_VAL_ULLONG) | \
+     FOXY_BIT(FOXY_VAL_FLOAT)  | \
+     FOXY_BIT(FOXY_VAL_DOUBLE) | \
+     FOXY_BIT(FOXY_VAL_LDOUBLE))
 
 /** @brief Máscara de aislamiento para tipos de coma flotante. */
 #define FOXY_MASK_FLOATING_POINT \
-    (FOXY_BIT(FOXY_VAL_FLOAT) | FOXY_BIT(FOXY_VAL_DOUBLE) | FOXY_BIT(FOXY_VAL_LDOUBLE))
+    (FOXY_BIT(FOXY_VAL_FLOAT)  | \
+     FOXY_BIT(FOXY_VAL_DOUBLE) | \
+     FOXY_BIT(FOXY_VAL_LDOUBLE))
 
 /** @brief Máscara de aislamiento para enteros sin signo (Unsigned Integers). */
 #define FOXY_MASK_UNSIGNED_INT \
-    (FOXY_BIT(FOXY_VAL_UCHAR) | FOXY_BIT(FOXY_VAL_USHORT) | FOXY_BIT(FOXY_VAL_UINT) | \
-     FOXY_BIT(FOXY_VAL_ULONG) | FOXY_BIT(FOXY_VAL_ULLONG))
+    (FOXY_BIT(FOXY_VAL_UCHAR)  | \
+     FOXY_BIT(FOXY_VAL_USHORT) | \
+     FOXY_BIT(FOXY_VAL_UINT)   | \
+     FOXY_BIT(FOXY_VAL_ULONG)  | \
+     FOXY_BIT(FOXY_VAL_ULLONG))
 
 /** @brief Máscara para identificar estructuras complejas almacenadas en el Heap (Punteros). */
 #define FOXY_MASK_HEAP_OBJECT \
-    (FOXY_BIT(FOXY_VAL_ARRAY)    | FOXY_BIT(FOXY_VAL_DICT)     | \
-     FOXY_BIT(FOXY_VAL_OBJECT)   | FOXY_BIT(FOXY_VAL_STRUCT)   | \
-     FOXY_BIT(FOXY_VAL_CLASS)    | FOXY_BIT(FOXY_VAL_FUNCTION) | \
+    (FOXY_BIT(FOXY_VAL_ARRAY)    | \
+     FOXY_BIT(FOXY_VAL_DICT)     | \
+     FOXY_BIT(FOXY_VAL_OBJECT)   | \
+     FOXY_BIT(FOXY_VAL_STRUCT)   | \
+     FOXY_BIT(FOXY_VAL_CLASS)    | \
+     FOXY_BIT(FOXY_VAL_FUNCTION) | \
      FOXY_BIT(FOXY_VAL_ENUM))

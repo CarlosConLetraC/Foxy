@@ -6,6 +6,11 @@
 
 /* Tabla de palabras clave y métodos marcados con sus categorías */
 const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
+    /* Modificadores / Especificadores */
+    {"global",       FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_GLOBAL},
+    {"static",       FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_STATIC},
+    {"const",        FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_CONST},
+
     /* Palabras Reservadas / Primitivos */
     {"null",         FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_NULL},
     {"bool",         FOXY_TOKEN_CAT_TYPE,    FOX_TOKEN_KW_BOOL},
@@ -59,6 +64,8 @@ const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
     {"self",         FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_SELF},
     {"ancestorof",   FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_ANCESTOROF},
     {"descendantof", FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_DESCENDANTOF},
+    {"parentof",     FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_PARENTOF},
+    {"childof",      FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_CHILDOF},
     {"typeof",       FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_KW_TYPEOF},
     {"true",         FOXY_TOKEN_CAT_LITERAL, FOX_TOKEN_KW_TRUE},
     {"false",        FOXY_TOKEN_CAT_LITERAL, FOX_TOKEN_KW_FALSE},
@@ -352,23 +359,33 @@ static FoxyToken scan_char(FoxyLexer *lexer) {
 }
 
 static FoxyToken scan_label_or_less(FoxyLexer *lexer) {
-    /* Verificar si es una etiqueta estilo <myLabel> */
+    /* Verificar si sigue un identificador válido para una etiqueta: <nombre_etiqueta> */
     const char *temp = lexer->cursor;
+    
     if (isalpha((unsigned char)*temp) || *temp == '_') {
-        while (isalnum((unsigned char)*temp) || *temp == '_') temp++;
+        while (isalnum((unsigned char)*temp) || *temp == '_') {
+            temp++;
+        }
+        /* Si termina con '>', es una etiqueta de goto */
         if (*temp == '>') {
-            lexer->cursor = temp + 1;
+            lexer->cursor = temp + 1; /* Consumir hasta el '>' */
+            lexer->column += (uint32_t)(lexer->cursor - lexer->token_start - 1);
             return make_token(lexer, FOX_TOKEN_LABEL, FOXY_TOKEN_CAT_IDENTIFIER);
         }
     }
 
-    if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_LE, FOXY_TOKEN_CAT_OPERATOR);
-    
+    /* Operadores de comparación y desplazamiento */
+    if (match(lexer, '=')) {
+        return make_token(lexer, FOX_TOKEN_LE, FOXY_TOKEN_CAT_OPERATOR);
+    }
+
     if (match(lexer, '<')) {
-        if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_LSHIFT_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
+        if (match(lexer, '=')) {
+            return make_token(lexer, FOX_TOKEN_LSHIFT_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
+        }
         return make_token(lexer, FOX_TOKEN_LSHIFT, FOXY_TOKEN_CAT_OPERATOR);
     }
-    
+
     return make_token(lexer, FOX_TOKEN_LT, FOXY_TOKEN_CAT_OPERATOR);
 }
 
@@ -419,7 +436,7 @@ FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
         case '-':
             if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_MINUS_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
             if (match(lexer, '-')) return make_token(lexer, FOX_TOKEN_DEC, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '>')) return make_token(lexer, FOX_TOKEN_PTR_ARROW, FOXY_TOKEN_CAT_OPERATOR);
+            if (match(lexer, '>')) return make_token(lexer, FOX_TOKEN_ARROW, FOXY_TOKEN_CAT_OPERATOR); // Retornar ARROW si la semántica del lenguaje lo requiere
             return make_token(lexer, FOX_TOKEN_MINUS, FOXY_TOKEN_CAT_OPERATOR);
 
         case '*':
@@ -479,24 +496,45 @@ FoxyToken f_lexer_peek_token(FoxyLexer *lexer) {
 }
 
 const char *f_lexer_token_type_to_string(FoxyTokenType type) {
+#if FOXY_COMPILER_SUPPORTS_XMACROS
     switch (type) {
-        case FOX_TOKEN_EOF: return "EOF";
-        case FOX_TOKEN_ERROR: return "ERROR";
-        case FOX_TOKEN_IDENTIFIER: return "IDENTIFIER";
-        case FOX_TOKEN_LABEL: return "LABEL";
-        case FOX_TOKEN_INT_LITERAL: return "INT_LITERAL";
-        case FOX_TOKEN_FLOAT_LITERAL: return "FLOAT_LITERAL";
-        case FOX_TOKEN_DOUBLE_LITERAL: return "DOUBLE_LITERAL";
-        case FOX_TOKEN_STRING_LITERAL: return "STRING_LITERAL";
-        case FOX_TOKEN_CHAR_LITERAL: return "CHAR_LITERAL";
-        case FOX_TOKEN_DOTDOT: return "DOTDOT (..)";
-        case FOX_TOKEN_METHOD_CONCAT: return "METHOD __concat";
-        default: return "GENERIC_TOKEN";
+#define F(ftoken) case ftoken: return #ftoken;
+        FOXY_TOKEN_LIST(F)
+#undef F
+        default: return "UNKNOWN_TOKEN";
     }
+#else
+    switch (type) {
+        case FOX_TOKEN_EOF: return "FOX_TOKEN_EOF";
+        case FOX_TOKEN_ERROR: return "FOX_TOKEN_ERROR";
+        case FOX_TOKEN_IDENTIFIER: return "FOX_TOKEN_IDENTIFIER";
+        case FOX_TOKEN_LABEL: return "FOX_TOKEN_LABEL";
+        case FOX_TOKEN_INT_LITERAL: return "FOX_TOKEN_INT_LITERAL";
+        case FOX_TOKEN_UINT_LITERAL: return "FOX_TOKEN_UINT_LITERAL";
+        case FOX_TOKEN_LONG_LITERAL: return "FOX_TOKEN_LONG_LITERAL";
+        case FOX_TOKEN_ULONG_LITERAL: return "FOX_TOKEN_ULONG_LITERAL";
+        case FOX_TOKEN_LLONG_LITERAL: return "FOX_TOKEN_LLONG_LITERAL";
+        case FOX_TOKEN_ULLONG_LITERAL: return "FOX_TOKEN_ULLONG_LITERAL";
+        case FOX_TOKEN_FLOAT_LITERAL: return "FOX_TOKEN_FLOAT_LITERAL";
+        case FOX_TOKEN_DOUBLE_LITERAL: return "FOX_TOKEN_DOUBLE_LITERAL";
+        case FOX_TOKEN_LDOUBLE_LITERAL: return "FOX_TOKEN_LDOUBLE_LITERAL";
+        case FOX_TOKEN_NUMBER_LITERAL: return "FOX_TOKEN_NUMBER_LITERAL";
+        case FOX_TOKEN_CHAR_LITERAL: return "FOX_TOKEN_CHAR_LITERAL";
+        case FOX_TOKEN_STRING_LITERAL: return "FOX_TOKEN_STRING_LITERAL";
+        case FOX_TOKEN_ARROW: return "FOX_TOKEN_ARROW";
+        case FOX_TOKEN_FAT_ARROW: return "FOX_TOKEN_FAT_ARROW";
+        case FOX_TOKEN_PTR_ARROW: return "FOX_TOKEN_PTR_ARROW";
+        case FOX_TOKEN_DOTDOT: return "FOX_TOKEN_DOTDOT";
+        case FOX_TOKEN_ELLIPSIS: return "FOX_TOKEN_ELLIPSIS";
+        default: return "FOX_TOKEN_GENERIC";
+    }
+#endif
 }
 
 void f_lexer_print_token(const FoxyToken *token) {
-    printf("[%s:%u:%u] Token Type: %u, Lexema: '%.*s'\n",
+    printf("[%s:%u:%u] Cat: %u, Subtype: %u (%s), Lexema: '%.*s'\n",
            token->pos.filename, token->pos.line, token->pos.column,
-           token->type, token->length, token->start);
+           token->type_category, token->type,
+           f_lexer_token_type_to_string(token->type),
+           token->length, token->start);
 }

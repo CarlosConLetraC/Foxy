@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "f_foxmode.h" // aquí vienen todas las máscaras / macros para trabajar con la lista maestra de bytecode.
+#include "f_foxmode.h" // Aquí vienen todas las máscaras / macros para trabajar con la lista maestra de bytecode.
 
 /**
  * ============================================================================
@@ -45,20 +45,20 @@ typedef struct FoxyFunction FoxyFunction;
     F(FOXY_VAL_DOUBLE,              "double")   /* [13] Coma flotante de doble precisión */ \
     F(FOXY_VAL_LDOUBLE,             "ldouble")  /* [14] Coma flotante extendida */ \
     F(FOXY_VAL_NUMBER,              "number")   /* [15] Metatipo numérico dinámico */ \
-    F(FOXY_VAL_ARRAY,               "array")    /* [16] Arreglo dinámico en Heap/Stack */ \
-    F(FOXY_VAL_DICT,                "dict")     /* [17] Tabla hash / Diccionario en Heap */ \
-    F(FOXY_VAL_OBJECT,              "object")   /* [18] Instancia de clase en Heap */ \
-    F(FOXY_VAL_STRUCT,              "struct")   /* [19] Estructura de datos simple en Heap */ \
-    F(FOXY_VAL_CLASS,               "class")    /* [20] Metaclas de Foxy en Heap */ \
-    F(FOXY_VAL_FUNCTION,            "function") /* [21] Objeto función / Closure en Heap */ \
-    F(FOXY_VAL_ENUM,                "enum")     /* [22] Enumeración en Heap, aunque se busca que sean enums como en C. */
+    F(FOXY_VAL_VOID,                "void")     /* [16] Tipo de dato sin retorno */ \
+    F(FOXY_VAL_ARRAY,               "array")    /* [17] Arreglo dinámico en Heap/Stack */ \
+    F(FOXY_VAL_DICT,                "dict")     /* [18] Tabla hash / Diccionario en Heap */ \
+    F(FOXY_VAL_OBJECT,              "object")   /* [19] Instancia de clase en Heap */ \
+    F(FOXY_VAL_STRUCT,              "struct")   /* [20] Estructura de datos simple en Heap */ \
+    F(FOXY_VAL_CLASS,               "class")    /* [21] Metaclas de Foxy en Heap */ \
+    F(FOXY_VAL_FUNCTION,            "function") /* [22] Objeto función / Closure en Heap */ \
+    F(FOXY_VAL_ENUM,                "enum")     /* [23] Enumeración en Heap */
 
 /** @brief Enumeración de tipos de datos únicos representables en la VM. */
 typedef enum FOXY_PACKED {
     #define F(type_enum, type_str) type_enum,
     FOXY_VALUE_value_LIST(F)
     #undef F
-    // FOXY_VAL_COUNT
 } FoxyValueType;
 #else
 typedef enum FOXY_PACKED {
@@ -78,14 +78,14 @@ typedef enum FOXY_PACKED {
     FOXY_VAL_DOUBLE,              /* [13] Coma flotante de doble precisión */
     FOXY_VAL_LDOUBLE,             /* [14] Coma flotante extendida */
     FOXY_VAL_NUMBER,              /* [15] Metatipo numérico dinámico */
-    FOXY_VAL_ARRAY,               /* [16] Arreglo dinámico en Heap/Stack */
-    FOXY_VAL_DICT,                /* [17] Tabla hash / Diccionario en Heap */
-    FOXY_VAL_OBJECT,              /* [18] Instancia de clase en Heap */
-    FOXY_VAL_STRUCT,              /* [19] Estructura de datos simple en Heap */
-    FOXY_VAL_CLASS,               /* [20] Metaclas de Foxy en Heap */
-    FOXY_VAL_FUNCTION,            /* [21] Objeto función / Closure en Heap */
-    FOXY_VAL_ENUM                 /* [22] Enumeración en Heap */
-    //FOXY_VAL_COUNT
+    FOXY_VAL_VOID,                /* [16] Tipo de dato sin retorno */
+    FOXY_VAL_ARRAY,               /* [17] Arreglo dinámico en Heap/Stack */
+    FOXY_VAL_DICT,                /* [18] Tabla hash / Diccionario en Heap */
+    FOXY_VAL_OBJECT,              /* [19] Instancia de clase en Heap */
+    FOXY_VAL_STRUCT,              /* [20] Estructura de datos simple en Heap */
+    FOXY_VAL_CLASS,               /* [21] Metaclas de Foxy en Heap */
+    FOXY_VAL_FUNCTION,            /* [22] Objeto función / Closure en Heap */
+    FOXY_VAL_ENUM                 /* [23] Enumeración en Heap */
 } FoxyValueType;
 #endif
 
@@ -119,7 +119,7 @@ typedef struct FoxyValue {
         FoxyStruct *f_struct;
         FoxyClass *f_class;
         FoxyFunction *f_function;
-        // FoxyEnum *f_enum; TODO: crear estructura para foxy enum.
+        // FoxyEnum *f_enum;
     } like;
 } FoxyValue;
 
@@ -132,6 +132,7 @@ extern const char * const FOXY_VALUE_value_NAMES[];
  * ============================================================================
  */
 #define FOXY_CONSTANT_VALUE_NULL        ((FoxyValue){ .type = FOXY_VAL_NULL })
+#define FOXY_CONSTANT_VALUE_VOID        ((FoxyValue){ .type = FOXY_VAL_VOID })
 #define FOXY_CONSTANT_VALUE_BOOL_TRUE   ((FoxyValue){ .type = FOXY_VAL_BOOL, .like.f_bool = true })
 #define FOXY_CONSTANT_VALUE_BOOL_FALSE  ((FoxyValue){ .type = FOXY_VAL_BOOL, .like.f_bool = false })
 
@@ -141,6 +142,7 @@ extern const char * const FOXY_VALUE_value_NAMES[];
  * ============================================================================
  */
 #define f_value_new_null()       (FOXY_CONSTANT_VALUE_NULL)
+#define f_value_new_void()       (FOXY_CONSTANT_VALUE_VOID)
 #define f_value_new_bool(v)      ((v) ? FOXY_CONSTANT_VALUE_BOOL_TRUE : FOXY_CONSTANT_VALUE_BOOL_FALSE)
 #define f_value_new_char(v)      ((FoxyValue){ .type = FOXY_VAL_CHAR, .like.f_char = (v) })
 #define f_value_new_uchar(v)     ((FoxyValue){ .type = FOXY_VAL_UCHAR, .like.f_uchar = (v) })
@@ -184,6 +186,24 @@ FOXY_EXPORT void f_value_print(FoxyValue value);
 /** @brief Operaciones de inspección de herencia y prototipos */
 FOXY_EXPORT bool f_value_is_ancestor_of(FoxyValue parent, FoxyValue child);
 FOXY_EXPORT bool f_value_is_descendant_of(FoxyValue child, FoxyValue parent);
+
+/** @brief Comprueba si 'parent' es la superclase directa (padre inmediato) de 'child'. */
+FOXY_EXPORT bool f_value_is_parent_of(FoxyValue parent, FoxyValue child);
+
+/** @brief Comprueba si 'child' es una subclase/instancia directa de 'parent'. */
+FOXY_EXPORT bool f_value_is_child_of(FoxyValue child, FoxyValue parent);
+
+/** @brief Convierte cualquier FoxyValue numérico a un double (representación de precisión). */
+FOXY_EXPORT double f_value_to_double(FoxyValue val);
+
+/** @brief Convierte cualquier FoxyValue numérico a un int64_t (representación entera de 64 bits). */
+FOXY_EXPORT int64_t f_value_to_int64(FoxyValue val);
+
+/** @brief Promueve o convierte un FoxyValue numérico a otro subtipo preserving/casting su valor. */
+FOXY_EXPORT FoxyValue f_value_cast_numeric(FoxyValue val, FoxyValueType target_type);
+
+/** @brief Compara si dos FoxyValue numéricos representan el mismo valor numérico exacto aunque diferen de tipo. */
+FOXY_EXPORT bool f_value_numeric_equals(FoxyValue a, FoxyValue b);
 
 /**
  * ============================================================================
