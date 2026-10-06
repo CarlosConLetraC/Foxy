@@ -114,9 +114,9 @@ typedef enum FOXY_PACKED {
  * @brief Lista dinámica de nodos AST para almacenar bloques, argumentos o parámetros.
  */
 typedef struct {
-    FoxyAstNode **nodes;
-    size_t count;
-    size_t capacity;
+    FoxyAstNode **nodes;            /* 8 bytes */
+    size_t count;                   /* 8 bytes */
+    size_t capacity;                /* 8 bytes */
 } FoxyAstNodeList;
 
 /* ========================================================================= */
@@ -124,7 +124,7 @@ typedef struct {
 /* ========================================================================= */
 
 typedef struct {
-    FoxyValue value;                /* Valor parseado en compilación */
+    FoxyValue value;                /* 32 bytes */
 } FoxyAstLiteral;
 
 typedef struct {
@@ -132,149 +132,151 @@ typedef struct {
 } FoxyAstIdentifier;
 
 typedef struct {
-    FoxyToken op;                   /* Operador (!, -, ~, #, ++, --, etc.) */
-    FoxyAstNode *operand;           /* Expresión operada */
-    bool is_postfix;                /* true si es a++, false si es ++a */
+    FoxyAstNode *operand;           /* 8 bytes */
+    FoxyToken op;                   /* FoxyToken */
+    uint8_t is_postfix;             /* 1 byte */
+    uint8_t _pad[7];                /* 7 bytes para alineación de 8 bytes */
 } FoxyAstUnary;
 
 typedef struct {
-    FoxyToken op;                   /* Operador (+, -, *, /, ==, !=, &&, etc.) */
-    FoxyAstNode *left;
-    FoxyAstNode *right;
+    FoxyAstNode *left;              /* 8 bytes */
+    FoxyAstNode *right;             /* 8 bytes */
+    FoxyToken op;                   /* FoxyToken */
 } FoxyAstBinary;
 
 typedef struct {
-    FoxyAstNode *target;            /* Identificador, Acceso a miembro o índice */
-    FoxyToken op;                   /* =, +=, -=, *=, /=, etc. */
-    FoxyAstNode *value;
-    bool is_grouped;                /* true si la expresión estuvo envuelta en () */
+    FoxyAstNode *target;            /* 8 bytes */
+    FoxyAstNode *value;             /* 8 bytes */
+    FoxyToken op;                   /* FoxyToken */
+    uint8_t is_grouped;             /* 1 byte */
+    uint8_t _pad[7];                /* 7 bytes para alineación de 8 bytes */
 } FoxyAstAssign;
 
 typedef struct {
-    FoxyAstNode *callee;            /* Identificador o expresión evaluable */
-    FoxyAstNodeList args;           /* Argumentos */
+    FoxyAstNode *callee;            /* 8 bytes */
+    FoxyAstNodeList args;           /* 24 bytes */
 } FoxyAstCall;
 
 typedef struct {
-    FoxyAstNode *object;            /* Objeto al que se accede */
-    FoxyToken member;               /* Identificador del miembro */
+    FoxyAstNode *object;            /* 8 bytes */
+    FoxyToken member;               /* FoxyToken */
 } FoxyAstGetMember;
 
 typedef struct {
-    FoxyAstNode *object;
-    FoxyToken member;
-    FoxyAstNode *value;
+    FoxyAstNode *object;            /* 8 bytes */
+    FoxyAstNode *value;             /* 8 bytes */
+    FoxyToken member;               /* FoxyToken */
 } FoxyAstSetMember;
 
 typedef struct {
-    FoxyAstNode *target;            /* Arreglo o Diccionario */
-    FoxyAstNode *index;             /* Expresión del índice o clave */
+    FoxyAstNode *target;            /* 8 bytes */
+    FoxyAstNode *index;             /* 8 bytes */
 } FoxyAstGetIndex;
 
 typedef struct {
-    FoxyAstNode *target;
-    FoxyAstNode *index;
-    FoxyAstNode *value;
+    FoxyAstNode *target;            /* 8 bytes */
+    FoxyAstNode *index;             /* 8 bytes */
+    FoxyAstNode *value;             /* 8 bytes */
 } FoxyAstSetIndex;
 
 typedef struct {
-    FoxyAstNodeList elements;       /* Elementos de la lista [a, b, c] */
+    FoxyAstNodeList elements;       /* 24 bytes */
 } FoxyAstArrayLiteral;
 
 typedef struct {
-    FoxyAstNodeList entries;        /* Nodos de tipo FOXY_AST_EXPR_DICT_ENTRY */
+    FoxyAstNodeList entries;        /* 24 bytes */
 } FoxyAstDictLiteral;
 
 typedef struct {
-    FoxyToken key;                  /* Clave */
-    FoxyAstNode *value;             /* Valor asignado */
+    FoxyAstNode *value;             /* 8 bytes */
+    FoxyToken key;                  /* FoxyToken */
 } FoxyAstDictEntry;
 
 /* Sentencias y Declaraciones */
 
 typedef struct {
-    FoxyToken name;                 /* Nombre de la variable */
-    FoxyTokenType type_token;       /* Tipo explícito si lo tiene */
-    FoxyAstNode *initializer;       /* Expresión inicial (opcional) */
+    FoxyAstNode *initializer;       /* 8 bytes */
+    FoxyToken name;                 /* FoxyToken */
+    FoxyTokenType type_token;       /* Tipo enum/packed */
+    uint8_t _pad[7];                /* Padding para múltiplo de 8 */
 } FoxyAstVarDecl;
 
 typedef struct {
-    FoxyToken name;                 /* Nombre de la función */
-    FoxyAstNodeList params;         /* Lista de parámetros */
-    FoxyAstNode *body;              /* Nodo de tipo FOXY_AST_STMT_BLOCK */
+    FoxyAstNode *body;              /* 8 bytes */
+    FoxyAstNodeList params;         /* 24 bytes */
+    FoxyToken name;                 /* FoxyToken */
 } FoxyAstFuncDecl;
 
 typedef struct {
-    FoxyAstNode *condition;
-    FoxyAstNode *then_branch;       /* Bloque verdadero */
-    FoxyAstNode *else_branch;       /* Bloque falso / elseif (opcional) */
+    FoxyAstNode *condition;         /* 8 bytes */
+    FoxyAstNode *then_branch;       /* 8 bytes */
+    FoxyAstNode *else_branch;       /* 8 bytes */
 } FoxyAstIfStmt;
 
 typedef struct {
-    FoxyAstNode *condition;
-    FoxyAstNode *body;
+    FoxyAstNode *condition;         /* 8 bytes */
+    FoxyAstNode *body;              /* 8 bytes */
 } FoxyAstWhileStmt;
 
 typedef struct {
-    FoxyAstNode *init;              /* Decl/Expr inicial (opcional) */
-    FoxyAstNode *condition;         /* Condición de iteración (opcional) */
-    FoxyAstNode *increment;         /* Incremento/Paso (opcional) */
-    FoxyAstNode *body;
+    FoxyAstNode *init;              /* 8 bytes */
+    FoxyAstNode *condition;         /* 8 bytes */
+    FoxyAstNode *increment;         /* 8 bytes */
+    FoxyAstNode *body;              /* 8 bytes */
 } FoxyAstForStmt;
 
 typedef struct {
-    FoxyToken iterator_var;         /* Variable iteradora */
-    FoxyAstNode *iterable;          /* Expresión a iterar */
-    FoxyAstNode *body;
+    FoxyAstNode *iterable;          /* 8 bytes */
+    FoxyAstNode *body;              /* 8 bytes */
+    FoxyToken iterator_var;         /* FoxyToken */
 } FoxyAstForeachStmt;
 
 typedef struct {
-    FoxyAstNode *condition;         /* Expresión evaluada */
-    FoxyAstNodeList cases;          /* Lista de FOXY_AST_STMT_CASE */
+    FoxyAstNode *condition;         /* 8 bytes */
+    FoxyAstNodeList cases;          /* 24 bytes */
 } FoxyAstSwitchStmt;
 
 typedef struct {
-    FoxyAstNode *expr;              /* Expresión del case (NULL para default) */
-    FoxyAstNodeList stmts;          /* Sentencias internas */
+    FoxyAstNode *expr;              /* 8 bytes */
+    FoxyAstNodeList stmts;          /* 24 bytes */
 } FoxyAstCaseStmt;
 
 typedef struct {
-    FoxyAstNode *value;             /* Expresión de retorno (opcional) */
+    FoxyAstNode *value;             /* 8 bytes */
 } FoxyAstReturnStmt;
 
 typedef struct {
-    FoxyToken label;                /* Etiqueta de salto */
+    FoxyToken label;                /* FoxyToken */
 } FoxyAstGotoStmt;
 
 typedef struct {
-    FoxyAstNode *try_block;
-    FoxyAstNodeList catch_blocks;   /* Lista de bloques catch */
-    FoxyAstNode *finally_block;     /* Bloque final (opcional) */
+    FoxyAstNode *try_block;         /* 8 bytes */
+    FoxyAstNode *finally_block;     /* 8 bytes */
+    FoxyAstNodeList catch_blocks;   /* 24 bytes */
 } FoxyAstTryStmt;
 
 typedef struct {
-    FoxyToken var_name;             /* Captura de excepción */
-    FoxyAstNode *body;
+    FoxyAstNode *body;              /* 8 bytes */
+    FoxyToken var_name;             /* FoxyToken */
 } FoxyAstCatchStmt;
 
 typedef struct {
     FoxyLexer lexer;
     FoxyToken current_token;
     FoxyToken previous_token;
-    bool had_error;
-    bool panic_mode;
+    uint32_t nest_depth;            /* 4 bytes (control de anidamiento) */
+    uint16_t error_count;           /* 2 bytes (total de errores detectados) */
+    uint8_t had_error : 1;          /* 1 byte contenedor para bitfields */
+    uint8_t panic_mode : 1;
+    uint8_t _reserved : 8;
 } FoxyAstParser;
 
 /**
  * @brief Estructura Principal de Nodo AST (Tagged Union)
  */
 struct FoxyAstNode {
-    FoxyAstKind kind;
-    FoxySourcePos pos;              /* Posición en el archivo fuente */
-
     union {
         FoxyAstNodeList program;
-
         FoxyAstLiteral literal;
         FoxyAstIdentifier identifier;
         FoxyAstUnary unary;
@@ -288,9 +290,7 @@ struct FoxyAstNode {
         FoxyAstArrayLiteral array_literal;
         FoxyAstDictLiteral dict_literal;
         FoxyAstDictEntry dict_entry;
-
         FoxyAstNode *expr_stmt;
-
         FoxyAstVarDecl var_decl;
         FoxyAstFuncDecl func_decl;
         FoxyAstIfStmt if_stmt;
@@ -303,7 +303,11 @@ struct FoxyAstNode {
         FoxyAstGotoStmt goto_stmt;
         FoxyAstTryStmt try_stmt;
         FoxyAstCatchStmt catch_stmt;
-    } as;
+    } as;                           /* Alineado a 8 bytes primero */
+
+    FoxySourcePos pos;              /* Posición en el fuente */
+    FoxyAstKind kind;               /* 1 byte al final */
+    uint8_t _pad[15];               /* 15 bytes de padding explícito para alcanzar múltiplo de 16 */
 };
 
 /* ========================================================================= */

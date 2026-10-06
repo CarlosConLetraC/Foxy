@@ -1,6 +1,6 @@
 # Compilador y banderas
 CC = gcc
-CFLAGS = -Wall -Wextra -g -std=c17 -O2 -fomit-frame-pointer -Iinclude -If_include -fPIC -Wsign-conversion #-Wno-comment
+CFLAGS = -Wall -Wextra -Wpadded -g -std=c17 -O2 -fomit-frame-pointer -Iinclude -If_include -fPIC -Wsign-conversion 
 LDFLAGS = -rdynamic -ldl -lm -Wl,-rpath,.
 
 # Directorios

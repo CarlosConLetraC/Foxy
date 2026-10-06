@@ -381,31 +381,35 @@ typedef struct {
 } FoxySourcePos;
 
 typedef struct {
-    FoxyTokenType type;
-    const char *start;
-    uint32_t length;
-    uint16_t type_category : 4;
-    FoxySourcePos pos;
-} FoxyToken;
+    const char *start;       /* 8 bytes */
+    FoxySourcePos pos;       /* 16 bytes */
+    uint32_t length;         /* 4 bytes */
+    uint16_t flags;          /* 2 bytes (reemplaza el padding con banderas de lexer) */
+    FoxyTokenType type;      /* 1 byte */
+    uint8_t type_category;   /* 1 byte */
+} FoxyToken;                 /* Exactamente 32 bytes sin desperdicio */
 
 typedef struct {
-    const char *text;
-    uint16_t category : 4;
-    uint16_t subtype  : 12;
-} FoxyKeywordMap;
+    const char *text;      /* 8 bytes [offset 0..7] */
+    uint16_t category;     /* 2 bytes [offset 8..9] */
+    uint16_t subtype;      /* 2 bytes [offset 10..11] */
+    uint32_t flags;        /* 4 bytes útiles en lugar de padding [offset 12..15] */
+} FoxyKeywordMap;          /* Exactamente 16 bytes sin padding residual */
 
 extern const FoxyKeywordMap FOXY_KEYWORD_TABLE[];
 extern const size_t FOXY_KEYWORD_TABLE_SIZE;
 
 typedef struct {
-    FILE *file;
-    const char *filename;
-    char line_buffer[LEXER_LINE_BUFFER_SIZE];
-    const char *cursor;
-    const char *token_start;
-    uint32_t line;
-    uint32_t column;
-    bool is_eof : 1;
+    FILE *file;                                  /* 8 bytes */
+    const char *filename;                        /* 8 bytes */
+    const char *cursor;                          /* 8 bytes */
+    const char *token_start;                     /* 8 bytes */
+    char line_buffer[LEXER_LINE_BUFFER_SIZE];    /* N bytes (múltiplo de alineación) */
+    uint32_t line;                               /* 4 bytes */
+    uint32_t column;                             /* 4 bytes */
+    uint8_t flags;                               /* 1 byte  */
+    uint8_t is_eof;                              /* 1 byte (remplaza el bit-field para evitar padding) */
+    uint8_t reserved[6];                         /* 6 bytes (completa exactos 8 bytes) */
 } FoxyLexer;
 
 /* ========================================================================= */
@@ -427,17 +431,17 @@ void f_lexer_print_token(const FoxyToken *token);
     FOXY_BIT(FOX_TOKEN_INT_LITERAL - 0)  | \
     FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL - 0)| \
     FOXY_BIT(FOX_TOKEN_STRING_LITERAL - 0)| \
-    FOXY_BIT(FOX_TOKEN_TRUE - 0)         | \
-    FOXY_BIT(FOX_TOKEN_FALSE - 0)        | \
-    FOXY_BIT(FOX_TOKEN_NIL - 0)            \
+    FOXY_BIT(FOX_TOKEN_KW_TRUE - 0)         | \
+    FOXY_BIT(FOX_TOKEN_KW_FALSE - 0)        | \
+    FOXY_BIT(FOX_TOKEN_KW_NULL - 0)            \
 )
 
 #define FOXY_MASK_PRIMARY_1 (0ULL)
 
 /* --- Postfix (Op. Postfijos: Acceso, Llamada, Incrementos) --- */
 #define FOXY_MASK_POSTFIX_0 ( \
-    FOXY_BIT(FOX_TOKEN_LEFT_PAREN - 0)   | \
-    FOXY_BIT(FOX_TOKEN_LEFT_BRACKET - 0) | \
+    FOXY_BIT(FOX_TOKEN_LPAREN - 0)   | \
+    FOXY_BIT(FOX_TOKEN_LBRACKET - 0) | \
     FOXY_BIT(FOX_TOKEN_DOT - 0)          | \
     FOXY_BIT(FOX_TOKEN_INC - 0)          | \
     FOXY_BIT(FOX_TOKEN_DEC - 0)            \
@@ -471,42 +475,40 @@ void f_lexer_print_token(const FoxyToken *token);
 
 /* --- Relational (<, <=, >, >=) --- */
 #define FOXY_MASK_RELATIONAL_0 ( \
-    FOXY_BIT(FOX_TOKEN_LESS - 0)         | \
-    FOXY_BIT(FOX_TOKEN_LESS_EQUAL - 0)   | \
-    FOXY_BIT(FOX_TOKEN_GREATER - 0)      | \
-    FOXY_BIT(FOX_TOKEN_GREATER_EQUAL - 0)\
+    FOXY_BIT(FOX_TOKEN_LT - 0)         | \
+    FOXY_BIT(FOX_TOKEN_LE - 0)   | \
+    FOXY_BIT(FOX_TOKEN_GT - 0)      | \
+    FOXY_BIT(FOX_TOKEN_GE - 0)\
 )
 #define FOXY_MASK_RELATIONAL_1 (0ULL)
 
 /* --- Equality (==, !=) --- */
 #define FOXY_MASK_EQUALITY_0 ( \
-    FOXY_BIT(FOX_TOKEN_EQUAL_EQUAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_BANG_EQUAL - 0)     \
+    FOXY_BIT(FOX_TOKEN_EQ - 0)  | \
+    FOXY_BIT(FOX_TOKEN_NEQ - 0)     \
 )
 #define FOXY_MASK_EQUALITY_1 (0ULL)
 
-/* --- Logical (&&, ||, and, or) --- */
+/* --- Logical (&&, ||) --- */
 #define FOXY_MASK_LOGICAL_0 ( \
-    FOXY_BIT(FOX_TOKEN_AMP_AMP - 0)      | \
-    FOXY_BIT(FOX_TOKEN_PIPE_PIPE - 0)    | \
-    FOXY_BIT(FOX_TOKEN_KW_AND - 0)       | \
-    FOXY_BIT(FOX_TOKEN_KW_OR - 0)          \
+    FOXY_BIT(FOX_TOKEN_AND - 0)       | \
+    FOXY_BIT(FOX_TOKEN_OR - 0)          \
 )
 #define FOXY_MASK_LOGICAL_1 (0ULL)
 
 /* --- Assignment (=, +=, -=, *=, /=, %=, etc.) --- */
 #define FOXY_MASK_ASSIGNMENT_0 ( \
-    FOXY_BIT(FOX_TOKEN_EQUAL - 0)        | \
-    FOXY_BIT(FOX_TOKEN_PLUS_EQUAL - 0)   | \
-    FOXY_BIT(FOX_TOKEN_MINUS_EQUAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_STAR_EQUAL - 0)   | \
-    FOXY_BIT(FOX_TOKEN_SLASH_EQUAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_PERCENT_EQUAL - 0)\
+    FOXY_BIT(FOX_TOKEN_ASSIGN - 0)        | \
+    FOXY_BIT(FOX_TOKEN_PLUS_ASSIGN - 0)   | \
+    FOXY_BIT(FOX_TOKEN_MINUS_ASSIGN - 0)  | \
+    FOXY_BIT(FOX_TOKEN_STAR_ASSIGN - 0)   | \
+    FOXY_BIT(FOX_TOKEN_SLASH_ASSIGN - 0)  | \
+    FOXY_BIT(FOX_TOKEN_PERCENT_ASSIGN - 0)\
 )
 #define FOXY_MASK_ASSIGNMENT_1 ( \
-    FOXY_BIT(FOX_TOKEN_AMP_EQUAL - 64)   | \
-    FOXY_BIT(FOX_TOKEN_PIPE_EQUAL - 64)  | \
-    FOXY_BIT(FOX_TOKEN_CARET_EQUAL - 64)   \
+    FOXY_BIT(FOX_TOKEN_AND_ASSIGN - 64)   | \
+    FOXY_BIT(FOX_TOKEN_OR_ASSIGN - 64)    | \
+    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN - 64)     \
 )
 
 static inline bool f_token_is_in_mask(uint32_t token_type, uint64_t mask0, uint64_t mask1) {

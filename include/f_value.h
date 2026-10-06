@@ -1,10 +1,10 @@
 #pragma once
 
 #include "f_settings.h" 
+#include "f_foxmode.h" // Aquí vienen todas las máscaras / macros para trabajar con la lista maestra de bytecode.
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "f_foxmode.h" // Aquí vienen todas las máscaras / macros para trabajar con la lista maestra de bytecode.
 
 /**
  * ============================================================================
@@ -91,10 +91,9 @@ typedef enum FOXY_PACKED {
 
 /**
  * @brief Estructura de valor dinámico principal (Tagged Union).
- * Almacena tanto valores primitivos en Stack como referencias a objetos en Heap.
+ * Ordenada por alineación decreciente (16 bytes -> 1 byte) para eliminar -Wpadded.
  */
 typedef struct FoxyValue {
-    FoxyValueType type; /**< Etiqueta única del tipo de valor */
     union {
         /* Primitivos numéricos y escalares */
         bool f_bool;
@@ -119,8 +118,10 @@ typedef struct FoxyValue {
         FoxyStruct *f_struct;
         FoxyClass *f_class;
         FoxyFunction *f_function;
-        // FoxyEnum *f_enum;
-    } like;
+    } like;                 /**< 16 bytes (requiere alineación de 16 por f_ldouble) */
+
+    FoxyValueType type;     /**< 1 byte (FOXY_PACKED / enum) */
+    uint8_t padding[15];    /**< 15 bytes explícitos para ajustar la estructura a múltiplo de 16 */
 } FoxyValue;
 
 /** @brief Tabla de nombres de tipos representada en cadenas de texto (generada dinámicamente). */
@@ -131,10 +132,10 @@ extern const char * const FOXY_VALUE_value_NAMES[];
  * VALORES CONSTANTES GLOBALES
  * ============================================================================
  */
-#define FOXY_CONSTANT_VALUE_NULL        ((FoxyValue){ .type = FOXY_VAL_NULL })
-#define FOXY_CONSTANT_VALUE_VOID        ((FoxyValue){ .type = FOXY_VAL_VOID })
-#define FOXY_CONSTANT_VALUE_BOOL_TRUE   ((FoxyValue){ .type = FOXY_VAL_BOOL, .like.f_bool = true })
-#define FOXY_CONSTANT_VALUE_BOOL_FALSE  ((FoxyValue){ .type = FOXY_VAL_BOOL, .like.f_bool = false })
+#define FOXY_CONSTANT_VALUE_NULL        ((FoxyValue){ .type = FOXY_VAL_NULL, .padding = {0} })
+#define FOXY_CONSTANT_VALUE_VOID        ((FoxyValue){ .type = FOXY_VAL_VOID, .padding = {0} })
+#define FOXY_CONSTANT_VALUE_BOOL_TRUE   ((FoxyValue){ .like.f_bool = true, .type = FOXY_VAL_BOOL, .padding = {0} })
+#define FOXY_CONSTANT_VALUE_BOOL_FALSE  ((FoxyValue){ .like.f_bool = false, .type = FOXY_VAL_BOOL, .padding = {0} })
 
 /**
  * ============================================================================
@@ -144,26 +145,25 @@ extern const char * const FOXY_VALUE_value_NAMES[];
 #define f_value_new_null()       (FOXY_CONSTANT_VALUE_NULL)
 #define f_value_new_void()       (FOXY_CONSTANT_VALUE_VOID)
 #define f_value_new_bool(v)      ((v) ? FOXY_CONSTANT_VALUE_BOOL_TRUE : FOXY_CONSTANT_VALUE_BOOL_FALSE)
-#define f_value_new_char(v)      ((FoxyValue){ .type = FOXY_VAL_CHAR, .like.f_char = (v) })
-#define f_value_new_uchar(v)     ((FoxyValue){ .type = FOXY_VAL_UCHAR, .like.f_uchar = (v) })
-#define f_value_new_short(v)     ((FoxyValue){ .type = FOXY_VAL_SHORT, .like.f_short = (v) })
-#define f_value_new_ushort(v)    ((FoxyValue){ .type = FOXY_VAL_USHORT, .like.f_ushort = (v) })
-#define f_value_new_int(v)       ((FoxyValue){ .type = FOXY_VAL_INT, .like.f_int = (v) })
-#define f_value_new_uint(v)      ((FoxyValue){ .type = FOXY_VAL_UINT, .like.f_uint = (v) })
-#define f_value_new_long(v)      ((FoxyValue){ .type = FOXY_VAL_LONG, .like.f_long = (v) })
-#define f_value_new_ulong(v)     ((FoxyValue){ .type = FOXY_VAL_ULONG, .like.f_ulong = (v) })
-#define f_value_new_llong(v)     ((FoxyValue){ .type = FOXY_VAL_LLONG, .like.f_llong = (v) })
-#define f_value_new_ullong(v)    ((FoxyValue){ .type = FOXY_VAL_ULLONG, .like.f_ullong = (v) })
-#define f_value_new_float(v)     ((FoxyValue){ .type = FOXY_VAL_FLOAT, .like.f_float = (v) })
-#define f_value_new_double(v)    ((FoxyValue){ .type = FOXY_VAL_DOUBLE, .like.f_double = (v) })
-#define f_value_new_ldouble(v)   ((FoxyValue){ .type = FOXY_VAL_LDOUBLE, .like.f_ldouble = (v) })
-#define f_value_new_array(v)     ((FoxyValue){ .type = FOXY_VAL_ARRAY, .like.f_array = (v) })
-#define f_value_new_dict(v)      ((FoxyValue){ .type = FOXY_VAL_DICT, .like.f_dict = (v) })
-#define f_value_new_object(v)    ((FoxyValue){ .type = FOXY_VAL_OBJECT, .like.f_object = (v) })
-#define f_value_new_struct(v)    ((FoxyValue){ .type = FOXY_VAL_STRUCT, .like.f_struct = (v) })
-#define f_value_new_class(v)     ((FoxyValue){ .type = FOXY_VAL_CLASS, .like.f_class = (v) })
-#define f_value_new_function(v)  ((FoxyValue){ .type = FOXY_VAL_FUNCTION, .like.f_function = (v) })
-#define f_value_new_enum(v)      ((FoxyValue){ .type = FOXY_VAL_ENUM, .like.f_enum = (v) })
+#define f_value_new_char(v)      ((FoxyValue){ .like.f_char = (v), .type = FOXY_VAL_CHAR, .padding = {0} })
+#define f_value_new_uchar(v)     ((FoxyValue){ .like.f_uchar = (v), .type = FOXY_VAL_UCHAR, .padding = {0} })
+#define f_value_new_short(v)     ((FoxyValue){ .like.f_short = (v), .type = FOXY_VAL_SHORT, .padding = {0} })
+#define f_value_new_ushort(v)    ((FoxyValue){ .like.f_ushort = (v), .type = FOXY_VAL_USHORT, .padding = {0} })
+#define f_value_new_int(v)       ((FoxyValue){ .like.f_int = (v), .type = FOXY_VAL_INT, .padding = {0} })
+#define f_value_new_uint(v)      ((FoxyValue){ .like.f_uint = (v), .type = FOXY_VAL_UINT, .padding = {0} })
+#define f_value_new_long(v)      ((FoxyValue){ .like.f_long = (v), .type = FOXY_VAL_LONG, .padding = {0} })
+#define f_value_new_ulong(v)     ((FoxyValue){ .like.f_ulong = (v), .type = FOXY_VAL_ULONG, .padding = {0} })
+#define f_value_new_llong(v)     ((FoxyValue){ .like.f_llong = (v), .type = FOXY_VAL_LLONG, .padding = {0} })
+#define f_value_new_ullong(v)    ((FoxyValue){ .like.f_ullong = (v), .type = FOXY_VAL_ULLONG, .padding = {0} })
+#define f_value_new_float(v)     ((FoxyValue){ .like.f_float = (v), .type = FOXY_VAL_FLOAT, .padding = {0} })
+#define f_value_new_double(v)    ((FoxyValue){ .like.f_double = (v), .type = FOXY_VAL_DOUBLE, .padding = {0} })
+#define f_value_new_ldouble(v)   ((FoxyValue){ .like.f_ldouble = (v), .type = FOXY_VAL_LDOUBLE, .padding = {0} })
+#define f_value_new_array(v)     ((FoxyValue){ .like.f_array = (v), .type = FOXY_VAL_ARRAY, .padding = {0} })
+#define f_value_new_dict(v)      ((FoxyValue){ .like.f_dict = (v), .type = FOXY_VAL_DICT, .padding = {0} })
+#define f_value_new_object(v)    ((FoxyValue){ .like.f_object = (v), .type = FOXY_VAL_OBJECT, .padding = {0} })
+#define f_value_new_struct(v)    ((FoxyValue){ .like.f_struct = (v), .type = FOXY_VAL_STRUCT, .padding = {0} })
+#define f_value_new_class(v)     ((FoxyValue){ .like.f_class = (v), .type = FOXY_VAL_CLASS, .padding = {0} })
+#define f_value_new_function(v)  ((FoxyValue){ .like.f_function = (v), .type = FOXY_VAL_FUNCTION, .padding = {0} })
 
 /**
  * ============================================================================
