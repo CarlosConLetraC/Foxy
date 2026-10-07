@@ -49,7 +49,7 @@ function demostracionStatic() {
 number demo_primitivos[] = {
     true,                         @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (true)
     false,                        @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (false)
-    NULL,                         @ FOX_TOKEN_KW_NULL / FOX_TOKEN_LIT_NULL
+    null,                         @ FOX_TOKEN_KW_NULL / FOX_TOKEN_LIT_NULL
     (char)97,                     @ FOX_TOKEN_KW_CHAR
     (uchar)255,                   @ FOX_TOKEN_KW_UCHAR
     (short)-32768,                @ FOX_TOKEN_KW_SHORT
@@ -91,7 +91,7 @@ for (int i = 0; i < #demo_primitivos; i++) {
 
 @ Bucle 'foreach' sobre arreglo
 foreach (number val : demo_primitivos) {
-    if (val == NULL) {
+    if (val == null) {
         continue @ FOX_TOKEN_KW_CONTINUE
     } else {
         break @ FOX_TOKEN_KW_BREAK

@@ -1,10 +1,70 @@
 #include "f_lexer.h"
+#include "f_exceptions.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
-/* Tabla de palabras clave y métodos marcados con sus categorías */
+/* ========================================================================= */
+/* TABLA DE NOMBRES DE TOKENS (PARA IMPRESIÓN Y DEBUG)                        */
+/* ========================================================================= */
+#if FOXY_COMPILER_SUPPORTS_XMACROS
+static const char *const FOXY_TOKEN_NAMES[] = {
+    #define F(ftoken) #ftoken,
+    FOXY_TOKEN_LIST(F)
+    #undef F
+};
+#else
+static const char *const FOXY_TOKEN_NAMES[] = {
+    "FOX_TOKEN_EOF", "FOX_TOKEN_ERROR", "FOX_TOKEN_IDENTIFIER", "FOX_TOKEN_LABEL",
+    "FOX_TOKEN_INT_LITERAL", "FOX_TOKEN_UINT_LITERAL", "FOX_TOKEN_LONG_LITERAL",
+    "FOX_TOKEN_ULONG_LITERAL", "FOX_TOKEN_LLONG_LITERAL", "FOX_TOKEN_ULLONG_LITERAL",
+    "FOX_TOKEN_FLOAT_LITERAL", "FOX_TOKEN_DOUBLE_LITERAL", "FOX_TOKEN_LDOUBLE_LITERAL",
+    "FOX_TOKEN_NUMBER_LITERAL", "FOX_TOKEN_CHAR_LITERAL", "FOX_TOKEN_STRING_LITERAL",
+    "FOX_TOKEN_KW_GLOBAL", "FOX_TOKEN_KW_STATIC", "FOX_TOKEN_KW_CONST", "FOX_TOKEN_KW_NULL",
+    "FOX_TOKEN_KW_BOOL", "FOX_TOKEN_KW_CHAR", "FOX_TOKEN_KW_UCHAR", "FOX_TOKEN_KW_SHORT",
+    "FOX_TOKEN_KW_USHORT", "FOX_TOKEN_KW_INT", "FOX_TOKEN_KW_UINT", "FOX_TOKEN_KW_LONG",
+    "FOX_TOKEN_KW_ULONG", "FOX_TOKEN_KW_LLONG", "FOX_TOKEN_KW_ULLONG", "FOX_TOKEN_KW_FLOAT",
+    "FOX_TOKEN_KW_DOUBLE", "FOX_TOKEN_KW_LDOUBLE", "FOX_TOKEN_KW_NUMBER", "FOX_TOKEN_KW_DICT",
+    "FOX_TOKEN_KW_OBJECT", "FOX_TOKEN_KW_IF", "FOX_TOKEN_KW_ELSE", "FOX_TOKEN_KW_ELSEIF",
+    "FOX_TOKEN_KW_WHILE", "FOX_TOKEN_KW_FOR", "FOX_TOKEN_KW_FOREACH", "FOX_TOKEN_KW_SWITCH",
+    "FOX_TOKEN_KW_CASE", "FOX_TOKEN_KW_DEFAULT", "FOX_TOKEN_KW_BREAK", "FOX_TOKEN_KW_CONTINUE",
+    "FOX_TOKEN_KW_RETURN", "FOX_TOKEN_KW_GOTO", "FOX_TOKEN_KW_TRY", "FOX_TOKEN_KW_CATCH",
+    "FOX_TOKEN_KW_EXCEPT", "FOX_TOKEN_KW_FINAL", "FOX_TOKEN_KW_CLASS", "FOX_TOKEN_KW_STRUCT",
+    "FOX_TOKEN_KW_ENUM", "FOX_TOKEN_KW_FROM", "FOX_TOKEN_KW_FUNCTION", "FOX_TOKEN_KW_OVERRULE",
+    "FOX_TOKEN_KW_INCLUDE", "FOX_TOKEN_KW_USE", "FOX_TOKEN_KW_EXPORT", "FOX_TOKEN_KW_SUPER",
+    "FOX_TOKEN_KW_SELF", "FOX_TOKEN_KW_ANCESTOROF", "FOX_TOKEN_KW_DESCENDANTOF",
+    "FOX_TOKEN_KW_PARENTOF", "FOX_TOKEN_KW_CHILDOF", "FOX_TOKEN_KW_TYPEOF", "FOX_TOKEN_KW_TRUE",
+    "FOX_TOKEN_KW_FALSE", "FOX_TOKEN_KW_PRIVATE", "FOX_TOKEN_KW_PROTECTED", "FOX_TOKEN_KW_PUBLIC",
+    "FOX_TOKEN_MOD_PRIVATE", "FOX_TOKEN_MOD_PROTECTED", "FOX_TOKEN_MOD_PUBLIC",
+    "FOX_TOKEN_METHOD_NEW", "FOX_TOKEN_METHOD_CAST", "FOX_TOKEN_METHOD_TOSTRING",
+    "FOX_TOKEN_METHOD_ADD", "FOX_TOKEN_METHOD_SUB", "FOX_TOKEN_METHOD_MUL",
+    "FOX_TOKEN_METHOD_DIV", "FOX_TOKEN_METHOD_POW", "FOX_TOKEN_METHOD_MOD",
+    "FOX_TOKEN_METHOD_CONCAT", "FOX_TOKEN_METHOD_UNM", "FOX_TOKEN_METHOD_NOT",
+    "FOX_TOKEN_METHOD_EQ", "FOX_TOKEN_METHOD_NEQ", "FOX_TOKEN_METHOD_LT",
+    "FOX_TOKEN_METHOD_GT", "FOX_TOKEN_METHOD_LE", "FOX_TOKEN_METHOD_GE",
+    "FOX_TOKEN_METHOD_BAND", "FOX_TOKEN_METHOD_BOR", "FOX_TOKEN_METHOD_BNOT",
+    "FOX_TOKEN_METHOD_BXOR", "FOX_TOKEN_METHOD_LSHIFT", "FOX_TOKEN_METHOD_RSHIFT",
+    "FOX_TOKEN_METHOD_FOREACH", "FOX_TOKEN_METHOD_CLOSED", "FOX_TOKEN_METHOD_LEN",
+    "FOX_TOKEN_PLUS", "FOX_TOKEN_MINUS", "FOX_TOKEN_STAR", "FOX_TOKEN_SLASH",
+    "FOX_TOKEN_PERCENT", "FOX_TOKEN_POWER", "FOX_TOKEN_HASH", "FOX_TOKEN_ASSIGN",
+    "FOX_TOKEN_PLUS_ASSIGN", "FOX_TOKEN_MINUS_ASSIGN", "FOX_TOKEN_STAR_ASSIGN",
+    "FOX_TOKEN_SLASH_ASSIGN", "FOX_TOKEN_PERCENT_ASSIGN", "FOX_TOKEN_POWER_ASSIGN",
+    "FOX_TOKEN_AND_ASSIGN", "FOX_TOKEN_OR_ASSIGN", "FOX_TOKEN_XOR_ASSIGN",
+    "FOX_TOKEN_LSHIFT_ASSIGN", "FOX_TOKEN_RSHIFT_ASSIGN", "FOX_TOKEN_INC", "FOX_TOKEN_DEC",
+    "FOX_TOKEN_EQ", "FOX_TOKEN_NEQ", "FOX_TOKEN_LT", "FOX_TOKEN_GT", "FOX_TOKEN_LE",
+    "FOX_TOKEN_GE", "FOX_TOKEN_BANG", "FOX_TOKEN_AND", "FOX_TOKEN_OR", "FOX_TOKEN_AMPERSAND",
+    "FOX_TOKEN_PIPE", "FOX_TOKEN_TILDE", "FOX_TOKEN_CARET", "FOX_TOKEN_LSHIFT", "FOX_TOKEN_RSHIFT",
+    "FOX_TOKEN_ARROW", "FOX_TOKEN_FAT_ARROW", "FOX_TOKEN_PTR_ARROW", "FOX_TOKEN_ELLIPSIS",
+    "FOX_TOKEN_LPAREN", "FOX_TOKEN_RPAREN", "FOX_TOKEN_LBRACE", "FOX_TOKEN_RBRACE",
+    "FOX_TOKEN_LBRACKET", "FOX_TOKEN_RBRACKET", "FOX_TOKEN_SEMICOLON", "FOX_TOKEN_COLON",
+    "FOX_TOKEN_COMMA", "FOX_TOKEN_DOT", "FOX_TOKEN_DOTDOT", "FOX_TOKEN_QUESTION"
+};
+#endif
+
+/* ========================================================================= */
+/* TABLA DE PALABRAS CLAVE RESERVADAS                                        */
+/* ========================================================================= */
 const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
     /* Modificadores / Especificadores */
     {.text = "global",       .category = FOXY_TOKEN_CAT_KEYWORD, .subtype = FOX_TOKEN_KW_GLOBAL,       .flags = 0},
@@ -105,125 +165,140 @@ const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
 
 const size_t FOXY_KEYWORD_TABLE_SIZE = sizeof(FOXY_KEYWORD_TABLE) / sizeof(FoxyKeywordMap);
 
-static bool fetch_next_line(FoxyLexer *lexer) {
-    if (lexer->is_eof || !lexer->file) return false;
+/* ========================================================================= */
+/* AUXILIARES DE ENTRADA Y BUFFER DE LÍNEA                                   */
+/* ========================================================================= */
 
-    if (fgets(lexer->line_buffer, LEXER_LINE_BUFFER_SIZE, lexer->file) == NULL) {
-        lexer->is_eof = true;
-        lexer->line_buffer[0] = '\0';
-        lexer->cursor = lexer->line_buffer;
+static bool f_lexer_load_next_line(FoxyLexer *lexer) {
+    if (!lexer || !lexer->file || lexer->is_eof) return false;
+
+    if (fgets(lexer->line_buffer, sizeof(lexer->line_buffer), lexer->file) == NULL) {
+        /* Archivo vacío o se alcanzó el EOF -> cerrar recursos */
+        f_lexer_close(lexer);
         return false;
     }
 
+    lexer->line++;
+    lexer->column = 1;
     lexer->cursor = lexer->line_buffer;
+    lexer->token_start = lexer->line_buffer;
     return true;
 }
 
-/* Auxiliares internos del Lexer */
-static bool is_at_end(FoxyLexer *lexer) {
-    if (*lexer->cursor == '\0') {
-        if (!fetch_next_line(lexer)) return true;
+static char f_lexer_peek(FoxyLexer *lexer) {
+    if (!lexer) return '\0';
+
+    while (*lexer->cursor == '\0') {
+        if (!f_lexer_load_next_line(lexer)) {
+            return '\0';
+        }
     }
-    return false;
+    return *lexer->cursor;
 }
 
-static char advance(FoxyLexer *lexer) {
-    if (is_at_end(lexer)) return '\0';
+static char f_lexer_peek_next(FoxyLexer *lexer) {
+    if (!lexer) return '\0';
+    if (*lexer->cursor != '\0' && *(lexer->cursor + 1) != '\0') {
+        return *(lexer->cursor + 1);
+    }
+    return '\0';
+}
 
-    char c = *lexer->cursor++;
-    if (c == '\n') {
-        lexer->line++;
-        lexer->column = 1;
-    } else {
+static char f_lexer_advance(FoxyLexer *lexer) {
+    char c = f_lexer_peek(lexer);
+    if (c != '\0') {
+        lexer->cursor++;
         lexer->column++;
     }
     return c;
 }
 
-static char peek(FoxyLexer *lexer) {
-    if (is_at_end(lexer)) return '\0';
-    return *lexer->cursor;
+static bool f_lexer_match(FoxyLexer *lexer, char expected) {
+    if (f_lexer_peek(lexer) == expected) {
+        f_lexer_advance(lexer);
+        return true;
+    }
+    return false;
 }
 
-static char peek_next(FoxyLexer *lexer) {
-    if (is_at_end(lexer)) return '\0';
-    if (lexer->cursor[0] != '\0' && lexer->cursor[1] != '\0') return lexer->cursor[1];
-    /* Si el siguiente carácter está al final de la línea actual, no se realiza lookahead multi-línea agresivo. */
-    return '\0';
-}
-
-static bool match(FoxyLexer *lexer, char expected) {
-    if (is_at_end(lexer)) return false;
-    if (*lexer->cursor != expected) return false;
-    advance(lexer);
-    return true;
-}
-
-static FoxyToken make_token(FoxyLexer *lexer, FoxyTokenType type, uint16_t category) {
+static FoxyToken f_lexer_make_token(FoxyLexer *lexer, uint8_t cat, FoxyTokenType type) {
     FoxyToken token;
-    token.type = type;
     token.start = lexer->token_start;
     token.length = (uint32_t)(lexer->cursor - lexer->token_start);
-    token.type_category = category;
     token.pos.filename = lexer->filename;
     token.pos.line = lexer->line;
     token.pos.column = lexer->column - token.length;
+    token.type_category = cat;
+    token.type = type;
+    token.flags = 0;
     return token;
 }
 
-static FoxyToken error_token(FoxyLexer *lexer, const char *message) {
+static FoxyToken f_lexer_make_error_token(FoxyLexer *lexer, const char *msg) {
     FoxyToken token;
-    token.type = FOX_TOKEN_ERROR;
-    token.start = message;
-    token.length = (uint32_t)strlen(message);
-    token.type_category = FOXY_TOKEN_CAT_ERROR;
+    token.start = msg;
+    token.length = (uint32_t)strlen(msg);
     token.pos.filename = lexer->filename;
     token.pos.line = lexer->line;
     token.pos.column = lexer->column;
+    token.type_category = FOXY_TOKEN_CAT_ERROR;
+    token.type = FOX_TOKEN_ERROR;
+    token.flags = 0;
     return token;
 }
 
-static void skip_whitespace_and_comments(FoxyLexer *lexer) {
+static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
     for (;;) {
-        if (is_at_end(lexer)) return;
-
-        char c = peek(lexer);
+        char c = f_lexer_peek(lexer);
         switch (c) {
-            case '\x20': // ascii 32 | char '\40' 
+            case '\x20':
             case '\r':
             case '\t':
+                f_lexer_advance(lexer);
+                break;
             case '\n':
-                advance(lexer);
+                lexer->line++;
+                lexer->column = 1;
+                f_lexer_advance(lexer);
                 break;
             case '@': {
-                /* Conteo dinámico de símbolos '@' para comentarios simples y multilínea */
-                size_t at_count = 0;
-                const char *temp = lexer->cursor;
-                while (*temp == '@') {
-                    at_count++;
-                    temp++;
+                // Contar cuántas '@' consecutivas inician el comentario. . .
+                size_t count = 0;
+                while (f_lexer_peek(lexer) == '@') {
+                    count++;
+                    f_lexer_advance(lexer);
                 }
 
-                if (at_count == 1) {
-                    /* Comentario de una sola línea: @ ... \n */
-                    while (peek(lexer) != '\n' && !is_at_end(lexer)) advance(lexer);
+                if (count == 1) {
+                    // Comentario de una sola línea (@ ... \n)
+                    while (f_lexer_peek(lexer) != '\n' && f_lexer_peek(lexer) != '\0') {
+                        f_lexer_advance(lexer);
+                    }
                 } else {
-                    /* Comentario multilínea: se requieren 'at_count' símbolos '@' para cerrar */
-                    for (size_t i = 0; i < at_count; i++) advance(lexer);
-                    while (!is_at_end(lexer)) {
-                        if (peek(lexer) == '@') {
-                            size_t close_count = 0;
-                            const char *c_temp = lexer->cursor;
-                            while (*c_temp == '@') {
-                                close_count++;
-                                c_temp++;
-                            }
-                            if (close_count == at_count) {
-                                for (size_t i = 0; i < at_count; i++) advance(lexer);
-                                break;
-                            }
+                    // Comentario multilínea (N@ ... N@)
+                    while (f_lexer_peek(lexer) != '\0') {
+                        if (f_lexer_peek(lexer) == '\n') {
+                            lexer->line++;
+                            lexer->column = 1;
+                            f_lexer_advance(lexer);
+                            continue;
                         }
-                        advance(lexer);
+
+                        if (f_lexer_peek(lexer) == '@') {
+                            // Verificar si encontramos la misma cantidad de '@' para cerrar
+                            size_t close_count = 0;
+                            while (f_lexer_peek(lexer) == '@') {
+                                close_count++;
+                                f_lexer_advance(lexer);
+                            }
+
+                            if (close_count == count) {
+                                break; // Comentario multilínea cerrado correctamente
+                            }
+                            // Si no coincidió la cantidad, continuar buscando
+                        } else {
+                            f_lexer_advance(lexer);
+                        }
                     }
                 }
                 break;
@@ -234,307 +309,335 @@ static void skip_whitespace_and_comments(FoxyLexer *lexer) {
     }
 }
 
-void f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
+/* ========================================================================= */
+/* SCANNING DE TOKENS COMPLEJOS                                              */
+/* ========================================================================= */
+
+static FoxyToken f_lexer_scan_identifier(FoxyLexer *lexer) {
+    while (isalnum(f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_') {
+        f_lexer_advance(lexer);
+    }
+
+    uint32_t len = (uint32_t)(lexer->cursor - lexer->token_start);
+    for (size_t i = 0; i < FOXY_KEYWORD_TABLE_SIZE; ++i) {
+        if (strlen(FOXY_KEYWORD_TABLE[i].text) == len &&
+            memcmp(lexer->token_start, FOXY_KEYWORD_TABLE[i].text, len) == 0) {
+            return f_lexer_make_token(lexer, (uint8_t)FOXY_KEYWORD_TABLE[i].category, (FoxyTokenType)FOXY_KEYWORD_TABLE[i].subtype);
+        }
+    }
+
+    return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_IDENTIFIER, FOX_TOKEN_IDENTIFIER);
+}
+
+/* Matriz de resolución de tokens enteros: [has_u][l_count] */
+static const FoxyTokenType INT_TOKEN_MAP[2][3] = {
+    /* [has_u = 0] */ { FOX_TOKEN_INT_LITERAL,  FOX_TOKEN_LONG_LITERAL,  FOX_TOKEN_LLONG_LITERAL  },
+    /* [has_u = 1] */ { FOX_TOKEN_UINT_LITERAL, FOX_TOKEN_ULONG_LITERAL, FOX_TOKEN_ULLONG_LITERAL }
+};
+
+/* Helper para saltar guiones bajos consecutivos */
+static inline void f_lexer_skip_underscores(FoxyLexer *lexer) {
+    while (f_lexer_peek(lexer) == '_') {
+        f_lexer_advance(lexer);
+    }
+}
+
+static FoxyToken f_lexer_scan_number(FoxyLexer *lexer) {
+    bool is_float = false;
+    int base = 10;
+
+    /* 1. Detección de base mediante switch */
+    if (lexer->token_start[0] == '0') {
+        switch (f_lexer_peek(lexer) | 0x20) {
+            case 'x': base = 16; f_lexer_advance(lexer); break;
+            case 'b': base = 2;  f_lexer_advance(lexer); break;
+            case 'o': base = 8;  f_lexer_advance(lexer); break;
+            default: break;
+        }
+    }
+
+    /* 2. Lectura del cuerpo según la base (ignorando '_') */
+    for (;;) {
+        f_lexer_skip_underscores(lexer);
+        char c = f_lexer_peek(lexer);
+
+        switch (base) {
+            case 16:
+                if (!isxdigit((unsigned char)c)) goto check_float;
+                break;
+            case 2:
+                if (c != '0' && c != '1') goto check_float;
+                break;
+            case 8:
+                if (c < '0' || c > '7') goto check_float;
+                break;
+            default: /* Base 10 */
+                if (!isdigit((unsigned char)c)) goto check_float;
+                break;
+        }
+        f_lexer_advance(lexer);
+    }
+
+check_float:
+    /* 3. Detección y consumo de punto flotante (Solo Base 10) */
+    if (base == 10 && f_lexer_peek(lexer) == '.') {
+        /* Miramos si tras el punto (o posibles '_') hay un dígito */
+        char next = f_lexer_peek_next(lexer);
+        if (isdigit((unsigned char)next) || next == '_') {
+            is_float = true;
+            f_lexer_advance(lexer); /* Consumir '.' */
+
+            for (;;) {
+                f_lexer_skip_underscores(lexer);
+                if (!isdigit((unsigned char)f_lexer_peek(lexer))) break;
+                f_lexer_advance(lexer);
+            }
+        }
+    }
+
+    if (base != 10) goto parse_suffixes;
+
+parse_suffixes:;
+    /* 4. Captura de sufijos (U, L, LL, F, D, LD) */
+    bool has_u = false;
+    int l_count = 0;
+    bool has_f = false;
+    bool has_d = false;
+
+    for (;;) {
+        char lower_c = f_lexer_peek(lexer) | 0x20;
+
+        switch (lower_c) {
+            case 'u':
+                if (has_u || is_float || has_d) goto finalize_type;
+                has_u = true;
+                f_lexer_advance(lexer);
+                continue;
+
+            case 'l':
+                if (l_count >= 2 || has_d || has_f) goto finalize_type;
+                l_count++;
+                f_lexer_advance(lexer);
+                continue;
+
+            case 'f':
+                if (has_f || has_d || has_u || base != 10) goto finalize_type;
+                has_f = is_float = true;
+                f_lexer_advance(lexer);
+                goto finalize_type;
+
+            case 'd':
+                /* Habilita 'd' como sufijo double o 'ld' / 'lld' para long double */
+                if (has_f || has_d || has_u || base != 10) goto finalize_type;
+                has_d = is_float = true;
+                f_lexer_advance(lexer);
+                goto finalize_type;
+
+            default:
+                goto finalize_type;
+        }
+    }
+
+finalize_type:;
+    /* Comprobar si el literal continúa con caracteres alfanuméricos no válidos (ej. 123ldx) */
+    char next_c = f_lexer_peek(lexer);
+    if (isalpha((unsigned char)next_c) || next_c == '_') {
+        /* Se consume el identificador erróneo completo para evitar fragmentación de tokens */
+        while (isalnum((unsigned char)f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_') {
+            f_lexer_advance(lexer);
+        }
+        /* Retorna token de error usando el código de excepción unificado */
+        return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_ERROR, (FoxyTokenType)FOX_EXCEPTION_MALFORMED_NUMBER);
+    }
+
+    /* 5. Clasificación final de token */
+    FoxyTokenType token_type;
+
+    if (is_float) {
+        token_type = has_f ? FOX_TOKEN_FLOAT_LITERAL :
+                     (l_count > 0 || has_d) ? FOX_TOKEN_LDOUBLE_LITERAL :
+                                             FOX_TOKEN_DOUBLE_LITERAL;
+    } else {
+        token_type = INT_TOKEN_MAP[has_u ? 1 : 0][l_count > 2 ? 2 : l_count];
+    }
+
+    return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_LITERAL, token_type);
+}
+
+static FoxyToken f_lexer_scan_string(FoxyLexer *lexer) {
+    while (f_lexer_peek(lexer) != '"' && f_lexer_peek(lexer) != '\0') {
+        if (f_lexer_peek(lexer) == '\\' && f_lexer_peek_next(lexer) != '\0') {
+            f_lexer_advance(lexer);
+        }
+        f_lexer_advance(lexer);
+    }
+
+    if (f_lexer_peek(lexer) == '\0') {
+        return f_lexer_make_error_token(lexer, "Unterminated string literal.");
+    }
+
+    f_lexer_advance(lexer); /* Consumir las comillas de cierre '"' */
+    return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_LITERAL, FOX_TOKEN_STRING_LITERAL);
+}
+
+/* ========================================================================= */
+/* IMPLEMENTACIÓN DE LA API PÚBLICA                                           */
+/* ========================================================================= */
+
+bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
+    if (!lexer) return false;
+    memset(lexer, 0, sizeof(FoxyLexer));
+
     lexer->file = file;
-    lexer->filename = filename ? filename : "script.foxy";
-    lexer->line = 1;
+    lexer->filename = filename ? filename : "<unknown>";
+    lexer->line = 0;
     lexer->column = 1;
     lexer->is_eof = false;
+    lexer->cursor = lexer->line_buffer;
+    lexer->token_start = lexer->line_buffer;
+    lexer->line_buffer[0] = '\0';
+
+    if (!file) {
+        lexer->is_eof = true;
+        return false;
+    }
+
+    /* Precargar la primera línea. Si el archivo está vacío (fgets da NULL), 
+       f_lexer_load_next_line ejecutará f_lexer_close() y devolverá false. */
+    if (!f_lexer_load_next_line(lexer)) {
+        return false; /* Archivo vacío o no leíble */
+    }
+
+    return true; /* Lexer listo para tokenizar */
+}
+
+void f_lexer_close(FoxyLexer *lexer) {
+    if (!lexer) return;
+
+    if (lexer->file) {
+        fclose(lexer->file);
+        lexer->file = NULL;
+    }
+
+    lexer->is_eof = true;
     lexer->line_buffer[0] = '\0';
     lexer->cursor = lexer->line_buffer;
     lexer->token_start = lexer->line_buffer;
-
-    fetch_next_line(lexer);
-}
-
-// void f_lexer_init(FoxyLexer *lexer, const char *source, const char *filename) {
-//     lexer->source = source;
-//     lexer->cursor = source;
-//     lexer->token_start = source;
-//     lexer->filename = filename ? filename : "script.foxy";
-//     lexer->line = 1;
-//     lexer->column = 1;
-// }
-
-static FoxyToken scan_identifier_or_keyword(FoxyLexer *lexer) {
-    while (isalnum((unsigned char)peek(lexer)) || peek(lexer) == '_') {
-        advance(lexer);
-    }
-
-    size_t length = (size_t)(lexer->cursor - lexer->token_start);
-
-    /* Buscar coincidencia en la tabla de palabras clave */
-    for (size_t i = 0; i < FOXY_KEYWORD_TABLE_SIZE; i++) {
-        if (strlen(FOXY_KEYWORD_TABLE[i].text) == length &&
-            memcmp(lexer->token_start, FOXY_KEYWORD_TABLE[i].text, length) == 0) {
-            return make_token(lexer, (FoxyTokenType)FOXY_KEYWORD_TABLE[i].subtype, FOXY_KEYWORD_TABLE[i].category);
-        }
-    }
-
-    return make_token(lexer, FOX_TOKEN_IDENTIFIER, FOXY_TOKEN_CAT_IDENTIFIER);
-}
-
-static FoxyToken scan_number(FoxyLexer *lexer) {
-    while (isdigit((unsigned char)peek(lexer))) advance(lexer);
-
-    FoxyTokenType type = FOX_TOKEN_INT_LITERAL;
-
-    /* Parte Fraccionaria */
-    if (peek(lexer) == '.' && isdigit((unsigned char)peek_next(lexer))) {
-        advance(lexer); /* Consumir '.' */
-        while (isdigit((unsigned char)peek(lexer))) advance(lexer);
-        type = FOX_TOKEN_DOUBLE_LITERAL;
-    }
-
-    /* Escanear sufijos numéricos explícitos de Foxy-Lang (i, ui, l, ul, ll, ull, f, d, ld, n) */
-    const char *suffix_start = lexer->cursor;
-    if (isalpha((unsigned char)peek(lexer))) {
-        while (isalpha((unsigned char)peek(lexer))) advance(lexer);
-        size_t s_len = (size_t)(lexer->cursor - suffix_start);
-
-        switch (s_len) {
-            case 1:
-                switch (suffix_start[0]) {
-                    case 'i': type = FOX_TOKEN_INT_LITERAL;    break;
-                    case 'l': type = FOX_TOKEN_LONG_LITERAL;   break;
-                    case 'f': type = FOX_TOKEN_FLOAT_LITERAL;  break;
-                    case 'd': type = FOX_TOKEN_DOUBLE_LITERAL; break;
-                    case 'n': type = FOX_TOKEN_NUMBER_LITERAL; break;
-                    default:  break;
-                }
-                break;
-
-            case 2: {
-                /* Empaquetar 2 caracteres en un uint16_t en Big Endian para usar switch */
-                uint16_t code2 = (uint16_t)(((uint16_t)(unsigned char)suffix_start[0] << 8) |
-                                            (uint16_t)(unsigned char)suffix_start[1]);
-                switch (code2) {
-                    case ('u' << 8 | 'i'): type = FOX_TOKEN_UINT_LITERAL;   break;
-                    case ('u' << 8 | 'l'): type = FOX_TOKEN_ULONG_LITERAL;  break;
-                    case ('l' << 8 | 'l'): type = FOX_TOKEN_LLONG_LITERAL;  break;
-                    case ('l' << 8 | 'd'): type = FOX_TOKEN_LDOUBLE_LITERAL; break;
-                    default: break;
-                }
-                break;
-            }
-
-            case 3: {
-                /* Empaquetar 3 caracteres en un uint32_t */
-                uint32_t code3 = ((uint32_t)(unsigned char)suffix_start[0] << 16) |
-                                 ((uint32_t)(unsigned char)suffix_start[1] << 8)  |
-                                 ((uint32_t)(unsigned char)suffix_start[2]);
-                switch (code3) {
-                    case ('u' << 16 | 'l' << 8 | 'l'): type = FOX_TOKEN_ULLONG_LITERAL; break;
-                    default: break;
-                }
-                break;
-            }
-
-            default:
-                break;
-        }
-    }
-
-    return make_token(lexer, type, FOXY_TOKEN_CAT_LITERAL);
-}
-
-static FoxyToken scan_string(FoxyLexer *lexer) {
-    while (peek(lexer) != '"' && !is_at_end(lexer)) {
-        if (peek(lexer) == '\\' && peek_next(lexer) != '\0') advance(lexer);
-        advance(lexer);
-    }
-
-    if (is_at_end(lexer)) return error_token(lexer, "Unterminated string literal.");
-    advance(lexer); /* Consumir " de cierre */
-
-    return make_token(lexer, FOX_TOKEN_STRING_LITERAL, FOXY_TOKEN_CAT_LITERAL);
-}
-
-static FoxyToken scan_char(FoxyLexer *lexer) {
-    if (peek(lexer) == '\\') advance(lexer);
-    advance(lexer);
-
-    if (!match(lexer, '\'')) return error_token(lexer, "Unterminated char literal.");
-    return make_token(lexer, FOX_TOKEN_CHAR_LITERAL, FOXY_TOKEN_CAT_LITERAL);
-}
-
-static FoxyToken scan_label_or_less(FoxyLexer *lexer) {
-    /* Verificar si sigue un identificador válido para una etiqueta: <nombre_etiqueta> */
-    const char *temp = lexer->cursor;
-    
-    if (isalpha((unsigned char)*temp) || *temp == '_') {
-        while (isalnum((unsigned char)*temp) || *temp == '_') {
-            temp++;
-        }
-        /* Si termina con '>', es una etiqueta de goto */
-        if (*temp == '>') {
-            lexer->cursor = temp + 1; /* Consumir hasta el '>' */
-            lexer->column += (uint32_t)(lexer->cursor - lexer->token_start - 1);
-            return make_token(lexer, FOX_TOKEN_LABEL, FOXY_TOKEN_CAT_IDENTIFIER);
-        }
-    }
-
-    /* Operadores de comparación y desplazamiento */
-    if (match(lexer, '=')) {
-        return make_token(lexer, FOX_TOKEN_LE, FOXY_TOKEN_CAT_OPERATOR);
-    }
-
-    if (match(lexer, '<')) {
-        if (match(lexer, '=')) {
-            return make_token(lexer, FOX_TOKEN_LSHIFT_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-        }
-        return make_token(lexer, FOX_TOKEN_LSHIFT, FOXY_TOKEN_CAT_OPERATOR);
-    }
-
-    return make_token(lexer, FOX_TOKEN_LT, FOXY_TOKEN_CAT_OPERATOR);
 }
 
 FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
-    skip_whitespace_and_comments(lexer);
+    if (!lexer) return (FoxyToken){0};
+
+    f_lexer_skip_whitespace_and_comments(lexer);
 
     lexer->token_start = lexer->cursor;
 
-    if (is_at_end(lexer)) return make_token(lexer, FOX_TOKEN_EOF, 0);
-
-    char c = advance(lexer);
-
-    if (isalpha((unsigned char)c) || c == '_') return scan_identifier_or_keyword(lexer);
-    if (isdigit((unsigned char)c)) return scan_number(lexer);
-
-    switch (c) {
-        case '(': return make_token(lexer, FOX_TOKEN_LPAREN, FOXY_TOKEN_CAT_OPERATOR);
-        case ')': return make_token(lexer, FOX_TOKEN_RPAREN, FOXY_TOKEN_CAT_OPERATOR);
-        case '{': return make_token(lexer, FOX_TOKEN_LBRACE, FOXY_TOKEN_CAT_OPERATOR);
-        case '}': return make_token(lexer, FOX_TOKEN_RBRACE, FOXY_TOKEN_CAT_OPERATOR);
-        case '[': return make_token(lexer, FOX_TOKEN_LBRACKET, FOXY_TOKEN_CAT_OPERATOR);
-        case ']': return make_token(lexer, FOX_TOKEN_RBRACKET, FOXY_TOKEN_CAT_OPERATOR);
-        case ';': return make_token(lexer, FOX_TOKEN_SEMICOLON, FOXY_TOKEN_CAT_OPERATOR);
-        case ':': return make_token(lexer, FOX_TOKEN_COLON, FOXY_TOKEN_CAT_OPERATOR);
-        case ',': return make_token(lexer, FOX_TOKEN_COMMA, FOXY_TOKEN_CAT_OPERATOR);
-        case '?': return make_token(lexer, FOX_TOKEN_QUESTION, FOXY_TOKEN_CAT_OPERATOR);
-        case '#': return make_token(lexer, FOX_TOKEN_HASH, FOXY_TOKEN_CAT_OPERATOR);
-        case '~': return make_token(lexer, FOX_TOKEN_TILDE, FOXY_TOKEN_CAT_OPERATOR);
-        case '^':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_XOR_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_CARET, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '"': return scan_string(lexer);
-        case '\'': return scan_char(lexer);
-
-        case '.':
-            if (match(lexer, '.')) {
-                if (match(lexer, '.')) return make_token(lexer, FOX_TOKEN_ELLIPSIS, FOXY_TOKEN_CAT_OPERATOR);
-                return make_token(lexer, FOX_TOKEN_DOTDOT, FOXY_TOKEN_CAT_OPERATOR);
-            }
-            return make_token(lexer, FOX_TOKEN_DOT, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '+':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_PLUS_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '+')) return make_token(lexer, FOX_TOKEN_INC, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_PLUS, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '-':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_MINUS_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '-')) return make_token(lexer, FOX_TOKEN_DEC, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '>')) return make_token(lexer, FOX_TOKEN_ARROW, FOXY_TOKEN_CAT_OPERATOR); // Retornar ARROW si la semántica del lenguaje lo requiere
-            return make_token(lexer, FOX_TOKEN_MINUS, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '*':
-            if (match(lexer, '*')) {
-                if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_POWER_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-                return make_token(lexer, FOX_TOKEN_POWER, FOXY_TOKEN_CAT_OPERATOR);
-            }
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_STAR_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_STAR, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '/':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_SLASH_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_SLASH, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '%':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_PERCENT_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_PERCENT, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '=':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_EQ, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '>')) return make_token(lexer, FOX_TOKEN_FAT_ARROW, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '!':
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_NEQ, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_BANG, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '<':
-            return scan_label_or_less(lexer);
-
-        case '>':
-            if (match(lexer, '>')) {
-                if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_RSHIFT_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-                return make_token(lexer, FOX_TOKEN_RSHIFT, FOXY_TOKEN_CAT_OPERATOR);
-            }
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_GE, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_GT, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '&':
-            if (match(lexer, '&')) return make_token(lexer, FOX_TOKEN_AND, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_AND_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_AMPERSAND, FOXY_TOKEN_CAT_OPERATOR);
-
-        case '|':
-            if (match(lexer, '|')) return make_token(lexer, FOX_TOKEN_OR, FOXY_TOKEN_CAT_OPERATOR);
-            if (match(lexer, '=')) return make_token(lexer, FOX_TOKEN_OR_ASSIGN, FOXY_TOKEN_CAT_OPERATOR);
-            return make_token(lexer, FOX_TOKEN_PIPE, FOXY_TOKEN_CAT_OPERATOR);
+    char c = f_lexer_peek(lexer);
+    if (c == '\0') {
+        return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_KEYWORD, FOX_TOKEN_EOF);
     }
 
-    return error_token(lexer, "Unrecognized character.");
+    f_lexer_advance(lexer);
+
+    if (isalpha(c) || c == '_') return f_lexer_scan_identifier(lexer);
+    if (isdigit(c)) return f_lexer_scan_number(lexer);
+
+    switch (c) {
+        case '"': return f_lexer_scan_string(lexer);
+        case '(': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LPAREN);
+        case ')': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_RPAREN);
+        case '{': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LBRACE);
+        case '}': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_RBRACE);
+        case '[': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LBRACKET);
+        case ']': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_RBRACKET);
+        case ';': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_SEMICOLON);
+        case ',': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_COMMA);
+        case '.':
+            if (f_lexer_match(lexer, '.')) {
+                return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DOTDOT);
+            }
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DOT);
+        case '+':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_PLUS_ASSIGN);
+            if (f_lexer_match(lexer, '+')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_INC);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_PLUS);
+        case '-':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_MINUS_ASSIGN);
+            if (f_lexer_match(lexer, '-')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DEC);
+            if (f_lexer_match(lexer, '>')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_ARROW);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_MINUS);
+        case '*':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_STAR_ASSIGN);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_STAR);
+        case '/':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_SLASH_ASSIGN);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_SLASH);
+        case '=':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_EQ);
+            if (f_lexer_match(lexer, '>')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_FAT_ARROW);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_ASSIGN);
+        case '!':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_NEQ);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_BANG);
+        case '&':
+            if (f_lexer_match(lexer, '&')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_AND);
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_AND_ASSIGN);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_AMPERSAND);
+        case '|':
+            if (f_lexer_match(lexer, '|')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_OR);
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_OR_ASSIGN);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_PIPE);
+        case '^':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_XOR_ASSIGN);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_CARET);
+        case '~':
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_TILDE);
+        case '<':
+            if (f_lexer_match(lexer, '<')) {
+                if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LSHIFT_ASSIGN);
+                return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LSHIFT);
+            }
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LE);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LT);
+        case '>':
+            if (f_lexer_match(lexer, '>')) {
+                if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_RSHIFT_ASSIGN);
+                return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_RSHIFT);
+            }
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_GE);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_GT);
+        case '%':
+            if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_PERCENT_ASSIGN);
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_PERCENT);
+        case ':':
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_COLON);
+        case '?': 
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_QUESTION);
+        case '#':
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_HASH);
+        default:
+            break;
+    }
+
+    return f_lexer_make_error_token(lexer, "Unexpected character.");
 }
 
 FoxyToken f_lexer_peek_token(FoxyLexer *lexer) {
+    if (!lexer) return (FoxyToken){0};
+
     FoxyLexer state_copy = *lexer;
     FoxyToken token = f_lexer_next_token(&state_copy);
     return token;
 }
 
 const char *f_lexer_token_type_to_string(FoxyTokenType type) {
-#if FOXY_COMPILER_SUPPORTS_XMACROS
-    switch (type) {
-#define F(ftoken) case ftoken: return #ftoken;
-        FOXY_TOKEN_LIST(F)
-#undef F
-        default: return "UNKNOWN_TOKEN";
-    }
-#else
-    switch (type) {
-        case FOX_TOKEN_EOF: return "FOX_TOKEN_EOF";
-        case FOX_TOKEN_ERROR: return "FOX_TOKEN_ERROR";
-        case FOX_TOKEN_IDENTIFIER: return "FOX_TOKEN_IDENTIFIER";
-        case FOX_TOKEN_LABEL: return "FOX_TOKEN_LABEL";
-        case FOX_TOKEN_INT_LITERAL: return "FOX_TOKEN_INT_LITERAL";
-        case FOX_TOKEN_UINT_LITERAL: return "FOX_TOKEN_UINT_LITERAL";
-        case FOX_TOKEN_LONG_LITERAL: return "FOX_TOKEN_LONG_LITERAL";
-        case FOX_TOKEN_ULONG_LITERAL: return "FOX_TOKEN_ULONG_LITERAL";
-        case FOX_TOKEN_LLONG_LITERAL: return "FOX_TOKEN_LLONG_LITERAL";
-        case FOX_TOKEN_ULLONG_LITERAL: return "FOX_TOKEN_ULLONG_LITERAL";
-        case FOX_TOKEN_FLOAT_LITERAL: return "FOX_TOKEN_FLOAT_LITERAL";
-        case FOX_TOKEN_DOUBLE_LITERAL: return "FOX_TOKEN_DOUBLE_LITERAL";
-        case FOX_TOKEN_LDOUBLE_LITERAL: return "FOX_TOKEN_LDOUBLE_LITERAL";
-        case FOX_TOKEN_NUMBER_LITERAL: return "FOX_TOKEN_NUMBER_LITERAL";
-        case FOX_TOKEN_CHAR_LITERAL: return "FOX_TOKEN_CHAR_LITERAL";
-        case FOX_TOKEN_STRING_LITERAL: return "FOX_TOKEN_STRING_LITERAL";
-        case FOX_TOKEN_ARROW: return "FOX_TOKEN_ARROW";
-        case FOX_TOKEN_FAT_ARROW: return "FOX_TOKEN_FAT_ARROW";
-        case FOX_TOKEN_PTR_ARROW: return "FOX_TOKEN_PTR_ARROW";
-        case FOX_TOKEN_DOTDOT: return "FOX_TOKEN_DOTDOT";
-        case FOX_TOKEN_ELLIPSIS: return "FOX_TOKEN_ELLIPSIS";
-        default: return "FOX_TOKEN_GENERIC";
-    }
-#endif
+    return FOXY_TOKEN_NAMES[type];
 }
 
 void f_lexer_print_token(const FoxyToken *token) {
-    printf("[%s:%u:%u] Cat: %u, Subtype: %u (%s), Lexema: '%.*s'\n",
-           token->pos.filename, token->pos.line, token->pos.column,
-           token->type_category, token->type,
+    if (!token) return;
+    printf("Token { type: %-24s, lexeme: '%.*s', line: %u, col: %u }\n",
            f_lexer_token_type_to_string(token->type),
-           token->length, token->start);
+           token->length, token->start,
+           token->pos.line, token->pos.column);
 }

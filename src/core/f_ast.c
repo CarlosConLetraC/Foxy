@@ -49,8 +49,242 @@ static const char *const FOXY_AST_KIND_NAMES[] = {
 };
 #endif
 
-/* Forward Declarations de funciones internas */
+/* Forward Declarations internas */
+static void f_ast_advance(FoxyAstParser *parser);
+static void f_ast_synchronize(FoxyAstParser *parser);
+
 static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser);
+static FoxyAstNode *f_ast_parse_expression(FoxyAstParser *parser);
+static FoxyAstNode *f_ast_parse_precedence(FoxyAstParser *parser, FoxyPrecedence precedence);
+static const FoxyParseRule *f_ast_get_rule(FoxyTokenType type);
+
+/* Reglas de Parseo (deben coincidir con FoxyParseFn: parser, left, can_assign) */
+static FoxyAstNode *f_ast_parse_literal(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_binary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_unary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_grouping(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_variable(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_super(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_self(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_assign(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_postfix(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_member(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_call(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_dict(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_array(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_index(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_ternary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+
+static const FoxyParseRule rules[] = {
+    [FOX_TOKEN_EOF]              = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_ERROR]            = { NULL,               NULL,              PREC_NONE },
+
+    /* Identificadores y Literales */
+    [FOX_TOKEN_IDENTIFIER]       = { f_ast_parse_variable,NULL,              PREC_NONE },
+    [FOX_TOKEN_LABEL]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_INT_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_UINT_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_LONG_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_ULONG_LITERAL]    = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_LLONG_LITERAL]    = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_ULLONG_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_FLOAT_LITERAL]    = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_DOUBLE_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_LDOUBLE_LITERAL]  = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_NUMBER_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_CHAR_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_STRING_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
+
+    /* Palabras Clave / Especificadores / Tipos */
+    [FOX_TOKEN_KW_GLOBAL]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_STATIC]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CONST]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_NULL]          = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_BOOL]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CHAR]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_UCHAR]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SHORT]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_USHORT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_INT]           = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_UINT]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_LONG]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ULONG]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_LLONG]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ULLONG]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FLOAT]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DOUBLE]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_LDOUBLE]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_NUMBER]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DICT]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_OBJECT]        = { NULL,               NULL,              PREC_NONE },
+
+    /* Control de Flujo */
+    [FOX_TOKEN_KW_IF]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ELSE]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ELSEIF]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_WHILE]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FOR]           = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FOREACH]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SWITCH]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CASE]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DEFAULT]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_BREAK]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CONTINUE]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_RETURN]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_GOTO]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_TRY]           = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CATCH]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_EXCEPT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FINAL]         = { NULL,               NULL,              PREC_NONE },
+
+    /* POO y Estructuras */
+    [FOX_TOKEN_KW_CLASS]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_STRUCT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ENUM]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FROM]          = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FUNCTION]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_OVERRULE]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_INCLUDE]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_USE]           = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_EXPORT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SUPER]         = { f_ast_parse_super,  NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SELF]          = { f_ast_parse_self,   NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ANCESTOROF]    = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DESCENDANTOF]  = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PARENTOF]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CHILDOF]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_TYPEOF]        = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_KW_TRUE]          = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FALSE]         = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PRIVATE]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PROTECTED]     = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PUBLIC]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_MOD_PRIVATE]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_MOD_PROTECTED]    = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_MOD_PUBLIC]       = { NULL,               NULL,              PREC_NONE },
+
+    /* Métodos Marcados */
+    [FOX_TOKEN_METHOD_NEW]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_CAST]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_TOSTRING]  = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_ADD]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_SUB]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_MUL]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_DIV]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_POW]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_MOD]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_CONCAT]    = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_UNM]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_NOT]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_EQ]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_NEQ]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_GT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LE]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_GE]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BAND]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BOR]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BNOT]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BXOR]      = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LSHIFT]    = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_RSHIFT]    = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_FOREACH]   = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_CLOSED]    = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LEN]       = { NULL,               NULL,              PREC_NONE },
+
+    /* Operadores Aritméticos, Lógicos, Bitwise y Asignaciones */
+    [FOX_TOKEN_PLUS]             = { NULL,               f_ast_parse_binary, PREC_TERM },
+    [FOX_TOKEN_MINUS]            = { f_ast_parse_unary,  f_ast_parse_binary, PREC_TERM },
+    [FOX_TOKEN_STAR]             = { NULL,               f_ast_parse_binary, PREC_FACTOR },
+    [FOX_TOKEN_SLASH]            = { NULL,               f_ast_parse_binary, PREC_FACTOR },
+    [FOX_TOKEN_PERCENT]          = { NULL,               f_ast_parse_binary, PREC_FACTOR },
+    [FOX_TOKEN_POWER]            = { NULL,               f_ast_parse_binary, PREC_FACTOR },
+    [FOX_TOKEN_HASH]             = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_ASSIGN]           = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_PLUS_ASSIGN]      = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_MINUS_ASSIGN]     = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_STAR_ASSIGN]      = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_SLASH_ASSIGN]     = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_PERCENT_ASSIGN]   = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_POWER_ASSIGN]     = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_AND_ASSIGN]       = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_OR_ASSIGN]        = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_XOR_ASSIGN]       = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_LSHIFT_ASSIGN]    = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_RSHIFT_ASSIGN]    = { NULL,               f_ast_parse_assign, PREC_ASSIGNMENT },
+    [FOX_TOKEN_INC]              = { f_ast_parse_unary,  f_ast_parse_postfix,PREC_CALL },
+    [FOX_TOKEN_DEC]              = { f_ast_parse_unary,  f_ast_parse_postfix,PREC_CALL },
+    [FOX_TOKEN_EQ]               = { NULL,               f_ast_parse_binary, PREC_EQUALITY },
+    [FOX_TOKEN_NEQ]              = { NULL,               f_ast_parse_binary, PREC_EQUALITY },
+    [FOX_TOKEN_LT]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
+    [FOX_TOKEN_GT]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
+    [FOX_TOKEN_LE]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
+    [FOX_TOKEN_GE]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
+    [FOX_TOKEN_BANG]             = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_AND]              = { NULL,               f_ast_parse_binary, PREC_AND },
+    [FOX_TOKEN_OR]               = { NULL,               f_ast_parse_binary, PREC_OR },
+    [FOX_TOKEN_AMPERSAND]        = { f_ast_parse_unary,  f_ast_parse_binary, PREC_TERM },
+    [FOX_TOKEN_PIPE]             = { NULL,               f_ast_parse_binary, PREC_TERM },
+    [FOX_TOKEN_TILDE]            = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_CARET]            = { NULL,               f_ast_parse_binary, PREC_TERM },
+    [FOX_TOKEN_LSHIFT]           = { NULL,               f_ast_parse_binary, PREC_TERM },
+    [FOX_TOKEN_RSHIFT]           = { NULL,               f_ast_parse_binary, PREC_TERM },
+
+    /* Delimitadores y Puntuación */
+    [FOX_TOKEN_ARROW]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_FAT_ARROW]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_PTR_ARROW]        = { NULL,               f_ast_parse_member,PREC_CALL },
+    [FOX_TOKEN_ELLIPSIS]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_LPAREN]           = { f_ast_parse_grouping,f_ast_parse_call,  PREC_CALL },
+    [FOX_TOKEN_RPAREN]           = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_LBRACE]           = { f_ast_parse_dict,   NULL,              PREC_NONE },
+    [FOX_TOKEN_RBRACE]           = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_LBRACKET]         = { f_ast_parse_array,  f_ast_parse_index, PREC_CALL },
+    [FOX_TOKEN_RBRACKET]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_SEMICOLON]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_COLON]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_COMMA]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_DOT]              = { NULL,               f_ast_parse_member,PREC_CALL },
+    [FOX_TOKEN_DOTDOT]           = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
+    [FOX_TOKEN_QUESTION]         = { NULL,               f_ast_parse_ternary,PREC_ASSIGNMENT }
+};
+
+static const FoxyParseRule *f_ast_get_rule(FoxyTokenType type) {
+    return &rules[type];
+}
+
+static FoxyAstNode *f_ast_parse_unary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyToken op = parser->previous_token;
+    FoxyAstNode *operand = f_ast_parse_precedence(parser, PREC_UNARY);
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_UNARY, op.pos);
+    node->as.unary.op = op;
+    node->as.unary.operand = operand;
+    node->as.unary.is_postfix = 0;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_grouping(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyAstNode *expr = f_ast_parse_expression(parser);
+    if (parser->current_token.type == FOX_TOKEN_RPAREN) {
+        f_ast_advance(parser);
+    } else {
+        parser->had_error = true;
+    }
+    return expr;
+}
+
+static FoxyAstNode *f_ast_parse_variable(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_IDENTIFIER, parser->previous_token.pos);
+    node->as.identifier.name = parser->previous_token;
+    return node;
+}
 
 const char *f_ast_kind_to_string(FoxyAstKind kind) {
     return FOXY_AST_KIND_NAMES[kind];
@@ -666,11 +900,6 @@ static void f_ast_synchronize(FoxyAstParser *parser) {
     }
 }
 
-static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
-    f_ast_advance(parser);
-    return NULL;
-}
-
 FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser) {
     if (!parser) return NULL;
 
@@ -690,8 +919,11 @@ FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser) {
 
         if (stmt) {
             f_ast_append_child(program_node, stmt);
-        } else if (!parser->had_error) {
-            f_ast_advance(parser);
+        } else {
+            // Si ocurrió un error y no entramos en panic_mode, avanzamos manualmente para evitar bucle infinito
+            if (parser->had_error && !parser->panic_mode) {
+                f_ast_advance(parser);
+            }
         }
     }
 
@@ -701,4 +933,312 @@ FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser) {
     }
 
     return program_node;
+}
+
+static FoxyAstNode *f_ast_parse_precedence(FoxyAstParser *parser, FoxyPrecedence precedence) {
+    f_ast_advance(parser);
+    
+    FoxyParseFn prefix_rule = f_ast_get_rule(parser->previous_token.type)->prefix;
+    if (prefix_rule == NULL) {
+        fprintf(stderr, "[Foxy Parser Error] Line %u: Expected expression.\n", parser->previous_token.pos.line);
+        parser->had_error = true;
+        parser->panic_mode = true;
+        return NULL;
+    }
+
+    bool can_assign = (precedence <= PREC_ASSIGNMENT);
+    FoxyAstNode *node = prefix_rule(parser, NULL, can_assign);
+
+    while (precedence <= f_ast_get_rule(parser->current_token.type)->precedence) {
+        f_ast_advance(parser);
+        FoxyParseFn infix_rule = f_ast_get_rule(parser->previous_token.type)->infix;
+        if (infix_rule != NULL) {
+            node = infix_rule(parser, node, can_assign);
+        }
+    }
+
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_expression(FoxyAstParser *parser) {
+    return f_ast_parse_precedence(parser, PREC_ASSIGNMENT);
+}
+
+static FoxyAstNode *f_ast_parse_literal(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)can_assign;
+    (void)left;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_LITERAL, parser->previous_token.pos);
+    node->as.literal.value = f_ast_value_from_token(&parser->previous_token);
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_binary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)can_assign;
+    FoxyTokenType op_type = parser->previous_token.type;
+    FoxySourcePos pos = parser->previous_token.pos;
+    const FoxyParseRule *rule = f_ast_get_rule(op_type);
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_BINARY, pos);
+    node->as.binary.op = parser->previous_token;
+    node->as.binary.left = left; // Usa el nodo acumulado en la pila de Pratt
+
+    // Recursión con precedencia superior
+    node->as.binary.right = f_ast_parse_precedence(parser, (FoxyPrecedence)(rule->precedence + 1));
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_statement(FoxyAstParser *parser) {
+    // Para sentencias de expresión simples (ej: 1 + 2 * 3;)
+    FoxyAstNode *expr = f_ast_parse_expression(parser);
+    if (!expr) return NULL;
+
+    FoxyAstNode *stmt = f_ast_create_node(FOXY_AST_STMT_EXPR, expr->pos);
+    stmt->as.expr_stmt = expr;
+
+    if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
+        f_ast_advance(parser);
+    }
+    return stmt;
+}
+
+static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
+    if (f_ast_is_type_specifier(parser->current_token.type)) {
+        FoxySourcePos pos = parser->current_token.pos;
+        FoxyTokenType type_token = parser->current_token.type;
+        f_ast_advance(parser);
+
+        // Validar que el siguiente token sea el identificador/nombre de la variable
+        if (parser->current_token.type != FOX_TOKEN_IDENTIFIER) {
+            fprintf(stderr, "[Foxy Parser Error] Line %u: Expected variable name after type specifier.\n", 
+                    parser->current_token.pos.line);
+            parser->had_error = true;
+            parser->panic_mode = true;
+            return NULL;
+        }
+
+        FoxyToken name = parser->current_token;
+        f_ast_advance(parser);
+
+        FoxyAstNode *initializer = NULL;
+
+        // Parsear inicializador opcional (= expr)
+        if (parser->current_token.type == FOX_TOKEN_ASSIGN) {
+            f_ast_advance(parser); // Consumir '='
+            initializer = f_ast_parse_expression(parser);
+        }
+
+        // Exigir ';' al final de la declaración
+        if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
+            f_ast_advance(parser);
+        } else {
+            fprintf(stderr, "[Foxy Parser Error] Line %u: Expected ';' after variable declaration.\n", 
+                    parser->current_token.pos.line);
+            parser->had_error = true;
+        }
+
+        // Construir y retornar el nodo AST de la declaración
+        FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_VAR_DECL, pos);
+        node->as.var_decl.type_token = type_token;
+        node->as.var_decl.name = name;
+        node->as.var_decl.initializer = initializer;
+
+        return node;
+    }
+
+    return f_ast_parse_statement(parser);
+}
+
+/* ============================================================================
+ * IMPLEMENTACIÓN DE REGLAS DE PARSEO DE PRATT FALTANTES
+ * ============================================================================ */
+
+static FoxyAstNode *f_ast_parse_super(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_IDENTIFIER, parser->previous_token.pos);
+    node->as.identifier.name = parser->previous_token;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_self(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_IDENTIFIER, parser->previous_token.pos);
+    node->as.identifier.name = parser->previous_token;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_assign(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    if (!can_assign) {
+        fprintf(stderr, "[Foxy Parser Error] Line %u: Invalid assignment target.\n", parser->previous_token.pos.line);
+        parser->had_error = true;
+    }
+
+    FoxyToken op = parser->previous_token;
+    FoxyAstNode *value = f_ast_parse_precedence(parser, PREC_ASSIGNMENT);
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_ASSIGN, op.pos);
+    node->as.assign.op = op;
+    node->as.assign.target = left;
+    node->as.assign.value = value;
+    node->as.assign.is_grouped = 0;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_postfix(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_UNARY, parser->previous_token.pos);
+    node->as.unary.op = parser->previous_token;
+    node->as.unary.operand = left;
+    node->as.unary.is_postfix = 1;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_member(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    FoxyToken member = parser->current_token;
+    f_ast_advance(parser);
+
+    if (can_assign && f_ast_is_assignment_op(parser->current_token.type)) {
+        FoxyToken op = parser->current_token;
+        f_ast_advance(parser);
+        FoxyAstNode *value = f_ast_parse_expression(parser);
+
+        FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_SET_MEMBER, op.pos);
+        node->as.set_member.object = left;
+        node->as.set_member.member = member;
+        node->as.set_member.value = value;
+        return node;
+    }
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_GET_MEMBER, member.pos);
+    node->as.get_member.object = left;
+    node->as.get_member.member = member;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_call(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_CALL, parser->previous_token.pos);
+    node->as.call.callee = left;
+    f_ast_node_list_init(&node->as.call.args);
+
+    if (parser->current_token.type != FOX_TOKEN_RPAREN) {
+        do {
+            f_ast_node_list_append(&node->as.call.args, f_ast_parse_expression(parser));
+        } while (parser->current_token.type == FOX_TOKEN_COMMA && (f_ast_advance(parser), true));
+    }
+
+    if (parser->current_token.type == FOX_TOKEN_RPAREN) {
+        f_ast_advance(parser);
+    } else {
+        parser->had_error = true;
+    }
+
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_dict(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_DICT_LITERAL, parser->previous_token.pos);
+    f_ast_node_list_init(&node->as.dict_literal.entries);
+
+    while (parser->current_token.type != FOX_TOKEN_RBRACE && parser->current_token.type != FOX_TOKEN_EOF) {
+        FoxyToken key = parser->current_token;
+        f_ast_advance(parser);
+
+        if (parser->current_token.type == FOX_TOKEN_COLON) {
+            f_ast_advance(parser);
+        } else {
+            parser->had_error = true;
+        }
+
+        FoxyAstNode *val = f_ast_parse_expression(parser);
+        FoxyAstNode *entry = f_ast_create_node(FOXY_AST_EXPR_DICT_ENTRY, key.pos);
+        entry->as.dict_entry.key = key;
+        entry->as.dict_entry.value = val;
+
+        f_ast_node_list_append(&node->as.dict_literal.entries, entry);
+
+        if (parser->current_token.type == FOX_TOKEN_COMMA) {
+            f_ast_advance(parser);
+        } else {
+            break;
+        }
+    }
+
+    if (parser->current_token.type == FOX_TOKEN_RBRACE) {
+        f_ast_advance(parser);
+    } else {
+        parser->had_error = true;
+    }
+
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_array(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)left;
+    (void)can_assign;
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_ARRAY_LITERAL, parser->previous_token.pos);
+    f_ast_node_list_init(&node->as.array_literal.elements);
+
+    if (parser->current_token.type != FOX_TOKEN_RBRACKET) {
+        do {
+            f_ast_node_list_append(&node->as.array_literal.elements, f_ast_parse_expression(parser));
+        } while (parser->current_token.type == FOX_TOKEN_COMMA && (f_ast_advance(parser), true));
+    }
+
+    if (parser->current_token.type == FOX_TOKEN_RBRACKET) {
+        f_ast_advance(parser);
+    } else {
+        parser->had_error = true;
+    }
+
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_index(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    FoxyAstNode *index_expr = f_ast_parse_expression(parser);
+
+    if (parser->current_token.type == FOX_TOKEN_RBRACKET) {
+        f_ast_advance(parser);
+    } else {
+        parser->had_error = true;
+    }
+
+    if (can_assign && f_ast_is_assignment_op(parser->current_token.type)) {
+        FoxyToken op = parser->current_token;
+        f_ast_advance(parser);
+        FoxyAstNode *val = f_ast_parse_expression(parser);
+
+        FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_SET_INDEX, op.pos);
+        node->as.set_index.target = left;
+        node->as.set_index.index = index_expr;
+        node->as.set_index.value = val;
+        return node;
+    }
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_GET_INDEX, left->pos);
+    node->as.get_index.target = left;
+    node->as.get_index.index = index_expr;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_ternary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
+    (void)can_assign;
+    FoxyAstNode *then_branch = f_ast_parse_expression(parser);
+
+    if (parser->current_token.type == FOX_TOKEN_COLON) {
+        f_ast_advance(parser);
+    } else {
+        parser->had_error = true;
+    }
+
+    FoxyAstNode *else_branch = f_ast_parse_precedence(parser, PREC_ASSIGNMENT);
+
+    FoxyAstNode *if_node = f_ast_create_node(FOXY_AST_STMT_IF, left->pos);
+    if_node->as.if_stmt.condition = left;
+    if_node->as.if_stmt.then_branch = then_branch;
+    if_node->as.if_stmt.else_branch = else_branch;
+    return if_node;
 }

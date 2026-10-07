@@ -3,6 +3,7 @@
 // #include <stdint.h>
 // #include <stdbool.h>
 // #include <stddef.h>
+#include <stdio.h>
 
 /**
  * ============================================================================
@@ -44,7 +45,7 @@
  * ----------------------------------------------------------------------------
  */
 
-/** Longitud máxima de  */
+/** Longitud máxima de buffer estático para líneas del lexer (4 KB). */
 #define LEXER_LINE_BUFFER_SIZE             (1u << 12)
 
 /** Longitud máxima de identificadores de variables, funciones y símbolos (256 B). */
@@ -54,42 +55,42 @@
 #ifdef FILENAME_MAX
     #define FOXY_MAX_MODULE_NAME_SIZE      ((unsigned int)FILENAME_MAX)
 #else
-    #define FOXY_MAX_MODULE_NAME_SIZE      (1u << 9)   /* Fallback: 512 bytes */
+    #define FOXY_MAX_MODULE_NAME_SIZE      (1u << 9)   /* Fallback: 512 B */
 #endif
 
 /** Tamaño del buffer intermedio de nombres/cadenas basado en el BUFSIZ nativo de C. */
 #ifdef BUFSIZ
     #define FOXY_NAME_BUFFER_SIZE          ((unsigned int)BUFSIZ)
 #else
-    #define FOXY_NAME_BUFFER_SIZE          (1u << 13)  /* Fallback: 8192 bytes */
+    #define FOXY_NAME_BUFFER_SIZE          (1u << 13)  /* Fallback: 8 KB */
 #endif
 
-/** Capacidad inicial de la tabla Hash interna de símbolos/atributos. */
-#define FOXY_MAX_HASHTABLE_CAPACITY        (1u << 5)   /* 32 slots */
+/** Capacidad inicial de la tabla Hash interna de símbolos/atributos (32 slots). */
+#define FOXY_MAX_HASHTABLE_CAPACITY        (1u << 5)
 
-/** Capacidad inicial de nodos en la construcción del AST (Program Node). */
-#define FOXY_INITIAL_PROGRAM_NODE_CAPACITY (1u << 4)   /* 16 nodos */
+/** Capacidad inicial de nodos en la construcción del AST (16 nodos). */
+#define FOXY_INITIAL_PROGRAM_NODE_CAPACITY (1u << 4)
 
-/** Profundidad máxima del Call Stack (CallFrames de funciones simultáneas). */
-#define FOXY_MAX_FRAMES                    (1u << 8)   /* 256 frames */
+/** Profundidad máxima del Call Stack de la VM (256 frames). */
+#define FOXY_MAX_FRAMES                    (1u << 8)
 
-/** Máximo de registros direccionables por marco (alineado al campo A de 8 bits). */
-#define FOXY_MAX_REGISTERS_PER_FRAME       (1u << 8)   /* 256 registros (r0 <-> r255) */
+/** Máximo de registros direccionables por marco (alineado al campo de 8 bits). */
+#define FOXY_MAX_REGISTERS_PER_FRAME       (1u << 8)   /* 256 registros (r0 a r255) */
 
-/** Capacidad de la pila principal de evaluación de operandos de la VM. */
-#define FOXY_MAX_STACK_CAPACITY            (1u << 8)   /* 256 FoxyValues */
+/** Capacidad máxima de la pila de evaluación de operandos de la VM (256 valores). */
+#define FOXY_MAX_STACK_CAPACITY            (1u << 8)
 
-/** Máximo de variables locales activas simultáneas en el léxico de un scope. */
-#define FOXY_MAX_LOCALS                    (1u << 8)   /* 256 variables locales */
+/** Máximo de variables locales activas simultáneamente en un mismo ámbito (256 locales). */
+#define FOXY_MAX_LOCALS                    (1u << 8)
 
-/** Máximo de Upvalues (variables libres capturadas) por Closure. */
-#define FOXY_MAX_UPVALUES                  (1u << 8)   /* 256 upvalues */
+/** Máximo de Upvalues (variables libres capturadas) por Closure (256 upvalues). */
+#define FOXY_MAX_UPVALUES                  (1u << 8)
 
-/** Capacidad máxima de la pool de constantes de un chunk de bytecode (12 bits Bx). */
-#define FOXY_MAX_CONSTANTS_CAPACITY        (1u << 18)  /* 262,144 constantes */
+/** Capacidad máxima de la pool de constantes de un chunk de bytecode (4 KB constantes). */
+#define FOXY_MAX_CONSTANTS_CAPACITY        (1u << 12)  /* 4096 entradas */
 
-/** Capacidad de elementos de un arreglo In-line de foxy-lang (67,108,864) */
-#define FOXY_ARRAY_MAX_STACK_CAPACITY      (1u << 26)
+/** Capacidad máxima de elementos para arreglos integrados en el lenguaje (64 M elementos). */
+#define FOXY_ARRAY_MAX_STACK_CAPACITY      (1u << 26)  /* 67,108,864 entradas */
 
 /**
  * ----------------------------------------------------------------------------
@@ -151,19 +152,17 @@
  * EXPORTACIÓN DE SÍMBOLOS (SHARED LIBRARIES / DYNAMIC LINKING)
  * ----------------------------------------------------------------------------
  */
-#ifndef FOXY_EXPORT
-    #if defined(_WIN32) || defined(__CYGWIN__)
-        #ifdef FOXY_BUILDING_SHARED
-            #define FOXY_EXPORT __declspec(dllexport)
-        #else
-            #define FOXY_EXPORT __declspec(dllimport)
-        #endif
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #ifdef FOXY_BUILDING_SHARED
+        #define FOXY_EXPORT __declspec(dllexport)
     #else
-        #if __GNUC__ >= 4
-            #define FOXY_EXPORT __attribute__((visibility("default")))
-        #else
-            #define FOXY_EXPORT
-        #endif
+        #define FOXY_EXPORT __declspec(dllimport)
+    #endif
+#else
+    #if __GNUC__ >= 4
+        #define FOXY_EXPORT __attribute__((visibility("default")))
+    #else
+        #define FOXY_EXPORT
     #endif
 #endif
 
@@ -185,3 +184,43 @@
 #ifndef FOXY_NUMERIC_LITERAL_BUFFER_SIZE
     #define FOXY_NUMERIC_LITERAL_BUFFER_SIZE (1u << 7) /* 128 bytes */
 #endif
+
+/**
+ * ----------------------------------------------------------------------------
+ * ABSTRACCIÓN PORTABLE DE FUNCIONES Y TIPOS DE I/O (LARGE FILE SUPPORT)
+ * ----------------------------------------------------------------------------
+ * Unifica fseeko/ftello (POSIX 64-bit offsets) con _fseeki64/_ftelli64 en MSVC/Windows
+ * y cae en fseek/ftell para entornos ANSI C estrictos.
+ */
+
+#if defined(_WIN32) || defined(_MSC_VER)
+    /* Windows / MSVC */
+    #include <stdio.h>
+    #define foxy_fseek  _fseeki64
+    #define foxy_ftell  _ftelli64
+    typedef __int64     foxy_off_t;
+#elif defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L || defined(_GNU_SOURCE) || defined(__APPLE__)
+    /* Sistemas POSIX modernos (Linux / MacOS) con soporte de fseeko/ftello */
+    #include <stdio.h>
+    #include <sys/types.h>
+    #define foxy_fseek  fseeko
+    #define foxy_ftell  ftello
+    typedef off_t       foxy_off_t;
+#else
+    /* Fallback a ISO C99 / C11 estándar */
+    #include <stdio.h>
+    #define foxy_fseek  fseek
+    #define foxy_ftell  ftell
+    typedef long        foxy_off_t;
+#endif
+
+/**
+ * Aliases unificados para funciones I/O estándar de la VM y Lexer
+ */
+#define foxy_fopen   fopen
+#define foxy_fclose  fclose
+#define foxy_fread   fread
+#define foxy_fwrite  fwrite
+#define foxy_fgets   fgets
+#define foxy_feof    feof
+#define foxy_ferror  ferror

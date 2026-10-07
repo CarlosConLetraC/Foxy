@@ -11,7 +11,11 @@ int main(int argc, char **argv) {
     }
 
     FoxyLexer lexer;
-    f_lexer_init_file(&lexer, file, filepath);
+    if (!f_lexer_init_file(&lexer, file, filepath)) {
+        fprintf(stderr, "Aviso: El archivo '%s' está vacío o ocurrió un error al inicializar el lexer.\n", filepath);
+        /* f_lexer_init_file libera y cierra el FILE* automáticamente si falla/está vacío */
+        return 0;
+    }
 
     printf("=== Tokenizing: %s ===\n", filepath);
     FoxyToken token;
@@ -20,6 +24,6 @@ int main(int argc, char **argv) {
         f_lexer_print_token(&token);
     } while (token.type != FOX_TOKEN_EOF && token.type != FOX_TOKEN_ERROR);
 
-    fclose(file);
+    f_lexer_close(&lexer);
     return 0;
 }

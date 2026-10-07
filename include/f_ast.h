@@ -548,3 +548,47 @@ FOXY_EXPORT char *f_ast_strdup(const char *src, size_t length);
 FOXY_EXPORT void f_ast_parser_init(FoxyAstParser *parser, FILE *file, const char *filename);
 FOXY_EXPORT FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser);
 FOXY_EXPORT FoxyValue f_ast_value_from_token(const FoxyToken *token);
+
+#if FOXY_COMPILER_SUPPORTS_XMACROS
+#define FOXY_PRECEDENCE_LIST(F) \
+    F(PREC_NONE) \
+    F(PREC_ASSIGNMENT) /* = += -= */ \
+    F(PREC_OR) /* || */ \
+    F(PREC_AND) /* && */ \
+    F(PREC_EQUALITY) /* == != */ \
+    F(PREC_COMPARISON) /* < > <= >= */ \
+    F(PREC_TERM) /* + - */ \
+    F(PREC_FACTOR) /* * / % */ \
+    F(PREC_UNARY) /* ! - ++ -- */ \
+    F(PREC_CALL) /* . () [] */ \
+    F(PREC_PRIMARY)
+
+#define F(prec) prec,
+typedef enum FOXY_PACKED {
+    FOXY_PRECEDENCE_LIST(F)
+} FoxyPrecedence;
+#undef F
+#else
+typedef enum {
+    PREC_NONE,
+    PREC_ASSIGNMENT, // = += -=
+    PREC_OR,         // ||
+    PREC_AND,        // &&
+    PREC_EQUALITY,   // == !=
+    PREC_COMPARISON, // < > <= >=
+    PREC_TERM,       // + -
+    PREC_FACTOR,     // * / %
+    PREC_UNARY,      // ! - ++ --
+    PREC_CALL,       // . () []
+    PREC_PRIMARY
+} FoxyPrecedence;
+#endif
+
+typedef FoxyAstNode *(*FoxyParseFn)(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+
+typedef struct {
+    FoxyParseFn prefix;        /* 8 bytes */
+    FoxyParseFn infix;         /* 8 bytes */
+    FoxyPrecedence precedence; /* 1 byte */
+    uint8_t _pad[7];           /* 7 bytes explícitos para alineación a 8 bytes */
+} FoxyParseRule;

@@ -400,26 +400,27 @@ extern const FoxyKeywordMap FOXY_KEYWORD_TABLE[];
 extern const size_t FOXY_KEYWORD_TABLE_SIZE;
 
 typedef struct {
-    FILE *file;                                  /* 8 bytes */
-    const char *filename;                        /* 8 bytes */
-    const char *cursor;                          /* 8 bytes */
-    const char *token_start;                     /* 8 bytes */
-    char line_buffer[LEXER_LINE_BUFFER_SIZE];    /* N bytes (múltiplo de alineación) */
-    uint32_t line;                               /* 4 bytes */
-    uint32_t column;                             /* 4 bytes */
-    uint8_t flags;                               /* 1 byte  */
-    uint8_t is_eof;                              /* 1 byte (remplaza el bit-field para evitar padding) */
-    uint8_t reserved[6];                         /* 6 bytes (completa exactos 8 bytes) */
+    FILE *file;               /* 8 bytes: Descriptor del archivo de origen */
+    const char *filename;     /* 8 bytes: Ruta/Nombre del archivo para reporte de errores */
+    const char *cursor;       /* 8 bytes: Apunta a la posición actual dentro de line_buffer */
+    const char *token_start;  /* 8 bytes: Apunta al inicio del lexema en line_buffer */
+    uint32_t line;            /* 4 bytes: Fila actual */
+    uint32_t column;          /* 4 bytes: Columna actual */
+    uint8_t flags;            /* 1 byte  */
+    uint8_t is_eof;           /* 1 byte  */
+    uint8_t reserved[6];      /* 6 bytes: Padding explícito (Estructura total = 48 bytes) */
+    char line_buffer[LEXER_LINE_BUFFER_SIZE]; /* Buffer estático en el heap/stack según alloc */
 } FoxyLexer;
 
 /* ========================================================================= */
 /* 4. FUNCIONES PÚBLICAS                                                    */
 /* ========================================================================= */
-void f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename);
-FoxyToken f_lexer_next_token(FoxyLexer *lexer);
-FoxyToken f_lexer_peek_token(FoxyLexer *lexer);
-const char *f_lexer_token_type_to_string(FoxyTokenType type);
-void f_lexer_print_token(const FoxyToken *token);
+FOXY_EXPORT bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename);
+FOXY_EXPORT void f_lexer_close(FoxyLexer *lexer);
+FOXY_EXPORT FoxyToken f_lexer_next_token(FoxyLexer *lexer);
+FOXY_EXPORT FoxyToken f_lexer_peek_token(FoxyLexer *lexer);
+FOXY_EXPORT const char *f_lexer_token_type_to_string(FoxyTokenType type);
+FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
 
 /* ========================================================================= */
 /* 5. MÁSCARAS BITWISE PARA TOKENS DE EXPRESIONES (LEXER / PARSER)               */
@@ -494,6 +495,7 @@ void f_lexer_print_token(const FoxyToken *token);
     FOXY_BIT(FOX_TOKEN_AND - 0)       | \
     FOXY_BIT(FOX_TOKEN_OR - 0)          \
 )
+
 #define FOXY_MASK_LOGICAL_1 (0ULL)
 
 /* --- Assignment (=, +=, -=, *=, /=, %=, etc.) --- */
@@ -505,6 +507,8 @@ void f_lexer_print_token(const FoxyToken *token);
     FOXY_BIT(FOX_TOKEN_SLASH_ASSIGN - 0)  | \
     FOXY_BIT(FOX_TOKEN_PERCENT_ASSIGN - 0)\
 )
+
+/* Para tokens con FOX_TOKEN_* >= 64 en MASK_1 */
 #define FOXY_MASK_ASSIGNMENT_1 ( \
     FOXY_BIT(FOX_TOKEN_AND_ASSIGN - 64)   | \
     FOXY_BIT(FOX_TOKEN_OR_ASSIGN - 64)    | \
