@@ -480,8 +480,8 @@ struct FoxyAstNode {
 #define FOXY_AST_MASK_SINGLE_LIST_NODES ( \
     FOXY_BIT(FOXY_AST_PROGRAM)            | \
     FOXY_BIT(FOXY_AST_STMT_BLOCK)         | \
-    FOXY_AST_EXPR_ARRAY_LITERAL           | \
-    FOXY_AST_EXPR_DICT_LITERAL              \
+    FOXY_BIT(FOXY_AST_EXPR_ARRAY_LITERAL) | \
+    FOXY_BIT(FOXY_AST_EXPR_DICT_LITERAL)    \
 )
 
 /**
@@ -493,6 +493,17 @@ struct FoxyAstNode {
     FOXY_BIT(FOXY_AST_STMT_CONTINUE)    | \
     FOXY_BIT(FOXY_AST_STMT_GOTO)        | \
     FOXY_BIT(FOXY_AST_STMT_LABEL)         \
+)
+
+/**
+ * @brief Operadores Binarios / Infijos
+ */
+#define FOXY_MASK_BINARY_TOKENS ( \
+    FOXY_MASK_ARITHMETIC_TOKENS | \
+    FOXY_MASK_BITWISE_TOKENS    | \
+    FOXY_MASK_COMPARISON_TOKENS | \
+    FOXY_BIT(FOX_TOKEN_AND)     | \
+    FOXY_BIT(FOX_TOKEN_OR)        \
 )
 
 /* ========================================================================= */
@@ -518,6 +529,10 @@ static inline bool f_ast_is_binary_op(uint32_t token_type) {
                     FOXY_BIT(FOX_TOKEN_AND)     | 
                     FOXY_BIT(FOX_TOKEN_OR);
     return token_type < 64 && ((mask & FOXY_BIT(token_type)) != 0);
+}
+
+static inline bool f_ast_is_unary_op(uint32_t token_type) {
+    return token_type < 64 && ((FOXY_MASK_UNARY_TOKENS & FOXY_BIT(token_type)) != 0);
 }
 
 static inline bool f_ast_is_literal(uint32_t token_type) {

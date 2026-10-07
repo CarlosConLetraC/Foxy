@@ -74,14 +74,18 @@ static FoxyAstNode *f_ast_parse_dict(FoxyAstParser *parser, FoxyAstNode *left, b
 static FoxyAstNode *f_ast_parse_array(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_index(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_ternary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_block_statement(FoxyAstParser *parser);
+static FoxyAstNode *f_ast_parse_if_statement(FoxyAstParser *parser);
+static FoxyAstNode *f_ast_parse_return_statement(FoxyAstParser *parser);
+static FoxyAstNode *f_ast_parse_function_declaration(FoxyAstParser *parser);
 
 static const FoxyParseRule rules[] = {
-    [FOX_TOKEN_EOF]              = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_ERROR]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_EOF]              = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_ERROR]            = { NULL,                NULL,              PREC_NONE },
 
     /* Identificadores y Literales */
     [FOX_TOKEN_IDENTIFIER]       = { f_ast_parse_variable,NULL,              PREC_NONE },
-    [FOX_TOKEN_LABEL]            = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_LABEL]            = { NULL ,               NULL,              PREC_NONE },
     [FOX_TOKEN_INT_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
     [FOX_TOKEN_UINT_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
     [FOX_TOKEN_LONG_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
@@ -96,101 +100,100 @@ static const FoxyParseRule rules[] = {
     [FOX_TOKEN_STRING_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
 
     /* Palabras Clave / Especificadores / Tipos */
-    [FOX_TOKEN_KW_GLOBAL]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_STATIC]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_CONST]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_GLOBAL]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_STATIC]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CONST]         = { NULL,                NULL,              PREC_NONE },
     [FOX_TOKEN_KW_NULL]          = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_BOOL]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_CHAR]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_UCHAR]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_SHORT]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_USHORT]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_INT]           = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_UINT]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_LONG]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_ULONG]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_LLONG]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_ULLONG]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_FLOAT]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_DOUBLE]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_LDOUBLE]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_NUMBER]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_DICT]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_OBJECT]        = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_BOOL]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CHAR]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_UCHAR]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SHORT]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_USHORT]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_INT]           = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_UINT]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_LONG]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ULONG]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_LLONG]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ULLONG]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FLOAT]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DOUBLE]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_LDOUBLE]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_NUMBER]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DICT]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_OBJECT]        = { NULL,                NULL,              PREC_NONE },
 
     /* Control de Flujo */
-    [FOX_TOKEN_KW_IF]            = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_ELSE]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_ELSEIF]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_WHILE]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_FOR]           = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_FOREACH]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_SWITCH]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_CASE]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_DEFAULT]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_BREAK]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_CONTINUE]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_RETURN]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_GOTO]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_TRY]           = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_CATCH]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_EXCEPT]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_FINAL]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_IF]            = { NULL,        f_ast_parse_if_statement,  PREC_NONE },
+    [FOX_TOKEN_KW_RETURN]        = { NULL,    f_ast_parse_return_statement,  PREC_NONE },
+    [FOX_TOKEN_KW_ELSEIF]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_WHILE]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FOR]           = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FOREACH]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SWITCH]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CASE]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DEFAULT]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_BREAK]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CONTINUE]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_GOTO]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_TRY]           = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CATCH]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_EXCEPT]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FINAL]         = { NULL,                NULL,              PREC_NONE },
 
     /* POO y Estructuras */
-    [FOX_TOKEN_KW_CLASS]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_STRUCT]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_ENUM]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_FROM]          = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_FUNCTION]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_OVERRULE]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_INCLUDE]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_USE]           = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_EXPORT]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_SUPER]         = { f_ast_parse_super,  NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_SELF]          = { f_ast_parse_self,   NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_ANCESTOROF]    = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_DESCENDANTOF]  = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_PARENTOF]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_CHILDOF]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_TYPEOF]        = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_KW_CLASS]         = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_STRUCT]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ENUM]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FROM]          = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_FUNCTION]      = { NULL, f_ast_parse_function_declaration, PREC_NONE },
+    [FOX_TOKEN_KW_OVERRULE]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_INCLUDE]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_USE]           = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_EXPORT]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SUPER]         = { f_ast_parse_super,   NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_SELF]          = { f_ast_parse_self,    NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_ANCESTOROF]    = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_DESCENDANTOF]  = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PARENTOF]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_CHILDOF]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_TYPEOF]        = { f_ast_parse_unary,   NULL,              PREC_UNARY },
     [FOX_TOKEN_KW_TRUE]          = { f_ast_parse_literal, NULL,              PREC_NONE },
     [FOX_TOKEN_KW_FALSE]         = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_PRIVATE]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_PROTECTED]     = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_PUBLIC]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_MOD_PRIVATE]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_MOD_PROTECTED]    = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_MOD_PUBLIC]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PRIVATE]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PROTECTED]     = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_PUBLIC]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_MOD_PRIVATE]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_MOD_PROTECTED]    = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_MOD_PUBLIC]       = { NULL,                NULL,              PREC_NONE },
 
     /* Métodos Marcados */
-    [FOX_TOKEN_METHOD_NEW]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_CAST]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_TOSTRING]  = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_ADD]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_SUB]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_MUL]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_DIV]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_POW]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_MOD]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_CONCAT]    = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_UNM]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_NOT]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_EQ]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_NEQ]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_LT]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_GT]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_LE]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_GE]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_BAND]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_BOR]       = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_BNOT]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_BXOR]      = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_LSHIFT]    = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_RSHIFT]    = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_FOREACH]   = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_CLOSED]    = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_METHOD_LEN]       = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_NEW]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_CAST]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_TOSTRING]  = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_ADD]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_SUB]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_MUL]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_DIV]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_POW]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_MOD]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_CONCAT]    = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_UNM]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_NOT]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_EQ]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_NEQ]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LT]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_GT]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LE]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_GE]        = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BAND]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BOR]       = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BNOT]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_BXOR]      = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LSHIFT]    = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_RSHIFT]    = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_FOREACH]   = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_CLOSED]    = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_METHOD_LEN]       = { NULL,                NULL,              PREC_NONE },
 
     /* Operadores Aritméticos, Lógicos, Bitwise y Asignaciones */
     [FOX_TOKEN_PLUS]             = { NULL,               f_ast_parse_binary, PREC_TERM },
@@ -220,31 +223,31 @@ static const FoxyParseRule rules[] = {
     [FOX_TOKEN_GT]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
     [FOX_TOKEN_LE]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
     [FOX_TOKEN_GE]               = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
-    [FOX_TOKEN_BANG]             = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_BANG]             = { f_ast_parse_unary,  NULL,               PREC_UNARY },
     [FOX_TOKEN_AND]              = { NULL,               f_ast_parse_binary, PREC_AND },
     [FOX_TOKEN_OR]               = { NULL,               f_ast_parse_binary, PREC_OR },
     [FOX_TOKEN_AMPERSAND]        = { f_ast_parse_unary,  f_ast_parse_binary, PREC_TERM },
     [FOX_TOKEN_PIPE]             = { NULL,               f_ast_parse_binary, PREC_TERM },
-    [FOX_TOKEN_TILDE]            = { f_ast_parse_unary,  NULL,              PREC_UNARY },
+    [FOX_TOKEN_TILDE]            = { f_ast_parse_unary,  NULL,               PREC_UNARY },
     [FOX_TOKEN_CARET]            = { NULL,               f_ast_parse_binary, PREC_TERM },
     [FOX_TOKEN_LSHIFT]           = { NULL,               f_ast_parse_binary, PREC_TERM },
     [FOX_TOKEN_RSHIFT]           = { NULL,               f_ast_parse_binary, PREC_TERM },
 
     /* Delimitadores y Puntuación */
-    [FOX_TOKEN_ARROW]            = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_FAT_ARROW]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_PTR_ARROW]        = { NULL,               f_ast_parse_member,PREC_CALL },
-    [FOX_TOKEN_ELLIPSIS]         = { NULL,               NULL,              PREC_NONE },
+    [FOX_TOKEN_ARROW]            = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_FAT_ARROW]        = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_PTR_ARROW]        = { NULL,               f_ast_parse_member, PREC_CALL },
+    [FOX_TOKEN_ELLIPSIS]         = { NULL,               NULL,               PREC_NONE },
     [FOX_TOKEN_LPAREN]           = { f_ast_parse_grouping,f_ast_parse_call,  PREC_CALL },
-    [FOX_TOKEN_RPAREN]           = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_LBRACE]           = { f_ast_parse_dict,   NULL,              PREC_NONE },
-    [FOX_TOKEN_RBRACE]           = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_LBRACKET]         = { f_ast_parse_array,  f_ast_parse_index, PREC_CALL },
-    [FOX_TOKEN_RBRACKET]         = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_SEMICOLON]        = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_COLON]            = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_COMMA]            = { NULL,               NULL,              PREC_NONE },
-    [FOX_TOKEN_DOT]              = { NULL,               f_ast_parse_member,PREC_CALL },
+    [FOX_TOKEN_RPAREN]           = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_LBRACE]           = { f_ast_parse_dict,   NULL,               PREC_NONE },
+    [FOX_TOKEN_RBRACE]           = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_LBRACKET]         = { f_ast_parse_array,  f_ast_parse_index,  PREC_CALL },
+    [FOX_TOKEN_RBRACKET]         = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_SEMICOLON]        = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_COLON]            = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_COMMA]            = { NULL,               NULL,               PREC_NONE },
+    [FOX_TOKEN_DOT]              = { NULL,               f_ast_parse_member, PREC_CALL },
     [FOX_TOKEN_DOTDOT]           = { NULL,               f_ast_parse_binary, PREC_COMPARISON },
     [FOX_TOKEN_QUESTION]         = { NULL,               f_ast_parse_ternary,PREC_ASSIGNMENT }
 };
@@ -950,11 +953,19 @@ static FoxyAstNode *f_ast_parse_precedence(FoxyAstParser *parser, FoxyPrecedence
     FoxyAstNode *node = prefix_rule(parser, NULL, can_assign);
 
     while (precedence <= f_ast_get_rule(parser->current_token.type)->precedence) {
-        f_ast_advance(parser);
-        FoxyParseFn infix_rule = f_ast_get_rule(parser->previous_token.type)->infix;
-        if (infix_rule != NULL) {
-            node = infix_rule(parser, node, can_assign);
+        FoxyParseFn infix_rule = f_ast_get_rule(parser->current_token.type)->infix;
+        if (infix_rule == NULL) {
+            break; // Si el token no tiene regla infija/postfix, salimos del bucle
         }
+
+        f_ast_advance(parser);
+        node = infix_rule(parser, node, can_assign);
+    }
+
+    /* Manejo de error si se intentó asignar sobre un L-Value inválido */
+    if (can_assign && f_ast_is_assignment_op(parser->current_token.type)) {
+        fprintf(stderr, "[Foxy Parser Error] Line %u: Invalid assignment target.\n", parser->current_token.pos.line);
+        parser->had_error = true;
     }
 
     return node;
@@ -1007,7 +1018,7 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
         FoxyTokenType type_token = parser->current_token.type;
         f_ast_advance(parser);
 
-        // Validar que el siguiente token sea el identificador/nombre de la variable
+        // 1. Validar que el siguiente token sea el identificador
         if (parser->current_token.type != FOX_TOKEN_IDENTIFIER) {
             fprintf(stderr, "[Foxy Parser Error] Line %u: Expected variable name after type specifier.\n", 
                     parser->current_token.pos.line);
@@ -1021,22 +1032,27 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
 
         FoxyAstNode *initializer = NULL;
 
-        // Parsear inicializador opcional (= expr)
+        // 2. Parsear inicializador opcional (= expr)
         if (parser->current_token.type == FOX_TOKEN_ASSIGN) {
             f_ast_advance(parser); // Consumir '='
             initializer = f_ast_parse_expression(parser);
         }
 
-        // Exigir ';' al final de la declaración
+        // 3. Exigir ';' al final de la declaración
         if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
             f_ast_advance(parser);
         } else {
             fprintf(stderr, "[Foxy Parser Error] Line %u: Expected ';' after variable declaration.\n", 
                     parser->current_token.pos.line);
             parser->had_error = true;
+            parser->panic_mode = true;
+            
+            // Si hubo error grave y no quieres devolver un nodo incompleto:
+            // if (initializer) f_ast_free_node(initializer);
+            // return NULL;
         }
 
-        // Construir y retornar el nodo AST de la declaración
+        // 4. Construir y retornar el nodo AST
         FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_VAR_DECL, pos);
         node->as.var_decl.type_token = type_token;
         node->as.var_decl.name = name;
@@ -1241,4 +1257,118 @@ static FoxyAstNode *f_ast_parse_ternary(FoxyAstParser *parser, FoxyAstNode *left
     if_node->as.if_stmt.then_branch = then_branch;
     if_node->as.if_stmt.else_branch = else_branch;
     return if_node;
+}
+
+static FoxyAstNode *f_ast_parse_block_statement(FoxyAstParser *parser) {
+    FoxySourcePos pos = parser->previous_token.pos; // Consumió '{'
+    FoxyAstNode *block = f_ast_create_node(FOXY_AST_STMT_BLOCK, pos);
+    f_ast_node_list_init(&block->as.program);
+
+    while (parser->current_token.type != FOX_TOKEN_RBRACE && parser->current_token.type != FOX_TOKEN_EOF) {
+        FoxyAstNode *stmt = f_ast_parse_declaration(parser);
+        if (stmt) {
+            f_ast_node_list_append(&block->as.program, stmt);
+        }
+    }
+
+    if (parser->current_token.type == FOX_TOKEN_RBRACE) {
+        f_ast_advance(parser);
+    } else {
+        fprintf(stderr, "[Foxy Parser Error] Line %u: Expected '}' after block.\n", parser->current_token.pos.line);
+        parser->had_error = true;
+    }
+
+    return block;
+}
+
+static FoxyAstNode *f_ast_parse_if_statement(FoxyAstParser *parser) {
+    FoxySourcePos pos = parser->previous_token.pos; // 'if'
+    
+    // Paréntesis en la condición opcionales o requeridos según la sintaxis Foxy
+    if (parser->current_token.type == FOX_TOKEN_LPAREN) f_ast_advance(parser);
+    FoxyAstNode *condition = f_ast_parse_expression(parser);
+    if (parser->previous_token.type != FOX_TOKEN_RPAREN && parser->current_token.type == FOX_TOKEN_RPAREN) {
+        f_ast_advance(parser);
+    }
+
+    FoxyAstNode *then_branch = f_ast_parse_statement(parser);
+    FoxyAstNode *else_branch = NULL;
+
+    if (parser->current_token.type == FOX_TOKEN_KW_ELSE) {
+        f_ast_advance(parser);
+        else_branch = f_ast_parse_statement(parser);
+    }
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_IF, pos);
+    node->as.if_stmt.condition = condition;
+    node->as.if_stmt.then_branch = then_branch;
+    node->as.if_stmt.else_branch = else_branch;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_return_statement(FoxyAstParser *parser) {
+    FoxySourcePos pos = parser->previous_token.pos;
+    FoxyAstNode *value = NULL;
+
+    if (parser->current_token.type != FOX_TOKEN_SEMICOLON) {
+        value = f_ast_parse_expression(parser);
+    }
+
+    if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
+        f_ast_advance(parser);
+    }
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_RETURN, pos);
+    node->as.return_stmt.value = value;
+    return node;
+}
+
+static FoxyAstNode *f_ast_parse_function_declaration(FoxyAstParser *parser) {
+    FoxySourcePos pos = parser->previous_token.pos; // 'function'
+    
+    if (parser->current_token.type != FOX_TOKEN_IDENTIFIER) {
+        fprintf(stderr, "[Foxy Parser Error] Line %u: Expected function name.\n", parser->current_token.pos.line);
+        parser->had_error = true;
+        return NULL;
+    }
+
+    FoxyToken name = parser->current_token;
+    f_ast_advance(parser);
+
+    if (parser->current_token.type != FOX_TOKEN_LPAREN) {
+        fprintf(stderr, "[Foxy Parser Error] Line %u: Expected '(' after function name.\n", parser->current_token.pos.line);
+        parser->had_error = true;
+        return NULL;
+    }
+    f_ast_advance(parser); // Consumir '('
+
+    FoxyAstNodeList params;
+    f_ast_node_list_init(&params);
+
+    if (parser->current_token.type != FOX_TOKEN_RPAREN) {
+        do {
+            if (parser->current_token.type == FOX_TOKEN_IDENTIFIER) {
+                FoxyAstNode *param = f_ast_create_node(FOXY_AST_EXPR_IDENTIFIER, parser->current_token.pos);
+                param->as.identifier.name = parser->current_token;
+                f_ast_node_list_append(&params, param);
+                f_ast_advance(parser);
+            }
+        } while (parser->current_token.type == FOX_TOKEN_COMMA && (f_ast_advance(parser), true));
+    }
+
+    if (parser->current_token.type == FOX_TOKEN_RPAREN) {
+        f_ast_advance(parser);
+    }
+
+    FoxyAstNode *body = NULL;
+    if (parser->current_token.type == FOX_TOKEN_LBRACE) {
+        f_ast_advance(parser); // Consumir '{'
+        body = f_ast_parse_block_statement(parser);
+    }
+
+    FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_FUNC_DECL, pos);
+    node->as.func_decl.name = name;
+    node->as.func_decl.params = params;
+    node->as.func_decl.body = body;
+    return node;
 }
