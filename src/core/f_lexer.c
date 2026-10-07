@@ -455,8 +455,8 @@ finalize_type:;
 
     if (is_float) {
         token_type = has_f ? FOX_TOKEN_FLOAT_LITERAL :
-                     (l_count > 0 || has_d) ? FOX_TOKEN_LDOUBLE_LITERAL :
-                                             FOX_TOKEN_DOUBLE_LITERAL;
+                     (l_count > 0) ? FOX_TOKEN_LDOUBLE_LITERAL :
+                                     FOX_TOKEN_DOUBLE_LITERAL;
     } else {
         token_type = INT_TOKEN_MAP[has_u ? 1 : 0][l_count > 2 ? 2 : l_count];
     }
