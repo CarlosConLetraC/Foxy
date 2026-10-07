@@ -400,22 +400,24 @@ extern const FoxyKeywordMap FOXY_KEYWORD_TABLE[];
 extern const size_t FOXY_KEYWORD_TABLE_SIZE;
 
 typedef struct {
-    FILE *file;               /* 8 bytes: Descriptor del archivo de origen */
-    const char *filename;     /* 8 bytes: Ruta/Nombre del archivo para reporte de errores */
-    const char *cursor;       /* 8 bytes: Apunta a la posición actual dentro de line_buffer */
-    const char *token_start;  /* 8 bytes: Apunta al inicio del lexema en line_buffer */
+    FILE *file;               /* 8 bytes: Handle de archivo si se leyó de disco */
+    const char *filename;     /* 8 bytes: Nombre del archivo para reporte de errores */
+    const char *source;       /* 8 bytes: Apunta al inicio del buffer completo en memoria */
+    const char *cursor;       /* 8 bytes: Posición actual dentro del fuente */
+    const char *token_start;  /* 8 bytes: Inicio del lexema actual */
     uint32_t line;            /* 4 bytes: Fila actual */
     uint32_t column;          /* 4 bytes: Columna actual */
     uint8_t flags;            /* 1 byte  */
     uint8_t is_eof;           /* 1 byte  */
-    uint8_t reserved[6];      /* 6 bytes: Padding explícito (Estructura total = 48 bytes) */
-    char line_buffer[LEXER_LINE_BUFFER_SIZE]; /* Buffer estático en el heap/stack según alloc */
+    uint8_t owns_source;      /* 1 byte: Indica si el lexer debe hacer free(source) */
+    uint8_t reserved[5];      /* 5 bytes: Padding explícito (Estructura total = 56 bytes) */
 } FoxyLexer;
 
 /* ========================================================================= */
 /* 4. FUNCIONES PÚBLICAS                                                    */
 /* ========================================================================= */
 FOXY_EXPORT bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename);
+FOXY_EXPORT bool f_lexer_init_string(FoxyLexer *lexer, const char *source, const char *filename);
 FOXY_EXPORT void f_lexer_close(FoxyLexer *lexer);
 FOXY_EXPORT FoxyToken f_lexer_next_token(FoxyLexer *lexer);
 FOXY_EXPORT FoxyToken f_lexer_peek_token(FoxyLexer *lexer);

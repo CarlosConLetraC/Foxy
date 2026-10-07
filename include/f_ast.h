@@ -43,6 +43,7 @@ typedef struct FoxyAstNode FoxyAstNode;
     F(FOXY_AST_EXPR_DICT_LITERAL) \
     F(FOXY_AST_EXPR_DICT_ENTRY) \
     /* --- SENTENCIAS / DECLARACIONES (STMT) --- */ \
+    F(FOXY_AST_STMT_INCLUDE) \
     F(FOXY_AST_STMT_EXPR) \
     F(FOXY_AST_STMT_BLOCK) \
     F(FOXY_AST_STMT_VAR_DECL) \
@@ -82,6 +83,7 @@ typedef enum FOXY_PACKED {
     FOXY_AST_EXPR_ARRAY_LITERAL,
     FOXY_AST_EXPR_DICT_LITERAL,
     FOXY_AST_EXPR_DICT_ENTRY,
+    FOXY_AST_STMT_INCLUDE,
     FOXY_AST_STMT_EXPR,
     FOXY_AST_STMT_BLOCK,
     FOXY_AST_STMT_VAR_DECL,
@@ -271,6 +273,10 @@ typedef struct {
     uint8_t _reserved : 8;
 } FoxyAstParser;
 
+typedef struct {
+    FoxyToken path;                 /* Token de la cadena con la ruta o módulo */
+} FoxyAstIncludeStmt;
+
 /**
  * @brief Estructura Principal de Nodo AST (Tagged Union)
  */
@@ -303,6 +309,7 @@ struct FoxyAstNode {
         FoxyAstGotoStmt goto_stmt;
         FoxyAstTryStmt try_stmt;
         FoxyAstCatchStmt catch_stmt;
+        FoxyAstIncludeStmt include_stmt;
     } as;                           /* Alineado a 8 bytes primero */
 
     FoxySourcePos pos;              /* Posición en el fuente */
@@ -552,6 +559,7 @@ static inline bool f_ast_kind_is_leaf(FoxyAstKind kind) {
 /* ========================================================================= */
 
 FOXY_EXPORT FoxyAstNode *f_ast_create_node(FoxyAstKind kind, FoxySourcePos pos);
+FOXY_EXPORT FoxyAstNode *f_ast_create_binary_node(FoxyToken op, FoxyAstNode *left, FoxyAstNode *right);
 FOXY_EXPORT void f_ast_node_list_init(FoxyAstNodeList *list);
 FOXY_EXPORT void f_ast_node_list_append(FoxyAstNodeList *list, FoxyAstNode *node);
 FOXY_EXPORT void f_ast_append_child(FoxyAstNode *parent, FoxyAstNode *child);

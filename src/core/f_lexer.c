@@ -169,39 +169,30 @@ const size_t FOXY_KEYWORD_TABLE_SIZE = sizeof(FOXY_KEYWORD_TABLE) / sizeof(FoxyK
 /* AUXILIARES DE ENTRADA Y BUFFER DE LÍNEA                                   */
 /* ========================================================================= */
 
-static bool f_lexer_load_next_line(FoxyLexer *lexer) {
-    if (!lexer || !lexer->file || lexer->is_eof) return false;
-
-    if (fgets(lexer->line_buffer, sizeof(lexer->line_buffer), lexer->file) == NULL) {
-        /* Archivo vacío o se alcanzó el EOF -> cerrar recursos */
-        f_lexer_close(lexer);
-        return false;
-    }
-
-    lexer->line++;
-    lexer->column = 1;
-    lexer->cursor = lexer->line_buffer;
-    lexer->token_start = lexer->line_buffer;
-    return true;
-}
+// static bool f_lexer_load_next_line(FoxyLexer *lexer) {
+//     if (!lexer || !lexer->file || lexer->is_eof) return false;
+// 
+//     if (fgets(lexer->line_buffer, sizeof(lexer->line_buffer), lexer->file) == NULL) {
+//         /* Archivo vacío o se alcanzó el EOF -> cerrar recursos */
+//         f_lexer_close(lexer);
+//         return false;
+//     }
+// 
+//     lexer->line++;
+//     lexer->column = 1;
+//     lexer->cursor = lexer->line_buffer;
+//     lexer->token_start = lexer->line_buffer;
+//     return true;
+// }
 
 static char f_lexer_peek(FoxyLexer *lexer) {
-    if (!lexer) return '\0';
-
-    while (*lexer->cursor == '\0') {
-        if (!f_lexer_load_next_line(lexer)) {
-            return '\0';
-        }
-    }
+    if (!lexer || !lexer->cursor) return '\0';
     return *lexer->cursor;
 }
 
 static char f_lexer_peek_next(FoxyLexer *lexer) {
-    if (!lexer) return '\0';
-    if (*lexer->cursor != '\0' && *(lexer->cursor + 1) != '\0') {
-        return *(lexer->cursor + 1);
-    }
-    return '\0';
+    if (!lexer || !lexer->cursor || *lexer->cursor == '\0') return '\0';
+    return *(lexer->cursor + 1);
 }
 
 static char f_lexer_advance(FoxyLexer *lexer) {
@@ -251,7 +242,7 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
     for (;;) {
         char c = f_lexer_peek(lexer);
         switch (c) {
-            case '\x20':
+            case ' ':
             case '\r':
             case '\t':
                 f_lexer_advance(lexer);
@@ -259,10 +250,9 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
             case '\n':
                 lexer->line++;
                 lexer->column = 1;
-                f_lexer_advance(lexer);
+                lexer->cursor++; /* Avanza sin incrementar columna */
                 break;
             case '@': {
-                // Contar cuántas '@' consecutivas inician el comentario. . .
                 size_t count = 0;
                 while (f_lexer_peek(lexer) == '@') {
                     count++;
@@ -270,32 +260,31 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
                 }
 
                 if (count == 1) {
-                    // Comentario de una sola línea (@ ... \n)
+                    /* Comentario de línea única (@ ... \n) */
                     while (f_lexer_peek(lexer) != '\n' && f_lexer_peek(lexer) != '\0') {
                         f_lexer_advance(lexer);
                     }
                 } else {
-                    // Comentario multilínea (N@ ... N@)
+                    /* Comentario multilínea (N@ ... N@) */
                     while (f_lexer_peek(lexer) != '\0') {
                         if (f_lexer_peek(lexer) == '\n') {
                             lexer->line++;
                             lexer->column = 1;
-                            f_lexer_advance(lexer);
+                            lexer->cursor++;
                             continue;
                         }
 
                         if (f_lexer_peek(lexer) == '@') {
-                            // Verificar si encontramos la misma cantidad de '@' para cerrar
                             size_t close_count = 0;
+                            // const char *saved_cursor = lexer->cursor;
                             while (f_lexer_peek(lexer) == '@') {
                                 close_count++;
                                 f_lexer_advance(lexer);
                             }
 
                             if (close_count == count) {
-                                break; // Comentario multilínea cerrado correctamente
+                                break; /* Cerrado correctamente */
                             }
-                            // Si no coincidió la cantidad, continuar buscando
                         } else {
                             f_lexer_advance(lexer);
                         }
@@ -484,45 +473,68 @@ static FoxyToken f_lexer_scan_string(FoxyLexer *lexer) {
 /* IMPLEMENTACIÓN DE LA API PÚBLICA                                           */
 /* ========================================================================= */
 
-bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
-    if (!lexer) return false;
+bool f_lexer_init_string(FoxyLexer *lexer, const char *source, const char *filename) {
+    if (!lexer || !source) return false;
     memset(lexer, 0, sizeof(FoxyLexer));
 
-    lexer->file = file;
-    lexer->filename = filename ? filename : "<unknown>";
-    lexer->line = 0;
+    lexer->source = source;
+    lexer->cursor = source;
+    lexer->token_start = source;
+    lexer->filename = filename ? filename : "<string>";
+    lexer->line = 1;
     lexer->column = 1;
-    lexer->is_eof = false;
-    lexer->cursor = lexer->line_buffer;
-    lexer->token_start = lexer->line_buffer;
-    lexer->line_buffer[0] = '\0';
+    lexer->owns_source = 0;
+    lexer->is_eof = (*source == '\0');
 
-    if (!file) {
-        lexer->is_eof = true;
-        return false;
-    }
+    return true;
+}
 
-    /* Precargar la primera línea. Si el archivo está vacío (fgets da NULL), 
-       f_lexer_load_next_line ejecutará f_lexer_close() y devolverá false. */
-    if (!f_lexer_load_next_line(lexer)) {
-        return false; /* Archivo vacío o no leíble */
-    }
+bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
+    if (!lexer || !file) return false;
+    memset(lexer, 0, sizeof(FoxyLexer));
 
-    return true; /* Lexer listo para tokenizar */
+    /* Obtener tamaño del archivo usando las macros de f_settings.h */
+    if (foxy_fseek(file, 0, SEEK_END) != 0) return false;
+    foxy_off_t file_size = foxy_ftell(file);
+    if (file_size < 0) return false;
+    foxy_fseek(file, 0, SEEK_SET);
+
+    /* Reservar buffer contiguo en heap (+1 para '\0') */
+    char *buffer = (char *)malloc((size_t)file_size + 1);
+    if (!buffer) return false;
+
+    size_t bytes_read = fread(buffer, 1, (size_t)file_size, file);
+    buffer[bytes_read] = '\0';
+
+    lexer->file = file;
+    lexer->source = buffer;
+    lexer->cursor = buffer;
+    lexer->token_start = buffer;
+    lexer->filename = filename ? filename : "<unknown>";
+    lexer->line = 1;
+    lexer->column = 1;
+    lexer->owns_source = 1;
+    lexer->is_eof = (bytes_read == 0);
+
+    return true;
 }
 
 void f_lexer_close(FoxyLexer *lexer) {
     if (!lexer) return;
+
+    if (lexer->owns_source && lexer->source) {
+        free((void *)lexer->source);
+        lexer->source = NULL;
+    }
 
     if (lexer->file) {
         fclose(lexer->file);
         lexer->file = NULL;
     }
 
+    lexer->cursor = NULL;
+    lexer->token_start = NULL;
     lexer->is_eof = true;
-    lexer->line_buffer[0] = '\0';
-    lexer->cursor = lexer->line_buffer;
-    lexer->token_start = lexer->line_buffer;
 }
 
 FoxyToken f_lexer_next_token(FoxyLexer *lexer) {

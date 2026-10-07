@@ -46,7 +46,7 @@
  */
 
 /** Longitud máxima de buffer estático para líneas del lexer (4 KB). */
-#define LEXER_LINE_BUFFER_SIZE             (1u << 12)
+// #define LEXER_LINE_BUFFER_SIZE             (1u << 12)
 
 /** Longitud máxima de identificadores de variables, funciones y símbolos (256 B). */
 #define FOXY_MAX_IDENTIFIER_LEN            (1u << 8)
