@@ -45,7 +45,7 @@ static const char *const FOXY_TOKEN_NAMES[] = {
     "FOX_TOKEN_METHOD_GT", "FOX_TOKEN_METHOD_LE", "FOX_TOKEN_METHOD_GE",
     "FOX_TOKEN_METHOD_BAND", "FOX_TOKEN_METHOD_BOR", "FOX_TOKEN_METHOD_BNOT",
     "FOX_TOKEN_METHOD_BXOR", "FOX_TOKEN_METHOD_LSHIFT", "FOX_TOKEN_METHOD_RSHIFT",
-    "FOX_TOKEN_METHOD_FOREACH", "FOX_TOKEN_METHOD_CLOSED", "FOX_TOKEN_METHOD_LEN",
+    "FOX_TOKEN_METHOD_FOREACH", "FOX_TOKEN_METHOD_CLOSED", "FOX_TOKEN_METHOD_LEN", "FOX_TOKEN_METHOD_UNPACK",
     "FOX_TOKEN_PLUS", "FOX_TOKEN_MINUS", "FOX_TOKEN_STAR", "FOX_TOKEN_SLASH",
     "FOX_TOKEN_PERCENT", "FOX_TOKEN_POWER", "FOX_TOKEN_HASH", "FOX_TOKEN_ASSIGN",
     "FOX_TOKEN_PLUS_ASSIGN", "FOX_TOKEN_MINUS_ASSIGN", "FOX_TOKEN_STAR_ASSIGN",
@@ -58,7 +58,7 @@ static const char *const FOXY_TOKEN_NAMES[] = {
     "FOX_TOKEN_ARROW", "FOX_TOKEN_FAT_ARROW", "FOX_TOKEN_PTR_ARROW", "FOX_TOKEN_ELLIPSIS",
     "FOX_TOKEN_LPAREN", "FOX_TOKEN_RPAREN", "FOX_TOKEN_LBRACE", "FOX_TOKEN_RBRACE",
     "FOX_TOKEN_LBRACKET", "FOX_TOKEN_RBRACKET", "FOX_TOKEN_SEMICOLON", "FOX_TOKEN_COLON",
-    "FOX_TOKEN_COMMA", "FOX_TOKEN_DOT", "FOX_TOKEN_DOTDOT", "FOX_TOKEN_QUESTION"
+    "FOX_TOKEN_COMMA", "FOX_TOKEN_DOT", "FOX_TOKEN_DOTDOT", "FOX_TOKEN_DOTDOTDOT", "FOX_TOKEN_QUESTION"
 };
 #endif
 
@@ -160,7 +160,8 @@ const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
     {.text = "__rshift",     .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_RSHIFT,     .flags = 0},
     {.text = "__foreach",    .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_FOREACH,    .flags = 0},
     {.text = "__closed",     .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_CLOSED,     .flags = 0},
-    {.text = "__len",        .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_LEN,        .flags = 0}
+    {.text = "__len",        .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_LEN,        .flags = 0},
+    {.text = "__unpack",     .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_UNPACK}
 };
 
 const size_t FOXY_KEYWORD_TABLE_SIZE = sizeof(FOXY_KEYWORD_TABLE) / sizeof(FoxyKeywordMap);
@@ -566,6 +567,9 @@ FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
         case ',': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_COMMA);
         case '.':
             if (f_lexer_match(lexer, '.')) {
+                if (f_lexer_match(lexer, '.')) {
+                    return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DOTDOTDOT);
+                }
                 return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DOTDOT);
             }
             return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DOT);

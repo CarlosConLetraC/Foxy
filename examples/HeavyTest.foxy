@@ -26,7 +26,7 @@ global const foo_constante_global = (int[]){5, 10, 15}
 function demostracionStatic() {
     @ Variable estática con ámbito limitado a la función (mantiene valor entre llamadas)
     static int llamadas = 0
-    static const float PI_LOCAL = 3.14159f
+    static const PI_LOCAL = 3.14159f
     llamadas++
     printf("Llamada numero: %d\n", llamadas)
 }
@@ -276,13 +276,21 @@ class Cuadrado from BaseFigura {
 
 Cuadrado c1 = Cuadrado("Cuadrado1", 4.0f)
 
-@ Verificación de herencia y tipos mediante 'ancestorof' y 'descendantof'
+@ Verificación de herencia y tipos mediante 'ancestorof', 'descendantof', 'parentof' y 'childof'
 if (BaseFigura ancestorof c1) {
     println("BaseFigura es ancestro de c1")
 }
 
 if (c1 descendantof BaseFigura) {
     println("c1 es descendiente de BaseFigura")
+}
+
+if (BaseFigura parentof c1) {
+    println("BaseFigura es padre de c1")
+}
+
+if (c1 childof BaseFigura) {
+    println("c1 es hijo de BaseFigura")
 }
 
 @ ============================================================================
@@ -320,7 +328,7 @@ function sumarMultiples(valores...) {
 }
 
 number mis_numeros[] = {1, 2, 3, 4, 5}
-number suma_total = sumarMultiples((number...)mis_numeros)
+number suma_total = sumarMultiples(...mis_numeros)
 
 @ Modo híbrido con asignación local
 function procesamientoDinamico(datos...) {

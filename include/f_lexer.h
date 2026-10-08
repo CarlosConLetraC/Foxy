@@ -138,6 +138,7 @@
     F(FOX_TOKEN_METHOD_FOREACH) \
     F(FOX_TOKEN_METHOD_CLOSED) \
     F(FOX_TOKEN_METHOD_LEN) \
+    F(FOX_TOKEN_METHOD_UNPACK) \
     /* Operadores Aritméticos, Lógicos y Bitwise */ \
     F(FOX_TOKEN_PLUS) \
     F(FOX_TOKEN_MINUS) \
@@ -191,6 +192,7 @@
     F(FOX_TOKEN_COMMA) \
     F(FOX_TOKEN_DOT) \
     F(FOX_TOKEN_DOTDOT) \
+    F(FOX_TOKEN_DOTDOTDOT) \
     F(FOX_TOKEN_QUESTION)
 
 #define F(ftoken) ftoken,
@@ -310,6 +312,7 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_METHOD_FOREACH,
     FOX_TOKEN_METHOD_CLOSED,
     FOX_TOKEN_METHOD_LEN,
+    FOX_TOKEN_METHOD_UNPACK,
     /* Operadores y Delimitadores */
     FOX_TOKEN_PLUS,
     FOX_TOKEN_MINUS,
@@ -362,6 +365,7 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_COMMA,
     FOX_TOKEN_DOT,
     FOX_TOKEN_DOTDOT,
+    FOX_TOKEN_DOTDOTDOT,
     FOX_TOKEN_QUESTION
 } FoxyTokenType;
 #endif
@@ -517,6 +521,23 @@ FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
     FOXY_BIT(FOX_TOKEN_XOR_ASSIGN - 64)     \
 )
 
+/* --- Máscara Bitwise para Sincronización de Errores (Parser Recovery) --- */
+#define FOXY_MASK_SYNC_TOKENS_0 ( \
+    FOXY_BIT(FOX_TOKEN_SEMICOLON - 0) | \
+    FOXY_BIT(FOX_TOKEN_KW_CLASS - 0)  | \
+    FOXY_BIT(FOX_TOKEN_KW_STRUCT - 0) | \
+    FOXY_BIT(FOX_TOKEN_KW_FUNCTION - 0)| \
+    FOXY_BIT(FOX_TOKEN_KW_FOR - 0)     | \
+    FOXY_BIT(FOX_TOKEN_KW_FOREACH - 0) | \
+    FOXY_BIT(FOX_TOKEN_KW_IF - 0)      | \
+    FOXY_BIT(FOX_TOKEN_KW_WHILE - 0)   | \
+    FOXY_BIT(FOX_TOKEN_KW_RETURN - 0)  | \
+    FOXY_BIT(FOX_TOKEN_KW_SWITCH - 0)  | \
+    FOXY_BIT(FOX_TOKEN_KW_TRY - 0)       \
+)
+
+#define FOXY_MASK_SYNC_TOKENS_1 (0ULL)
+
 static inline bool f_token_is_in_mask(uint32_t token_type, uint64_t mask0, uint64_t mask1) {
     uint32_t idx = token_type / 64;
     uint64_t bit = 1ULL << (token_type % 64);
@@ -561,4 +582,11 @@ static inline bool f_token_is_logical(uint32_t type) {
 
 static inline bool f_token_is_assignment(uint32_t type) {
     return f_token_is_in_mask(type, FOXY_MASK_ASSIGNMENT_0, FOXY_MASK_ASSIGNMENT_1);
+}
+
+/**
+ * @brief Evalúa si un token es un punto de límite/inicio válido para descartar e interactuar con panic mode.
+ */
+static inline bool f_token_is_sync_boundary(uint32_t token_type) {
+    return f_token_is_in_mask(token_type, FOXY_MASK_SYNC_TOKENS_0, FOXY_MASK_SYNC_TOKENS_1);
 }

@@ -207,7 +207,14 @@ static inline uint32_t f_foxmode_create_iAsBx(uint8_t op, uint8_t a, uint8_t fla
 
 /** @brief Genera una máscara de bit de 64 bits para la posición especificada por f_type. */
 // #define FOXY_BIT(f_type) ((f_type) < 64 ? (1ULL << (f_type)) : 0ULL)
-#define FOXY_BIT(f_type) (1ULL << ((f_type) & 63))
+// #define FOXY_BIT(f_type) (1ULL << ((f_type) & 63))
+#define FOXY_BIT(f_type) (((uint64_t)1) << ((uint64_t)(f_type) & 63U))
+
+/* Mantiene 0ULL si el token no pertenece al banco 0 [0..63] */
+#define FOXY_BIT_0(t) (((uint64_t)(t) < 64U) ? (((uint64_t)1) << ((uint64_t)(t))) : 0ULL)
+
+/* Mantiene 0ULL si el token no pertenece al banco 1 [64..127] */
+#define FOXY_BIT_1(t) (((uint64_t)(t) >= 64U && (uint64_t)(t) < 128U) ? (((uint64_t)1) << (((uint64_t)(t)) - 64U)) : 0ULL)
 
 /** @brief Máscara conteniendo todos los tipos numéricos y primitivos acelerados. */
 #define FOXY_MASK_PRIMITIVE_NUMERIC \

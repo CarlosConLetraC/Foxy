@@ -48,6 +48,8 @@
 /** Longitud máxima de buffer estático para líneas del lexer (4 KB). */
 // #define LEXER_LINE_BUFFER_SIZE             (1u << 12)
 
+#define FOXY_NATIVE_TOKEN_RANGE            (1u << 7) // 128 tokens disponibles.
+
 /** Longitud máxima de identificadores de variables, funciones y símbolos (256 B). */
 #define FOXY_MAX_IDENTIFIER_LEN            (1u << 8)
 
@@ -174,7 +176,7 @@
 
 /** Capacidad inicial por defecto para arreglos dinámicos del AST (nodos hijo, argumentos, etc.) */
 #ifndef FOXY_AST_CHILDREN_INITIAL_CAPACITY
-    #define FOXY_AST_CHILDREN_INITIAL_CAPACITY (1u << 3) /* 8 elementos */
+    #define FOXY_AST_CHILDREN_INITIAL_CAPACITY (1u << 14) /* 16,384 elementos */
 #endif
 
 /**
