@@ -338,23 +338,24 @@ struct FoxyAstNode {
  * @brief Lista X-Macro de Especificadores de Tipos Reservados
  */
 #define FOXY_TYPE_SPECIFIER_LIST(F) \
-    F(FOX_TOKEN_KW_BOOL)     \
-    F(FOX_TOKEN_KW_CHAR)     \
-    F(FOX_TOKEN_KW_UCHAR)    \
-    F(FOX_TOKEN_KW_SHORT)    \
-    F(FOX_TOKEN_KW_USHORT)   \
-    F(FOX_TOKEN_KW_INT)      \
-    F(FOX_TOKEN_KW_UINT)     \
-    F(FOX_TOKEN_KW_LONG)     \
-    F(FOX_TOKEN_KW_ULONG)    \
-    F(FOX_TOKEN_KW_LLONG)    \
-    F(FOX_TOKEN_KW_ULLONG)   \
-    F(FOX_TOKEN_KW_FLOAT)    \
-    F(FOX_TOKEN_KW_DOUBLE)   \
-    F(FOX_TOKEN_KW_LDOUBLE)  \
-    F(FOX_TOKEN_KW_OBJECT)   \
-    F(FOX_TOKEN_KW_STRUCT)   \
-    F(FOX_TOKEN_KW_CLASS)    \
+    F(FOX_TOKEN_KW_BOOL)            \
+    F(FOX_TOKEN_KW_CHAR)            \
+    F(FOX_TOKEN_KW_UCHAR)           \
+    F(FOX_TOKEN_KW_SHORT)           \
+    F(FOX_TOKEN_KW_USHORT)          \
+    F(FOX_TOKEN_KW_INT)             \
+    F(FOX_TOKEN_KW_UINT)            \
+    F(FOX_TOKEN_KW_LONG)            \
+    F(FOX_TOKEN_KW_ULONG)           \
+    F(FOX_TOKEN_KW_LLONG)           \
+    F(FOX_TOKEN_KW_ULLONG)          \
+    F(FOX_TOKEN_KW_FLOAT)           \
+    F(FOX_TOKEN_KW_DOUBLE)          \
+    F(FOX_TOKEN_KW_LDOUBLE)         \
+    F(FOX_TOKEN_KW_NUMBER)          \
+    F(FOX_TOKEN_KW_OBJECT)          \
+    F(FOX_TOKEN_KW_STRUCT)          \
+    F(FOX_TOKEN_KW_CLASS)           \
     F(FOX_TOKEN_KW_ENUM)
 
 /* Banco 0: Filtra y activa únicamente tokens con ID de 0 a 63 */
@@ -367,17 +368,17 @@ struct FoxyAstNode {
  * @brief Tokens de inicio de sentencias
  */
 #define FOXY_MASK_STMT_START_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_KW_CLASS)    | \
-    FOXY_BIT(FOX_TOKEN_KW_STRUCT)   | \
-    FOXY_BIT(FOX_TOKEN_KW_FUNCTION) | \
-    FOXY_BIT(FOX_TOKEN_KW_FOR)      | \
-    FOXY_BIT(FOX_TOKEN_KW_FOREACH)  | \
-    FOXY_BIT(FOX_TOKEN_KW_IF)       | \
-    FOXY_BIT(FOX_TOKEN_KW_WHILE)    | \
-    FOXY_BIT(FOX_TOKEN_KW_RETURN)   | \
-    FOXY_BIT(FOX_TOKEN_KW_SWITCH)   | \
-    FOXY_BIT(FOX_TOKEN_KW_TRY)      | \
-    FOXY_BIT(FOX_TOKEN_KW_INCLUDE)    \
+    FOXY_BIT(FOX_TOKEN_KW_CLASS)      | \
+    FOXY_BIT(FOX_TOKEN_KW_STRUCT)     | \
+    FOXY_BIT(FOX_TOKEN_KW_FUNCTION)   | \
+    FOXY_BIT(FOX_TOKEN_KW_FOR)        | \
+    FOXY_BIT(FOX_TOKEN_KW_FOREACH)    | \
+    FOXY_BIT(FOX_TOKEN_KW_IF)         | \
+    FOXY_BIT(FOX_TOKEN_KW_WHILE)      | \
+    FOXY_BIT(FOX_TOKEN_KW_RETURN)     | \
+    FOXY_BIT(FOX_TOKEN_KW_SWITCH)     | \
+    FOXY_BIT(FOX_TOKEN_KW_TRY)        | \
+    FOXY_BIT(FOX_TOKEN_KW_INCLUDE)      \
 )
 #define FOXY_MASK_STMT_START_TOKENS_1 ((uint64_t)0)
 
@@ -385,18 +386,18 @@ struct FoxyAstNode {
  * @brief Operadores de Asignación
  */
 #define FOXY_MASK_ASSIGNMENT_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_ASSIGN)         | \
-    FOXY_BIT(FOX_TOKEN_PLUS_ASSIGN)    | \
-    FOXY_BIT(FOX_TOKEN_MINUS_ASSIGN)   | \
-    FOXY_BIT(FOX_TOKEN_STAR_ASSIGN)    | \
-    FOXY_BIT(FOX_TOKEN_SLASH_ASSIGN)   | \
-    FOXY_BIT(FOX_TOKEN_PERCENT_ASSIGN) | \
-    FOXY_BIT(FOX_TOKEN_POWER_ASSIGN)   | \
-    FOXY_BIT(FOX_TOKEN_AND_ASSIGN)     | \
-    FOXY_BIT(FOX_TOKEN_OR_ASSIGN)      | \
-    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN)     | \
-    FOXY_BIT(FOX_TOKEN_LSHIFT_ASSIGN)  | \
-    FOXY_BIT(FOX_TOKEN_RSHIFT_ASSIGN)    \
+    FOXY_BIT(FOX_TOKEN_ASSIGN)        | \
+    FOXY_BIT(FOX_TOKEN_PLUS_ASSIGN)   | \
+    FOXY_BIT(FOX_TOKEN_MINUS_ASSIGN)  | \
+    FOXY_BIT(FOX_TOKEN_STAR_ASSIGN)   | \
+    FOXY_BIT(FOX_TOKEN_SLASH_ASSIGN)  | \
+    FOXY_BIT(FOX_TOKEN_PERCENT_ASSIGN)| \
+    FOXY_BIT(FOX_TOKEN_POWER_ASSIGN)  | \
+    FOXY_BIT(FOX_TOKEN_AND_ASSIGN)    | \
+    FOXY_BIT(FOX_TOKEN_OR_ASSIGN)     | \
+    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN)    | \
+    FOXY_BIT(FOX_TOKEN_LSHIFT_ASSIGN) | \
+    FOXY_BIT(FOX_TOKEN_RSHIFT_ASSIGN)   \
 )
 #define FOXY_MASK_ASSIGNMENT_TOKENS_1 ((uint64_t)0)
 
@@ -404,12 +405,12 @@ struct FoxyAstNode {
  * @brief Operadores Aritméticos
  */
 #define FOXY_MASK_ARITHMETIC_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_PLUS)    | \
-    FOXY_BIT(FOX_TOKEN_MINUS)   | \
-    FOXY_BIT(FOX_TOKEN_STAR)    | \
-    FOXY_BIT(FOX_TOKEN_SLASH)   | \
-    FOXY_BIT(FOX_TOKEN_PERCENT) | \
-    FOXY_BIT(FOX_TOKEN_POWER)     \
+    FOXY_BIT(FOX_TOKEN_PLUS)          | \
+    FOXY_BIT(FOX_TOKEN_MINUS)         | \
+    FOXY_BIT(FOX_TOKEN_STAR)          | \
+    FOXY_BIT(FOX_TOKEN_SLASH)         | \
+    FOXY_BIT(FOX_TOKEN_PERCENT)       | \
+    FOXY_BIT(FOX_TOKEN_POWER)           \
 )
 #define FOXY_MASK_ARITHMETIC_TOKENS_1 ((uint64_t)0)
 
@@ -417,12 +418,12 @@ struct FoxyAstNode {
  * @brief Operadores de Bits
  */
 #define FOXY_MASK_BITWISE_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_AMPERSAND) | \
-    FOXY_BIT(FOX_TOKEN_PIPE)      | \
-    FOXY_BIT(FOX_TOKEN_CARET)     | \
-    FOXY_BIT(FOX_TOKEN_TILDE)     | \
-    FOXY_BIT(FOX_TOKEN_LSHIFT)    | \
-    FOXY_BIT(FOX_TOKEN_RSHIFT)      \
+    FOXY_BIT(FOX_TOKEN_AMPERSAND)  | \
+    FOXY_BIT(FOX_TOKEN_PIPE)       | \
+    FOXY_BIT(FOX_TOKEN_CARET)      | \
+    FOXY_BIT(FOX_TOKEN_TILDE)      | \
+    FOXY_BIT(FOX_TOKEN_LSHIFT)     | \
+    FOXY_BIT(FOX_TOKEN_RSHIFT)       \
 )
 #define FOXY_MASK_BITWISE_TOKENS_1 ((uint64_t)0)
 
@@ -430,35 +431,35 @@ struct FoxyAstNode {
  * @brief Operadores Relacionales y de Igualdad
  */
 #define FOXY_MASK_EQUALITY_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_EQ)  | \
-    FOXY_BIT(FOX_TOKEN_NEQ)   \
+    FOXY_BIT(FOX_TOKEN_EQ)          | \
+    FOXY_BIT(FOX_TOKEN_NEQ)           \
 )
 #define FOXY_MASK_EQUALITY_TOKENS_1 ((uint64_t)0)
 
 #define FOXY_MASK_RELATIONAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_LT) | \
-    FOXY_BIT(FOX_TOKEN_GT) | \
-    FOXY_BIT(FOX_TOKEN_LE) | \
-    FOXY_BIT(FOX_TOKEN_GE)   \
+    FOXY_BIT(FOX_TOKEN_LT)            | \
+    FOXY_BIT(FOX_TOKEN_GT)            | \
+    FOXY_BIT(FOX_TOKEN_LE)            | \
+    FOXY_BIT(FOX_TOKEN_GE)              \
 )
 #define FOXY_MASK_RELATIONAL_TOKENS_1 ((uint64_t)0)
 
 #define FOXY_MASK_COMPARISON_TOKENS_0 ( \
-    FOXY_MASK_EQUALITY_TOKENS_0 | \
-    FOXY_MASK_RELATIONAL_TOKENS_0 \
+    FOXY_MASK_EQUALITY_TOKENS_0       | \
+    FOXY_MASK_RELATIONAL_TOKENS_0       \
 )
 #define FOXY_MASK_COMPARISON_TOKENS_1 ( \
-    FOXY_MASK_EQUALITY_TOKENS_1 | \
-    FOXY_MASK_RELATIONAL_TOKENS_1 \
+    FOXY_MASK_EQUALITY_TOKENS_1       | \
+    FOXY_MASK_RELATIONAL_TOKENS_1       \
 )
 
 /**
  * @brief Operadores Lógicos
  */
 #define FOXY_MASK_LOGICAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_AND)  | \
-    FOXY_BIT(FOX_TOKEN_OR)   | \
-    FOXY_BIT(FOX_TOKEN_BANG)   \
+    FOXY_BIT(FOX_TOKEN_AND)        | \
+    FOXY_BIT(FOX_TOKEN_OR)         | \
+    FOXY_BIT(FOX_TOKEN_BANG)         \
 )
 #define FOXY_MASK_LOGICAL_TOKENS_1 ((uint64_t)0)
 
@@ -466,14 +467,14 @@ struct FoxyAstNode {
  * @brief Operadores Unarios
  */
 #define FOXY_MASK_UNARY_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_PLUS)      | \
-    FOXY_BIT(FOX_TOKEN_MINUS)     | \
-    FOXY_BIT(FOX_TOKEN_BANG)      | \
-    FOXY_BIT(FOX_TOKEN_TILDE)     | \
-    FOXY_BIT(FOX_TOKEN_HASH)      | \
-    FOXY_BIT(FOX_TOKEN_AMPERSAND) | \
-    FOXY_BIT(FOX_TOKEN_INC)       | \
-    FOXY_BIT(FOX_TOKEN_DEC)         \
+    FOXY_BIT(FOX_TOKEN_PLUS)     | \
+    FOXY_BIT(FOX_TOKEN_MINUS)    | \
+    FOXY_BIT(FOX_TOKEN_BANG)     | \
+    FOXY_BIT(FOX_TOKEN_TILDE)    | \
+    FOXY_BIT(FOX_TOKEN_HASH)     | \
+    FOXY_BIT(FOX_TOKEN_AMPERSAND)| \
+    FOXY_BIT(FOX_TOKEN_INC)      | \
+    FOXY_BIT(FOX_TOKEN_DEC)        \
 )
 #define FOXY_MASK_UNARY_TOKENS_1 ((uint64_t)0)
 
@@ -481,9 +482,9 @@ struct FoxyAstNode {
  * @brief Literales Flotantes y Reales
  */
 #define FOXY_MASK_FLOAT_LITERAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL)   | \
-    FOXY_BIT(FOX_TOKEN_DOUBLE_LITERAL)  | \
-    FOXY_BIT(FOX_TOKEN_LDOUBLE_LITERAL)   \
+    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL)    | \
+    FOXY_BIT(FOX_TOKEN_DOUBLE_LITERAL)   | \
+    FOXY_BIT(FOX_TOKEN_LDOUBLE_LITERAL)    \
 )
 #define FOXY_MASK_FLOAT_LITERAL_TOKENS_1 ((uint64_t)0)
 
@@ -497,7 +498,7 @@ struct FoxyAstNode {
     FOXY_BIT(FOX_TOKEN_ULONG_LITERAL)   | \
     FOXY_BIT(FOX_TOKEN_LLONG_LITERAL)   | \
     FOXY_BIT(FOX_TOKEN_ULLONG_LITERAL)  | \
-    FOXY_MASK_FLOAT_LITERAL_TOKENS_0      | \
+    FOXY_MASK_FLOAT_LITERAL_TOKENS_0    | \
     FOXY_BIT(FOX_TOKEN_NUMBER_LITERAL)    \
 )
 #define FOXY_MASK_NUMERIC_LITERAL_TOKENS_1 ( \
@@ -508,7 +509,7 @@ struct FoxyAstNode {
  * @brief Todos los Literales Válidos
  */
 #define FOXY_MASK_LITERAL_TOKENS_0 ( \
-    FOXY_MASK_NUMERIC_LITERAL_TOKENS_0   | \
+    FOXY_MASK_NUMERIC_LITERAL_TOKENS_0 | \
     FOXY_BIT(FOX_TOKEN_CHAR_LITERAL)   | \
     FOXY_BIT(FOX_TOKEN_STRING_LITERAL) | \
     FOXY_BIT(FOX_TOKEN_KW_TRUE)        | \
@@ -526,8 +527,8 @@ struct FoxyAstNode {
     FOXY_MASK_ARITHMETIC_TOKENS_0 | \
     FOXY_MASK_BITWISE_TOKENS_0    | \
     FOXY_MASK_COMPARISON_TOKENS_0 | \
-    FOXY_BIT(FOX_TOKEN_AND)     | \
-    FOXY_BIT(FOX_TOKEN_OR)        \
+    FOXY_BIT(FOX_TOKEN_AND)       | \
+    FOXY_BIT(FOX_TOKEN_OR)          \
 )
 #define FOXY_MASK_BINARY_TOKENS_1 ( \
     FOXY_MASK_ARITHMETIC_TOKENS_1 | \
@@ -554,6 +555,19 @@ struct FoxyAstNode {
     FOXY_BIT(FOXY_AST_STMT_LABEL)         \
 )
 #define FOXY_AST_MASK_LEAF_NODES_1 ((uint64_t)0)
+
+/**
+ * @brief Máscaras para clasificar métodos|miembros si están definidas al inicio.
+ */
+ #define FOXY_AST_MASK_DECLARATIVES_0 ( \
+    FOXY_BIT(FOX_TOKEN_KW_PRIVATE)    | \
+    FOXY_BIT(FOX_TOKEN_KW_PROTECTED)  | \
+    FOXY_BIT(FOX_TOKEN_KW_PUBLIC)     | \
+    FOXY_BIT(FOX_TOKEN_MOD_PRIVATE)   | \
+    FOXY_BIT(FOX_TOKEN_MOD_PROTECTED) | \
+    FOXY_BIT(FOX_TOKEN_MOD_PUBLIC)      \
+)
+#define FOXY_AST_MASK_DECLARATIVES_1 ((uint64_t)0)
 
 /* ========================================================================= */
 /* INLINES DE EVALUACIÓN EN O(1)                                             */
@@ -598,6 +612,10 @@ static inline bool f_ast_kind_is_single_list(FoxyAstKind kind) {
 
 static inline bool f_ast_kind_is_leaf(FoxyAstKind kind) {
     return f_ast_match_mask((uint32_t)kind, FOXY_AST_MASK_LEAF_NODES_0, FOXY_AST_MASK_LEAF_NODES_1);
+}
+
+static inline bool f_ast_is_declarative(uint32_t token_type) {
+    return f_ast_match_mask(token_type, FOXY_AST_MASK_DECLARATIVES_0, FOXY_AST_MASK_DECLARATIVES_1);
 }
 
 /* ========================================================================= */
