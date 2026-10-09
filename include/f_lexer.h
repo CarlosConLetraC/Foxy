@@ -177,10 +177,8 @@
     F(FOX_TOKEN_LSHIFT) \
     F(FOX_TOKEN_RSHIFT) \
     /* Operadores Especiales y Delimitadores */ \
-    F(FOX_TOKEN_ARROW) \
     F(FOX_TOKEN_FAT_ARROW) \
     F(FOX_TOKEN_PTR_ARROW) \
-    F(FOX_TOKEN_ELLIPSIS) \
     F(FOX_TOKEN_LPAREN) \
     F(FOX_TOKEN_RPAREN) \
     F(FOX_TOKEN_LBRACE) \
@@ -350,10 +348,8 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_CARET,
     FOX_TOKEN_LSHIFT,
     FOX_TOKEN_RSHIFT,
-    FOX_TOKEN_ARROW,
     FOX_TOKEN_FAT_ARROW,
     FOX_TOKEN_PTR_ARROW,
-    FOX_TOKEN_ELLIPSIS,
     FOX_TOKEN_LPAREN,
     FOX_TOKEN_RPAREN,
     FOX_TOKEN_LBRACE,
@@ -434,15 +430,23 @@ FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
 
 /* --- Primary / Literales & Identificadores --- */
 #define FOXY_MASK_PRIMARY_0 ( \
-    FOXY_BIT(FOX_TOKEN_IDENTIFIER - 0)   | \
-    FOXY_BIT(FOX_TOKEN_INT_LITERAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL - 0)| \
-    FOXY_BIT(FOX_TOKEN_STRING_LITERAL - 0)| \
+    FOXY_BIT(FOX_TOKEN_IDENTIFIER - 0)      | \
+    FOXY_BIT(FOX_TOKEN_INT_LITERAL - 0)     | \
+    FOXY_BIT(FOX_TOKEN_UINT_LITERAL - 0)    | \
+    FOXY_BIT(FOX_TOKEN_LONG_LITERAL - 0)    | \
+    FOXY_BIT(FOX_TOKEN_ULONG_LITERAL - 0)   | \
+    FOXY_BIT(FOX_TOKEN_LLONG_LITERAL - 0)   | \
+    FOXY_BIT(FOX_TOKEN_ULLONG_LITERAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL - 0)   | \
+    FOXY_BIT(FOX_TOKEN_DOUBLE_LITERAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_LDOUBLE_LITERAL - 0) | \
+    FOXY_BIT(FOX_TOKEN_NUMBER_LITERAL - 0)  | \
+    FOXY_BIT(FOX_TOKEN_CHAR_LITERAL - 0)    | \
+    FOXY_BIT(FOX_TOKEN_STRING_LITERAL - 0)  | \
     FOXY_BIT(FOX_TOKEN_KW_TRUE - 0)         | \
     FOXY_BIT(FOX_TOKEN_KW_FALSE - 0)        | \
-    FOXY_BIT(FOX_TOKEN_KW_NULL - 0)            \
+    FOXY_BIT(FOX_TOKEN_KW_NULL - 0)           \
 )
-
 #define FOXY_MASK_PRIMARY_1 (0ULL)
 
 /* --- Postfix (Op. Postfijos: Acceso, Llamada, Incrementos) --- */
@@ -516,9 +520,11 @@ FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
 
 /* Para tokens con FOX_TOKEN_* >= 64 en MASK_1 */
 #define FOXY_MASK_ASSIGNMENT_1 ( \
-    FOXY_BIT(FOX_TOKEN_AND_ASSIGN - 64)   | \
-    FOXY_BIT(FOX_TOKEN_OR_ASSIGN - 64)    | \
-    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN - 64)     \
+    FOXY_BIT(FOX_TOKEN_AND_ASSIGN - 64)    | \
+    FOXY_BIT(FOX_TOKEN_OR_ASSIGN - 64)     | \
+    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN - 64)    | \
+    FOXY_BIT(FOX_TOKEN_RSHIFT_ASSIGN - 64) | \
+    FOXY_BIT(FOX_TOKEN_LSHIFT_ASSIGN - 64)   \
 )
 
 /* --- Máscara Bitwise para Sincronización de Errores (Parser Recovery) --- */
@@ -537,6 +543,28 @@ FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
 )
 
 #define FOXY_MASK_SYNC_TOKENS_1 (0ULL)
+
+/* --- Máscaras de especificadores --- */
+#define FOXY_MASK_TYPE_SPECIFIERS_0 ( \
+    FOXY_BIT(FOX_TOKEN_KW_BOOL)     | \
+    FOXY_BIT(FOX_TOKEN_KW_CHAR)     | \
+    FOXY_BIT(FOX_TOKEN_KW_UCHAR)    | \
+    FOXY_BIT(FOX_TOKEN_KW_SHORT)    | \
+    FOXY_BIT(FOX_TOKEN_KW_USHORT)   | \
+    FOXY_BIT(FOX_TOKEN_KW_INT)      | \
+    FOXY_BIT(FOX_TOKEN_KW_UINT)     | \
+    FOXY_BIT(FOX_TOKEN_KW_LONG)     | \
+    FOXY_BIT(FOX_TOKEN_KW_ULONG)    | \
+    FOXY_BIT(FOX_TOKEN_KW_LLONG)    | \
+    FOXY_BIT(FOX_TOKEN_KW_ULLONG)   | \
+    FOXY_BIT(FOX_TOKEN_KW_FLOAT)    | \
+    FOXY_BIT(FOX_TOKEN_KW_DOUBLE)   | \
+    FOXY_BIT(FOX_TOKEN_KW_LDOUBLE)  | \
+    FOXY_BIT(FOX_TOKEN_KW_NUMBER)   | \
+    FOXY_BIT(FOX_TOKEN_KW_DICT)     | \
+    FOXY_BIT(FOX_TOKEN_KW_OBJECT)     \
+)
+#define FOXY_MASK_TYPE_SPECIFIERS_1 (0ULL)
 
 static inline bool f_token_is_in_mask(uint32_t token_type, uint64_t mask0, uint64_t mask1) {
     uint32_t idx = token_type / 64;
@@ -589,4 +617,11 @@ static inline bool f_token_is_assignment(uint32_t type) {
  */
 static inline bool f_token_is_sync_boundary(uint32_t token_type) {
     return f_token_is_in_mask(token_type, FOXY_MASK_SYNC_TOKENS_0, FOXY_MASK_SYNC_TOKENS_1);
+}
+
+/**
+ * @brief Evalúa si un token pertenece a un tipo de identificador.
+ */
+static inline bool f_token_is_type_specifier(FoxyTokenType type) {
+    return f_token_is_in_mask((uint32_t)type, FOXY_MASK_TYPE_SPECIFIERS_0, FOXY_MASK_TYPE_SPECIFIERS_1);
 }

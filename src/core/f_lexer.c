@@ -55,7 +55,7 @@ static const char *const FOXY_TOKEN_NAMES[] = {
     "FOX_TOKEN_EQ", "FOX_TOKEN_NEQ", "FOX_TOKEN_LT", "FOX_TOKEN_GT", "FOX_TOKEN_LE",
     "FOX_TOKEN_GE", "FOX_TOKEN_BANG", "FOX_TOKEN_AND", "FOX_TOKEN_OR", "FOX_TOKEN_AMPERSAND",
     "FOX_TOKEN_PIPE", "FOX_TOKEN_TILDE", "FOX_TOKEN_CARET", "FOX_TOKEN_LSHIFT", "FOX_TOKEN_RSHIFT",
-    "FOX_TOKEN_ARROW", "FOX_TOKEN_FAT_ARROW", "FOX_TOKEN_PTR_ARROW", "FOX_TOKEN_ELLIPSIS",
+    "FOX_TOKEN_FAT_ARROW", "FOX_TOKEN_PTR_ARROW",
     "FOX_TOKEN_LPAREN", "FOX_TOKEN_RPAREN", "FOX_TOKEN_LBRACE", "FOX_TOKEN_RBRACE",
     "FOX_TOKEN_LBRACKET", "FOX_TOKEN_RBRACKET", "FOX_TOKEN_SEMICOLON", "FOX_TOKEN_COLON",
     "FOX_TOKEN_COMMA", "FOX_TOKEN_DOT", "FOX_TOKEN_DOTDOT", "FOX_TOKEN_DOTDOTDOT", "FOX_TOKEN_QUESTION"
@@ -173,7 +173,7 @@ const size_t FOXY_KEYWORD_TABLE_SIZE = sizeof(FOXY_KEYWORD_TABLE) / sizeof(FoxyK
 // static bool f_lexer_load_next_line(FoxyLexer *lexer) {
 //     if (!lexer || !lexer->file || lexer->is_eof) return false;
 // 
-//     if (fgets(lexer->line_buffer, sizeof(lexer->line_buffer), lexer->file) == NULL) {
+//     if (foxy_fgets(lexer->line_buffer, sizeof(lexer->line_buffer), lexer->file) == NULL) {
 //         /* Archivo vacío o se alcanzó el EOF -> cerrar recursos */
 //         f_lexer_close(lexer);
 //         return false;
@@ -504,7 +504,7 @@ bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
     char *buffer = (char *)malloc((size_t)file_size + 1);
     if (!buffer) return false;
 
-    size_t bytes_read = fread(buffer, 1, (size_t)file_size, file);
+    size_t bytes_read = foxy_fread(buffer, 1, (size_t)file_size, file);
     buffer[bytes_read] = '\0';
 
     lexer->file = file;
@@ -529,7 +529,7 @@ void f_lexer_close(FoxyLexer *lexer) {
     }
 
     if (lexer->file) {
-        fclose(lexer->file);
+        foxy_fclose(lexer->file);
         lexer->file = NULL;
     }
 
@@ -580,9 +580,13 @@ FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
         case '-':
             if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_MINUS_ASSIGN);
             if (f_lexer_match(lexer, '-')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_DEC);
-            if (f_lexer_match(lexer, '>')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_ARROW);
+            if (f_lexer_match(lexer, '>')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_PTR_ARROW);
             return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_MINUS);
         case '*':
+            if (f_lexer_match(lexer, '*')) {
+                if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_POWER_ASSIGN);
+                return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_POWER);
+            }
             if (f_lexer_match(lexer, '=')) return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_STAR_ASSIGN);
             return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_STAR);
         case '/':

@@ -2,11 +2,14 @@ include "sys/out/*"
 include "math"
 include "string"
 include "utils/peektuple" @ Módulo nativo en C para inspección/extracción de tuplas (estilo select de Lua)
-
+@@ TODO: Generar documentació Gramática formal en formato Backus-Naur para foxy-lang. @@
 @ ============================================================================
 @ 1. ESPECIFICADORES DE VARIABLES, ÁMBITO Y CONSTANTES
-@ Orden de modificadores: [global | static] [const] [DATATYPE?] VAR_NAME = VALOR
+@ Orden de modificadores: [global? | static?] [const?] [DATATYPE?] VAR_NAME = VALOR
 @ ============================================================================
+
+@ concatenación de char[] con char[] := char[]
+char concatenado[] = "hola " .. "mundo"
 
 @ Variable global híbrida (dinámica)
 global foo_hibrido = true
@@ -45,7 +48,7 @@ function demostracionStatic() {
   Comentario multilínea delimitado por tres '@'
 @@@
 
-@ Arreglo de datos heterogéneos bajo el tipo unificado 'number'
+@ Arreglo de datos heterogéneos bajo el tipo unificado 'number' sin tamaño definido
 number demo_primitivos[] = {
     true,                         @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (true)
     false,                        @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (false)
@@ -65,6 +68,9 @@ number demo_primitivos[] = {
     (ldouble)1.4142135623ld,      @ FOX_TOKEN_KW_LDOUBLE
     (number)100n                  @ FOX_TOKEN_KW_NUMBER / FOX_TOKEN_LIT_NUMBER
 }
+
+@ Arreglo básico con tamaño definido
+int numeros_primos[10] = {2, 3, 5, 7, 11, 13, 17, 23, 29, 31}
 
 @ Literales con sufijos explícitos
 int lit_i = 10i
@@ -112,7 +118,18 @@ int salto_idx = 0
 <miEtiqueta> {
     salto_idx++
 }
-if (salto_idx < 3) goto miEtiqueta
+
+if (salto_idx < 3) {
+    goto miEtiqueta
+}
+
+@ Bucle while convencional
+int incremento = 0
+while (true) {
+    if (incremento++ >= 5) {
+        break
+    }
+}
 
 @ Enums y sentencia 'switch'
 export enum EstadoApp {
@@ -229,6 +246,7 @@ class BaseFigura {
         return 0.0f
     }
 
+    function __cast() {}
     @ Definición de métodos sobrecargados / marcados
     function __tostring() {
         return self.nombre
@@ -250,15 +268,15 @@ class BaseFigura {
     function __le(BaseFigura otra) { return false }
     function __ge(BaseFigura otra) { return false }
     function __band(BaseFigura otra) { return 0 }
-    function __bor(BaseFigura otra) { return 0 }
+    function __bor(BaseFigura otra) {return 0 }
     function __bnot() { return self }
     function __bxor(BaseFigura otra) { return 0 }
     function __lshift(int n) { return 0 }
     function __rshift(int n) { return 0 }
     function __foreach(dict val) {}
     function __closed() {}
-    function __cast() {}
     function __len() { return 1 }
+    function __unpack() { return 3, 6, 9, 12 } @ unpack de números tipo int.
 }
 
 class Cuadrado from BaseFigura {
