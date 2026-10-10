@@ -72,8 +72,8 @@ dict tablaEstiloLua = {
     [1] = 'o',
     [2] = 'l',
     [3] = 'a',
-    [4] = '\0' @ importante antes de castear (char[])tablaEstiloLua
+    [4] = '\0' @ importante antes de castear (char[])tablaEstiloLua si desea manejar cadenas de caracteres.
 }
 
-char otraVez[] = (char[])tablaEstiloLua
+char otraVez[] = (char[])tablaEstiloLua @ crea un arreglo tipo char := "hola\0"
 ```
