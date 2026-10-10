@@ -1,0 +1,15 @@
+.--- Si una variable tipo number se inicializa con una literal entera sin sufijo, se toma como int por defecto. Si tiene sufijo entonces ese number apunta al tipo del sufijo. Así evito hardcodear siempre al tipo double
+.--- En el lenguaje: number es un tipo de dato que maneja todos los tipos de dato de C, si guardas `number x = 123` esto se guarda en una máscara de bits apuntando a int (máscara de 2 bits) (0x00). El penúltimo 0 de 0x00 representa todos los tipos de dato numéricos de C: 0x0 <-> 0xF (es decir: los que puedes realizar operaciones aritméticas comúnmente), el penúltimo 0 de 0x00 maneja los primitivos: 0x00 <-> 0xF0.
+.--- Si el tipo number está apuntando a un tipo numérico específico y se realiza una operación aritmética que matemáticamente devuelve un valor distinto al que pertence el valor base, el lenguaje automáticamente castea el valor. Ejemplo:
+```foxy
+include "sys/out/printf"
+number entero = 5 @ tipo int por defecto.
+printf("entero: %T\n", entero) @ imprime 5
+
+entero += 3.1415926535 @ se considera esta literal como double, entonces ahora 'entero' extrae la máscara de bits a otra familia 0x0N.
+printf("entero: %T\n", entero) @ imprime 8.1415926535
+
+entero ^= 4l @ se realiza la operación bitwise XOR := 8.1415926535 ^ 4l, en operaciones bitwise siempre se debe trabajar con números naturales. Por lo que aquí lo redondea y lo deja como tipo long por el sufijo 'l' en 4l.
+
+printf("entero: %T\n", entero) @ imprime 12
+```
