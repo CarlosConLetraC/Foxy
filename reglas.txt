@@ -13,3 +13,15 @@ entero ^= 4l @ se realiza la operación bitwise XOR := 8.1415926535 ^ 4l, en ope
 
 printf("entero: %T\n", entero) @ imprime 12
 ```
+.--- Algunos ejemplos de casteo:
+```foxy
+int enteros[] = {3, 6, 9, 12, 0}
+float enteros_a_flotantes[] = (float[])enteros @ crea un arreglo tipo float := {3f, 6f, 9f, 12f, 0f}
+char enteros_a_caracteres[] = (char[])enteros  @ crea un arreglo tipo char := {'\3', '\6', '\9', '\12', '\0'}, equivalente a "\3\6\9\12\0".
+char nombre[] = "hola" @ como en C: esto automáticamente deja como último caracter \0 para decirle al programa que aquí cierra el arreglo tipo char.
+int valoresASCII[] = (int[])nombre @ devuelve arreglo tipo int: {104, 111, 108, 97, 0}
+int loMismo[] = (int[])"hola" @ como en C: esto automáticamente deja como último caracter \0 para decirle al programa que aquí cierra el arreglo tipo char.
+int deNuevo[] = (int[]){'h', 'o', 'l', 'a', '\0'}
+number mis_numeros[] = (long[]){1, 2, 3, 4, 5} @ crea un arreglo tipo long := {1l, 2l, 3l, 4l, 5l}
+short numeros_primos[10] = (short[]){2, 3, 5, 7, 11, 13, 17, 23, 29, 31} @ crea un arreglo tipo short := {2, 3, 5, 7, 11, 13, 17, 23, 29, 31}
+```
