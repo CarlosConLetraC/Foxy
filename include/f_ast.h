@@ -2,9 +2,10 @@
 
 #include "f_settings.h"
 #include "f_lexer.h"
-#include "f_value.h"
+// #include "f_value.h"
 #include "f_foxmode.h"
 #include <stddef.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -114,6 +115,121 @@ typedef enum FOXY_PACKED {
 #define FOXY_AST_IS_STMT_KIND(kind) \
     ((kind) >= FOXY_AST_STMT_EXPR && (kind) <= FOXY_AST_STMT_CATCH)
 
+#if FOXY_COMPILER_SUPPORTS_XMACROS
+#define FOXY_AST_VAL_LIST(F) \
+    F(FOXY_AST_VAL_NULL)     \
+    F(FOXY_AST_VAL_BOOL)     \
+    F(FOXY_AST_VAL_INT)      \
+    F(FOXY_AST_VAL_UINT)     \
+    F(FOXY_AST_VAL_LONG)     \
+    F(FOXY_AST_VAL_ULONG)    \
+    F(FOXY_AST_VAL_LLONG)    \
+    F(FOXY_AST_VAL_ULLONG)   \
+    F(FOXY_AST_VAL_FLOAT)    \
+    F(FOXY_AST_VAL_DOUBLE)   \
+    F(FOXY_AST_VAL_LDOUBLE)  \
+    F(FOXY_AST_VAL_CHAR)     \
+    F(FOXY_AST_VAL_STRING)
+#define F(ast_val) ast_val,
+typedef enum FOXY_PACKED {
+    FOXY_AST_VAL_LIST(F)
+} FoxyAstValType;
+#undef F
+#else
+typedef enum {
+    FOXY_AST_VAL_NULL = 0,
+    FOXY_AST_VAL_BOOL,
+    FOXY_AST_VAL_INT,
+    FOXY_AST_VAL_UINT,
+    FOXY_AST_VAL_LONG,
+    FOXY_AST_VAL_ULONG,
+    FOXY_AST_VAL_LLONG,
+    FOXY_AST_VAL_ULLONG,
+    FOXY_AST_VAL_FLOAT,
+    FOXY_AST_VAL_DOUBLE,
+    FOXY_AST_VAL_LDOUBLE,
+    FOXY_AST_VAL_CHAR,
+    FOXY_AST_VAL_STRING
+} FoxyAstValType;
+#endif
+
+typedef struct {
+    FoxyAstValType type;
+    union {
+        bool f_bool;
+        int f_int;
+        unsigned int f_uint;
+        long f_long;
+        unsigned long f_ulong;
+        long long f_llong;
+        unsigned long long f_ullong;
+        float f_float;
+        double f_double;
+        long double f_ldouble;
+        char f_char;
+        char *f_string; // Cadena con memoria reservada propia del AST
+    } as;
+} FoxyAstValue;
+
+static inline FoxyAstValue f_ast_new_null(void) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_NULL };
+}
+
+static inline FoxyAstValue f_ast_new_bool(bool val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_BOOL, .as.f_bool = val };
+}
+
+static inline FoxyAstValue f_ast_new_int(int val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_INT, .as.f_int = val };
+}
+
+static inline FoxyAstValue f_ast_new_uint(unsigned int val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_UINT, .as.f_uint = val };
+}
+
+static inline FoxyAstValue f_ast_new_long(long val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_LONG, .as.f_long = val };
+}
+
+static inline FoxyAstValue f_ast_new_ulong(unsigned long val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_ULONG, .as.f_ulong = val };
+}
+
+static inline FoxyAstValue f_ast_new_llong(long long val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_LLONG, .as.f_llong = val };
+}
+
+static inline FoxyAstValue f_ast_new_ullong(unsigned long long val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_ULLONG, .as.f_ullong = val };
+}
+
+static inline FoxyAstValue f_ast_new_float(float val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_FLOAT, .as.f_float = val };
+}
+
+static inline FoxyAstValue f_ast_new_double(double val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_DOUBLE, .as.f_double = val };
+}
+
+static inline FoxyAstValue f_ast_new_ldouble(long double val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_LDOUBLE, .as.f_ldouble = val };
+}
+
+static inline FoxyAstValue f_ast_new_char(char val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_CHAR, .as.f_char = val };
+}
+
+static inline FoxyAstValue f_ast_new_string(char *val) {
+    return (FoxyAstValue){ .type = FOXY_AST_VAL_STRING, .as.f_string = val };
+}
+
+static inline void f_ast_value_free(FoxyAstValue *val) {
+    if (val && val->type == FOXY_AST_VAL_STRING && val->as.f_string) {
+        free(val->as.f_string);
+        val->as.f_string = NULL;
+    }
+}
+
 /**
  * @brief Lista dinámica de nodos AST para almacenar bloques, argumentos o parámetros.
  */
@@ -128,7 +244,7 @@ typedef struct {
 /* ========================================================================= */
 
 typedef struct {
-    FoxyValue value;                /* 32 bytes */
+    FoxyAstValue value;             /* 32 bytes o equivalente adaptado */
 } FoxyAstLiteral;
 
 typedef struct {
@@ -185,7 +301,9 @@ typedef struct {
 
 typedef struct {
     FoxyAstNodeList elements;       /* 24 bytes */
-} FoxyAstArrayLiteral;
+    FoxyTokenType token_type;       /* 1 byte */
+    uint8_t _pad[7];                /* 7 bytes para alineación */
+} FoxyAstArrayLiteral;              /* Total = 32 bytes */
 
 typedef struct {
     FoxyAstNodeList entries;        /* 24 bytes */
@@ -199,26 +317,25 @@ typedef struct {
 /* Sentencias y Declaraciones */
 
 typedef struct {
-    FoxyAstNode *initializer;       /* 8 bytes: Expresión del valor asignado */
-    FoxyAstNode *array_size;        /* 8 bytes: Expresión del tamaño (NULL si no se especificó) */
-    FoxyToken name;                 /* 32 bytes: Token del identificador (VAR_NAME) */
-    FoxyTokenType type_token;       /* 4 bytes: FOX_TOKEN_KW_* o FOX_TOKEN_EOF */
-    uint16_t is_array  : 1;         /* Bitfields empacados en uint16_t (2 bytes) */
-    uint16_t is_global : 1;
-    uint16_t is_static : 1;
-    uint16_t is_const  : 1;
-    uint16_t is_hybrid : 1;
-    uint16_t _pad_bits : 11;
-    uint16_t _pad_align;            /* 2 bytes para completar exactamente 48 bytes (múltiplo de 8) */
-} FoxyAstVarDecl;
+    FoxyAstNode *initializer;       /* 8 bytes [offset 0..7] */
+    FoxyAstNode *array_size;        /* 8 bytes [offset 8..15] */
+    FoxyToken name;                 /* 32 bytes [offset 16..47] */
+    FoxyTokenType type_token;       /* 1 byte  [offset 48] */
+    uint8_t is_array;               /* 1 byte  [offset 49] */
+    uint8_t is_global;              /* 1 byte  [offset 50] */
+    uint8_t is_static;              /* 1 byte  [offset 51] */
+    uint8_t is_const;               /* 1 byte  [offset 52] */
+    uint8_t is_hybrid;              /* 1 byte  [offset 53] */
+    uint8_t _pad[2];                /* 2 bytes explícitos [offset 54..55] */
+} FoxyAstVarDecl;                   /* Total = 56 bytes (Múltiplo exacto de 8) */
 
 typedef struct {
-    FoxyAstNode *body;              /* 8 bytes */
-    FoxyAstNodeList params;         /* 24 bytes */
-    FoxyToken name;                 /* 32 bytes */
-    uint32_t is_overrule : 1;       /* 4 bytes con 31 bits de padding implícito */
-    uint32_t _pad_bits : 31;        /* Total = 68 -> alineado a 72 bytes por padding de estructura */
-} FoxyAstFuncDecl;
+    FoxyAstNode *body;              /* 8 bytes [offset 0..7] */
+    FoxyAstNodeList params;         /* 24 bytes [offset 8..31] */
+    FoxyToken name;                 /* 32 bytes [offset 32..63] */
+    uint8_t is_overrule;            /* 1 byte [offset 64] */
+    uint8_t _pad[7];                /* 7 bytes explícitos [offset 65..71] */
+} FoxyAstFuncDecl;                  /* Total = 72 bytes (Múltiplo exacto de 8) */
 
 typedef struct FoxyAstBlockStmt {
     FoxyAstNodeList statements;
@@ -295,373 +412,147 @@ typedef struct {
 typedef struct {
     FoxyAstNodeList params;         /* Lista de nodos FOXY_AST_STMT_VAR_DECL o IDENTIFIER */
     FoxyAstNode *body;              /* Expresión o Bloque */
-} FoxyAstLambdaExpr;
+} FoxyAstLambdaStmt;
+
+typedef enum {
+    FOXY_PREFIX_CAST,
+    FOXY_PREFIX_LAMBDA
+} FoxyPrefixKind;
+
+typedef struct {
+    FoxyPrefixKind kind;
+    union {
+        struct {
+            int target_type_mask; // Máscara de bits para el tipo de destino (primitivos/numéricos)
+            struct FoxyAstExpr* operand;
+        } cast;
+        struct {
+            int return_type_mask;
+            FoxyParamList* parameters;
+            struct FoxyAstStmt* body; // O bloque de código de la función anónima
+            bool is_anonymous;
+        } lambda;
+    };
+} FoxyAstPrefixStmt;
 
 /**
  * @brief Estructura Principal de Nodo AST (Tagged Union)
  */
 struct FoxyAstNode {
     union {
-        FoxyAstNodeList program;
-        FoxyAstLiteral literal;
-        FoxyAstIdentifier identifier;
-        FoxyAstUnary unary;
-        FoxyAstBinary binary;
-        FoxyAstAssign assign;
-        FoxyAstCall call;
-        FoxyAstGetMember get_member;
-        FoxyAstSetMember set_member;
-        FoxyAstGetIndex get_index;
-        FoxyAstSetIndex set_index;
-        FoxyAstArrayLiteral array_literal;
-        FoxyAstDictLiteral dict_literal;
-        FoxyAstDictEntry dict_entry;
-        FoxyAstNode *expr_stmt;
-        FoxyAstVarDecl var_decl;
-        FoxyAstFuncDecl func_decl;
-        FoxyAstBlockStmt block_stmt;
-        FoxyAstIfStmt if_stmt;
-        FoxyAstWhileStmt while_stmt;
-        FoxyAstForStmt for_stmt;
-        FoxyAstForeachStmt foreach_stmt;
-        FoxyAstSwitchStmt switch_stmt;
-        FoxyAstCaseStmt case_stmt;
-        FoxyAstReturnStmt return_stmt;
-        FoxyAstGotoStmt goto_stmt;
-        FoxyAstTryStmt try_stmt;
-        FoxyAstCatchStmt catch_stmt;
-        FoxyAstIncludeStmt include_stmt;
-        FoxyAstLambdaExpr lambda_stmt;
-    } as;                           /* Alineado a 8 bytes */
+        FoxyAstNodeList program;           /* 24 bytes */
+        FoxyAstLiteral literal;            /* 32 bytes */
+        FoxyAstIdentifier identifier;      /* 32 bytes */
+        FoxyAstUnary unary;                /* 48 bytes */
+        FoxyAstBinary binary;              /* 48 bytes */
+        FoxyAstAssign assign;              /* 56 bytes */
+        FoxyAstCall call;                  /* 32 bytes */
+        FoxyAstGetMember get_member;       /* 40 bytes */
+        FoxyAstSetMember set_member;       /* 48 bytes */
+        FoxyAstGetIndex get_index;         /* 16 bytes */
+        FoxyAstSetIndex set_index;         /* 24 bytes */
+        FoxyAstArrayLiteral array_literal; /* 24 bytes */
+        FoxyAstDictLiteral dict_literal;   /* 24 bytes */
+        FoxyAstDictEntry dict_entry;       /* 40 bytes */
+        FoxyAstNode *expr_stmt;            /* 8 bytes */
+        FoxyAstVarDecl var_decl;           /* 56 bytes */
+        FoxyAstFuncDecl func_decl;         /* 72 bytes */
+        FoxyAstBlockStmt block_stmt;       /* 24 bytes */
+        FoxyAstIfStmt if_stmt;             /* 24 bytes */
+        FoxyAstWhileStmt while_stmt;       /* 16 bytes */
+        FoxyAstForStmt for_stmt;           /* 32 bytes */
+        FoxyAstForeachStmt foreach_stmt;   /* 48 bytes */
+        FoxyAstSwitchStmt switch_stmt;     /* 32 bytes */
+        FoxyAstCaseStmt case_stmt;         /* 32 bytes */
+        FoxyAstReturnStmt return_stmt;     /* 8 bytes */
+        FoxyAstGotoStmt goto_stmt;         /* 32 bytes */
+        FoxyAstTryStmt try_stmt;           /* 40 bytes */
+        FoxyAstCatchStmt catch_stmt;       /* 40 bytes */
+        FoxyAstIncludeStmt include_stmt;   /* 32 bytes */
+        FoxyAstLambdaStmt lambda_stmt;     /* 32 bytes */
+        
+        /* Forzar la alineación y tamaño de la union a un múltiplo exacto de 8 bytes. */
+        uint64_t _align_union[10];         /* Reserva espacio alineado a 80 bytes */
+    } as;
 
-    FoxySourcePos pos;              /* 8 bytes: Posición en el fuente */
-    FoxyAstKind kind;               /* 1 byte (packed enum) */
-    uint8_t _pad[7];                /* 7 bytes de padding para completar el múltiplo de 8 exacto */
+    FoxySourcePos pos;                     /* 16 bytes (const char* [8] + uint32_t [4] + uint32_t [4]) */
+    FoxyAstKind kind;                      /* 1 byte */
+    uint8_t _pad[15];                      /* 15 bytes para completar alineación de 8 bytes */
 };
 
-/* ========================================================================= */
-/* MÁSCARAS BITWISE (O(1)) PARA LEXER, TOKENS Y CATEGORÍAS DE NODOS          */
-/* ========================================================================= */
+/* ============================================================================ */
+/* MÁSCARAS BITWISE UNIFICADAS DE 128 BITS (UTILIZA FOXY_BIT128 DE f_foxmode.h) */
+/* ============================================================================ */
 
-/* Macros helper para encadenar Bitwise OR sin romper la sintaxis del C preprocessor */
-#define FOXY_X_BIT_0(t) FOXY_BIT_0(t) |
-#define FOXY_X_BIT_1(t) FOXY_BIT_1(t) |
-
-/**
- * @brief Lista X-Macro de Especificadores de Tipos Reservados
- */
-#define FOXY_TYPE_SPECIFIER_LIST(F) \
-    F(FOX_TOKEN_KW_BOOL)            \
-    F(FOX_TOKEN_KW_CHAR)            \
-    F(FOX_TOKEN_KW_UCHAR)           \
-    F(FOX_TOKEN_KW_SHORT)           \
-    F(FOX_TOKEN_KW_USHORT)          \
-    F(FOX_TOKEN_KW_INT)             \
-    F(FOX_TOKEN_KW_UINT)            \
-    F(FOX_TOKEN_KW_LONG)            \
-    F(FOX_TOKEN_KW_ULONG)           \
-    F(FOX_TOKEN_KW_LLONG)           \
-    F(FOX_TOKEN_KW_ULLONG)          \
-    F(FOX_TOKEN_KW_FLOAT)           \
-    F(FOX_TOKEN_KW_DOUBLE)          \
-    F(FOX_TOKEN_KW_LDOUBLE)         \
-    F(FOX_TOKEN_KW_NUMBER)          \
-    F(FOX_TOKEN_KW_DICT)            \
-    F(FOX_TOKEN_KW_OBJECT)          \
-    F(FOX_TOKEN_KW_STRUCT)          \
-    F(FOX_TOKEN_KW_CLASS)           \
-    F(FOX_TOKEN_KW_ENUM)
-
-/* Banco 0: Filtra y activa únicamente tokens con ID de 0 a 63 */
-#define FOXY_MASK_TYPE_SPECIFIER_TOKENS_0 (FOXY_TYPE_SPECIFIER_LIST(FOXY_X_BIT_0) 0ULL)
-
-/* Banco 1: Filtra y activa únicamente tokens con ID de 64 a 127 */
-#define FOXY_MASK_TYPE_SPECIFIER_TOKENS_1 (FOXY_TYPE_SPECIFIER_LIST(FOXY_X_BIT_1) 0ULL)
-
-/**
- * @brief Tokens de inicio de sentencias
- */
-#define FOXY_MASK_STMT_START_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_KW_CLASS)      | \
-    FOXY_BIT(FOX_TOKEN_KW_STRUCT)     | \
-    FOXY_BIT(FOX_TOKEN_KW_ENUM)       | \
-    FOXY_BIT(FOX_TOKEN_KW_FUNCTION)   | \
-    FOXY_BIT(FOX_TOKEN_KW_FOR)        | \
-    FOXY_BIT(FOX_TOKEN_KW_FOREACH)    | \
-    FOXY_BIT(FOX_TOKEN_KW_IF)         | \
-    FOXY_BIT(FOX_TOKEN_KW_WHILE)      | \
-    FOXY_BIT(FOX_TOKEN_KW_RETURN)     | \
-    FOXY_BIT(FOX_TOKEN_KW_SWITCH)     | \
-    FOXY_BIT(FOX_TOKEN_KW_TRY)        | \
-    FOXY_BIT(FOX_TOKEN_KW_INCLUDE)      \
-)
-#define FOXY_MASK_STMT_START_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Operadores de Asignación
- */
-#define FOXY_MASK_ASSIGNMENT_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_ASSIGN)        | \
-    FOXY_BIT(FOX_TOKEN_PLUS_ASSIGN)   | \
-    FOXY_BIT(FOX_TOKEN_MINUS_ASSIGN)  | \
-    FOXY_BIT(FOX_TOKEN_STAR_ASSIGN)   | \
-    FOXY_BIT(FOX_TOKEN_SLASH_ASSIGN)  | \
-    FOXY_BIT(FOX_TOKEN_PERCENT_ASSIGN)| \
-    FOXY_BIT(FOX_TOKEN_POWER_ASSIGN)  | \
-    FOXY_BIT(FOX_TOKEN_AND_ASSIGN)    | \
-    FOXY_BIT(FOX_TOKEN_OR_ASSIGN)     | \
-    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN)    | \
-    FOXY_BIT(FOX_TOKEN_LSHIFT_ASSIGN) | \
-    FOXY_BIT(FOX_TOKEN_RSHIFT_ASSIGN)   \
-)
-#define FOXY_MASK_ASSIGNMENT_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Operadores Aritméticos
- */
-#define FOXY_MASK_ARITHMETIC_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_PLUS)          | \
-    FOXY_BIT(FOX_TOKEN_MINUS)         | \
-    FOXY_BIT(FOX_TOKEN_STAR)          | \
-    FOXY_BIT(FOX_TOKEN_SLASH)         | \
-    FOXY_BIT(FOX_TOKEN_PERCENT)       | \
-    FOXY_BIT(FOX_TOKEN_POWER)           \
-)
-#define FOXY_MASK_ARITHMETIC_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Operadores de Bits
- */
-#define FOXY_MASK_BITWISE_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_AMPERSAND)  | \
-    FOXY_BIT(FOX_TOKEN_PIPE)       | \
-    FOXY_BIT(FOX_TOKEN_CARET)      | \
-    FOXY_BIT(FOX_TOKEN_TILDE)      | \
-    FOXY_BIT(FOX_TOKEN_LSHIFT)     | \
-    FOXY_BIT(FOX_TOKEN_RSHIFT)       \
-)
-#define FOXY_MASK_BITWISE_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Operadores Relacionales y de Igualdad
- */
-#define FOXY_MASK_EQUALITY_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_EQ)          | \
-    FOXY_BIT(FOX_TOKEN_NEQ)           \
-)
-#define FOXY_MASK_EQUALITY_TOKENS_1 ((uint64_t)0)
-
-#define FOXY_MASK_RELATIONAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_LT)            | \
-    FOXY_BIT(FOX_TOKEN_GT)            | \
-    FOXY_BIT(FOX_TOKEN_LE)            | \
-    FOXY_BIT(FOX_TOKEN_GE)              \
-)
-#define FOXY_MASK_RELATIONAL_TOKENS_1 ((uint64_t)0)
-
-#define FOXY_MASK_COMPARISON_TOKENS_0 ( \
-    FOXY_MASK_EQUALITY_TOKENS_0       | \
-    FOXY_MASK_RELATIONAL_TOKENS_0       \
-)
-#define FOXY_MASK_COMPARISON_TOKENS_1 ( \
-    FOXY_MASK_EQUALITY_TOKENS_1       | \
-    FOXY_MASK_RELATIONAL_TOKENS_1       \
+#define FOXY_AST_MASK_SINGLE_LIST_NODES FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOXY_AST_PROGRAM)            | \
+    FOXY_TOK_BIT_W0(FOXY_AST_STMT_BLOCK)         | \
+    FOXY_TOK_BIT_W0(FOXY_AST_EXPR_ARRAY_LITERAL) | \
+    FOXY_TOK_BIT_W0(FOXY_AST_EXPR_DICT_LITERAL),   \
+    /* Word 1 [64..127]  */ 0ULL, \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
 )
 
-/**
- * @brief Operadores Lógicos
- */
-#define FOXY_MASK_LOGICAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_AND)        | \
-    FOXY_BIT(FOX_TOKEN_OR)         | \
-    FOXY_BIT(FOX_TOKEN_BANG)         \
-)
-#define FOXY_MASK_LOGICAL_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Operadores Unarios
- */
-#define FOXY_MASK_UNARY_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_PLUS)     | \
-    FOXY_BIT(FOX_TOKEN_MINUS)    | \
-    FOXY_BIT(FOX_TOKEN_BANG)     | \
-    FOXY_BIT(FOX_TOKEN_TILDE)    | \
-    FOXY_BIT(FOX_TOKEN_HASH)     | \
-    FOXY_BIT(FOX_TOKEN_AMPERSAND)| \
-    FOXY_BIT(FOX_TOKEN_INC)      | \
-    FOXY_BIT(FOX_TOKEN_DEC)        \
-)
-#define FOXY_MASK_UNARY_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Literales Flotantes y Reales
- */
-#define FOXY_MASK_FLOAT_LITERAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL)    | \
-    FOXY_BIT(FOX_TOKEN_DOUBLE_LITERAL)   | \
-    FOXY_BIT(FOX_TOKEN_LDOUBLE_LITERAL)    \
-)
-#define FOXY_MASK_FLOAT_LITERAL_TOKENS_1 ((uint64_t)0)
-
-/**
- * @brief Literales Numéricos Generales
- */
-#define FOXY_MASK_NUMERIC_LITERAL_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_INT_LITERAL)     | \
-    FOXY_BIT(FOX_TOKEN_UINT_LITERAL)    | \
-    FOXY_BIT(FOX_TOKEN_LONG_LITERAL)    | \
-    FOXY_BIT(FOX_TOKEN_ULONG_LITERAL)   | \
-    FOXY_BIT(FOX_TOKEN_LLONG_LITERAL)   | \
-    FOXY_BIT(FOX_TOKEN_ULLONG_LITERAL)  | \
-    FOXY_MASK_FLOAT_LITERAL_TOKENS_0    | \
-    FOXY_BIT(FOX_TOKEN_NUMBER_LITERAL)    \
-)
-#define FOXY_MASK_NUMERIC_LITERAL_TOKENS_1 ( \
-    FOXY_MASK_FLOAT_LITERAL_TOKENS_1 \
-)
-
-/**
- * @brief Todos los Literales Válidos
- */
-#define FOXY_MASK_LITERAL_TOKENS_0 ( \
-    FOXY_MASK_NUMERIC_LITERAL_TOKENS_0 | \
-    FOXY_BIT(FOX_TOKEN_CHAR_LITERAL)   | \
-    FOXY_BIT(FOX_TOKEN_STRING_LITERAL) | \
-    FOXY_BIT(FOX_TOKEN_KW_TRUE)        | \
-    FOXY_BIT(FOX_TOKEN_KW_FALSE)       | \
-    FOXY_BIT(FOX_TOKEN_KW_NULL)          \
-)
-#define FOXY_MASK_LITERAL_TOKENS_1 ( \
-    FOXY_MASK_NUMERIC_LITERAL_TOKENS_1 \
-)
-
-/**
- * @brief Operadores Binarios / Infijos
- */
-#define FOXY_MASK_BINARY_TOKENS_0 ( \
-    FOXY_MASK_ARITHMETIC_TOKENS_0 | \
-    FOXY_MASK_BITWISE_TOKENS_0    | \
-    FOXY_MASK_COMPARISON_TOKENS_0 | \
-    FOXY_BIT(FOX_TOKEN_AND)       | \
-    FOXY_BIT(FOX_TOKEN_OR)          \
-)
-#define FOXY_MASK_BINARY_TOKENS_1 ( \
-    FOXY_MASK_ARITHMETIC_TOKENS_1 | \
-    FOXY_MASK_BITWISE_TOKENS_1    | \
-    FOXY_MASK_COMPARISON_TOKENS_1   \
-)
-
-/**
- * @brief Máscaras para Categorías AST (FoxyAstKind)
- */
-#define FOXY_AST_MASK_SINGLE_LIST_NODES_0 ( \
-    FOXY_BIT(FOXY_AST_PROGRAM)            | \
-    FOXY_BIT(FOXY_AST_STMT_BLOCK)         | \
-    FOXY_BIT(FOXY_AST_EXPR_ARRAY_LITERAL) | \
-    FOXY_BIT(FOXY_AST_EXPR_DICT_LITERAL)    \
-)
-#define FOXY_AST_MASK_SINGLE_LIST_NODES_1 ((uint64_t)0)
-
-#define FOXY_AST_MASK_LEAF_NODES_0 ( \
-    FOXY_BIT(FOXY_AST_EXPR_IDENTIFIER)  | \
-    FOXY_BIT(FOXY_AST_STMT_BREAK)       | \
-    FOXY_BIT(FOXY_AST_STMT_CONTINUE)    | \
-    FOXY_BIT(FOXY_AST_STMT_GOTO)        | \
-    FOXY_BIT(FOXY_AST_STMT_LABEL)         \
-)
-#define FOXY_AST_MASK_LEAF_NODES_1 ((uint64_t)0)
-
-/**
- * @brief Máscaras para clasificar métodos|miembros si están definidas al inicio.
- */
-#define FOXY_AST_MASK_DECLARATIVES_0 ( \
-    FOXY_BIT_0(FOX_TOKEN_KW_PRIVATE)    | \
-    FOXY_BIT_0(FOX_TOKEN_KW_PROTECTED)  | \
-    FOXY_BIT_0(FOX_TOKEN_KW_PUBLIC)     | \
-    FOXY_BIT_0(FOX_TOKEN_MOD_PRIVATE)   | \
-    FOXY_BIT_0(FOX_TOKEN_MOD_PROTECTED) | \
-    FOXY_BIT_0(FOX_TOKEN_MOD_PUBLIC)      \
-)
-
-#define FOXY_AST_MASK_DECLARATIVES_1 ( \
-    FOXY_BIT_1(FOX_TOKEN_KW_PRIVATE)    | \
-    FOXY_BIT_1(FOX_TOKEN_KW_PROTECTED)  | \
-    FOXY_BIT_1(FOX_TOKEN_KW_PUBLIC)     | \
-    FOXY_BIT_1(FOX_TOKEN_MOD_PRIVATE)   | \
-    FOXY_BIT_1(FOX_TOKEN_MOD_PROTECTED) | \
-    FOXY_BIT_1(FOX_TOKEN_MOD_PUBLIC)      \
-)
-
-/**
- * @brief Máscaras para consumidor de calificadores global, static, const, export, private, protected, public.
- */
-#define FOXY_AST_MASK_CALIFICATORS_0 ( \
-    FOXY_BIT_0(FOX_TOKEN_KW_GLOBAL) | \
-    FOXY_BIT_0(FOX_TOKEN_KW_STATIC) | \
-    FOXY_BIT_0(FOX_TOKEN_KW_CONST)  | \
-    FOXY_BIT_0(FOX_TOKEN_KW_EXPORT) | \
-    FOXY_AST_MASK_DECLARATIVES_0      \
-)
-
-#define FOXY_AST_MASK_CALIFICATORS_1 ( \
-    FOXY_BIT_1(FOX_TOKEN_KW_GLOBAL) | \
-    FOXY_BIT_1(FOX_TOKEN_KW_STATIC) | \
-    FOXY_BIT_1(FOX_TOKEN_KW_CONST)  | \
-    FOXY_BIT_1(FOX_TOKEN_KW_EXPORT) | \
-    FOXY_AST_MASK_DECLARATIVES_1      \
+#define FOXY_AST_MASK_LEAF_NODES FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOXY_AST_EXPR_IDENTIFIER) | \
+    FOXY_TOK_BIT_W0(FOXY_AST_STMT_BREAK)      | \
+    FOXY_TOK_BIT_W0(FOXY_AST_STMT_CONTINUE)   | \
+    FOXY_TOK_BIT_W0(FOXY_AST_STMT_GOTO)       | \
+    FOXY_TOK_BIT_W0(FOXY_AST_STMT_LABEL),        \
+    /* Word 1 [64..127]  */ 0ULL, \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
 )
 
 /* ========================================================================= */
-/* INLINES DE EVALUACIÓN EN O(1)                                             */
+/* INLINES DE EVALUACIÓN Y PREDICADOS                                        */
 /* ========================================================================= */
 
-/* Helper genérico para evaluación en máscaras de 128 bits divididas */
-static inline bool f_ast_match_mask(uint32_t id, uint64_t mask_0, uint64_t mask_1) {
-    if (id < 64)
-        return (mask_0 & ((uint64_t)1 << id)) != 0;
-    if (id < 128)
-        return (mask_1 & ((uint64_t)1 << (id - 64))) != 0;
-    return false;
+static inline bool f_ast_match_mask128(uint32_t id, foxy_mask_t mask) {
+    return foxy_mask_contains(mask, id);
 }
 
 static inline bool f_ast_is_type_specifier(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_MASK_TYPE_SPECIFIER_TOKENS_0, FOXY_MASK_TYPE_SPECIFIER_TOKENS_1);
+    return f_token_is_in_mask(token_type, FOXY_MASK_TYPE_SPECIFIERS);
 }
 
 static inline bool f_ast_is_stmt_start(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_MASK_STMT_START_TOKENS_0, FOXY_MASK_STMT_START_TOKENS_1);
+    return f_token_is_in_mask(token_type, FOXY_MASK_STMT_START_TOKENS);
 }
 
 static inline bool f_ast_is_assignment_op(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_MASK_ASSIGNMENT_TOKENS_0, FOXY_MASK_ASSIGNMENT_TOKENS_1);
+    return f_token_is_assignment(token_type);
 }
 
 static inline bool f_ast_is_binary_op(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_MASK_BINARY_TOKENS_0, FOXY_MASK_BINARY_TOKENS_1);
+    return f_token_is_in_mask(token_type, FOXY_MASK_BINARY_TOKENS);
 }
 
 static inline bool f_ast_is_unary_op(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_MASK_UNARY_TOKENS_0, FOXY_MASK_UNARY_TOKENS_1);
+    return f_token_is_unary(token_type);
 }
 
 static inline bool f_ast_is_literal(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_MASK_LITERAL_TOKENS_0, FOXY_MASK_LITERAL_TOKENS_1);
+    return f_token_is_primary(token_type);
 }
 
 static inline bool f_ast_kind_is_single_list(FoxyAstKind kind) {
-    return f_ast_match_mask((uint32_t)kind, FOXY_AST_MASK_SINGLE_LIST_NODES_0, FOXY_AST_MASK_SINGLE_LIST_NODES_1);
+    return f_ast_match_mask128((uint32_t)kind, FOXY_AST_MASK_SINGLE_LIST_NODES);
 }
 
 static inline bool f_ast_kind_is_leaf(FoxyAstKind kind) {
-    return f_ast_match_mask((uint32_t)kind, FOXY_AST_MASK_LEAF_NODES_0, FOXY_AST_MASK_LEAF_NODES_1);
+    return f_ast_match_mask128((uint32_t)kind, FOXY_AST_MASK_LEAF_NODES);
 }
 
 static inline bool f_ast_is_declarative(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_AST_MASK_DECLARATIVES_0, FOXY_AST_MASK_DECLARATIVES_1);
+    return f_token_is_in_mask(token_type, FOXY_MASK_DECLARATIVE_TOKENS);
 }
 
 static inline bool f_ast_var_is_calificator(uint32_t token_type) {
-    return f_ast_match_mask(token_type, FOXY_AST_MASK_CALIFICATORS_0, FOXY_AST_MASK_CALIFICATORS_1);
+    return f_token_is_in_mask(token_type, FOXY_MASK_QUALIFIER_TOKENS);
 }
 
 /* ========================================================================= */
@@ -680,7 +571,7 @@ FOXY_EXPORT const char *f_ast_kind_to_string(FoxyAstKind kind);
 FOXY_EXPORT char *f_ast_strdup(const char *src, size_t length);
 FOXY_EXPORT void f_ast_parser_init(FoxyAstParser *parser, FILE *file, const char *filename);
 FOXY_EXPORT FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser);
-FOXY_EXPORT FoxyValue f_ast_value_from_token(const FoxyToken *token);
+FOXY_EXPORT FoxyAstValue f_ast_value_from_token(const FoxyToken *token);
 // FOXY_EXPORT void f_ast_synchronize_parser(FoxyAstParser *parser);
 
 #if FOXY_COMPILER_SUPPORTS_XMACROS

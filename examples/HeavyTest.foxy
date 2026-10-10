@@ -24,7 +24,7 @@ foo_hibrido &= 10
 const foo_constante = "no se puede modificar a partir del siguiente scope"
 
 @ Constante global con tipo explícito (arreglo de enteros)
-global const foo_constante_global = (int[]){5, 10, 15}
+global const foo_constante_global = (int[]){5.3, 10.6, 15.9} @ arreglo tipo int que tiene elementos: {5, 10, 15}
 
 function demostracionStatic() {
     @ Variable estática con ámbito limitado a la función (mantiene valor entre llamadas)
@@ -53,20 +53,20 @@ number demo_primitivos[] = {
     true,                         @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (true)
     false,                        @ FOX_TOKEN_KW_BOOL / FOX_TOKEN_LIT_BOOL (false)
     null,                         @ FOX_TOKEN_KW_NULL / FOX_TOKEN_LIT_NULL
-    (char)97,                     @ FOX_TOKEN_KW_CHAR
+    (char)97i,                    @ FOX_TOKEN_KW_CHAR
     (uchar)255,                   @ FOX_TOKEN_KW_UCHAR
     (short)-32768,                @ FOX_TOKEN_KW_SHORT
     (ushort)65535,                @ FOX_TOKEN_KW_USHORT
     (int)-2147483648,             @ FOX_TOKEN_KW_INT
     (uint)4294967295,             @ FOX_TOKEN_KW_UINT
-    (long)-100000l,               @ FOX_TOKEN_KW_LONG
-    (ulong)100000ul,              @ FOX_TOKEN_KW_ULONG
-    (llong)-9223372036854775807ll,@ FOX_TOKEN_KW_LLONG
-    (ullong)18446744073709551615ull, @ FOX_TOKEN_KW_ULLONG
-    (float)3.14159f,              @ FOX_TOKEN_KW_FLOAT
-    (double)2.7182818284d,        @ FOX_TOKEN_KW_DOUBLE
-    (ldouble)1.4142135623ld,      @ FOX_TOKEN_KW_LDOUBLE
-    (number)100n                  @ FOX_TOKEN_KW_NUMBER / FOX_TOKEN_LIT_NUMBER
+    (long)-100000,                @ FOX_TOKEN_KW_LONG
+    (ulong)100000,                @ FOX_TOKEN_KW_ULONG
+    (llong)-9223372036854775807,  @ FOX_TOKEN_KW_LLONG
+    (ullong)18446744073709551615, @ FOX_TOKEN_KW_ULLONG
+    (float)3.14159,               @ FOX_TOKEN_KW_FLOAT
+    (double)2.7182818284,         @ FOX_TOKEN_KW_DOUBLE
+    (ldouble)1.4142135623,        @ FOX_TOKEN_KW_LDOUBLE
+    (number)100                   @ FOX_TOKEN_KW_NUMBER / FOX_TOKEN_LIT_NUMBER
 }
 
 @ Arreglo básico con tamaño definido
@@ -392,3 +392,18 @@ for (int i = 0; i < #numeros;) {
 21
 27
 @@
+
+char nombre[] = "hola" @ como en C: esto automáticamente deja como último caracter \0 para decirle al programa que aquí cierra el arreglo tipo char.
+int valoresASCII[] = (int[])nombre @ devuelve arreglo tipo int: {104, 111, 108, 97, 0}
+int loMismo[] = (int[])"hola" @ como en C: esto automáticamente deja como último caracter \0 para decirle al programa que aquí cierra el arreglo tipo char.
+int deNuevo[] = (int[]){'h', 'o', 'l', 'a', '\0'}
+
+dict tablaEstiloLua = {
+    [0] = 'h', @ los dict son literalmente tablas Lua con limitantes de no usar metatablas.
+    [1] = 'o',
+    [2] = 'l',
+    [3] = 'a',
+    [4] = '\0' @ importante antes de castear (char[])tablaEstiloLua
+}
+
+char otraVez[] = (char[])tablaEstiloLua

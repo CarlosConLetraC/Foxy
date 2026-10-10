@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 /* ========================================================================= */
 /* TABLA DE NOMBRES DE TOKENS (PARA IMPRESIÓN Y DEBUG)                        */
@@ -251,7 +252,7 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
             case '\n':
                 lexer->line++;
                 lexer->column = 1;
-                lexer->cursor++; /* Avanza sin incrementar columna */
+                f_lexer_advance(lexer);
                 break;
             case '@': {
                 size_t count = 0;
@@ -267,34 +268,42 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
                     }
                 } else {
                     /* Comentario multilínea (N@ ... N@) */
+                    int closed = 0;
                     while (f_lexer_peek(lexer) != '\0') {
                         if (f_lexer_peek(lexer) == '\n') {
                             lexer->line++;
                             lexer->column = 1;
-                            lexer->cursor++;
+                            f_lexer_advance(lexer);
                             continue;
                         }
 
                         if (f_lexer_peek(lexer) == '@') {
                             size_t close_count = 0;
-                            // const char *saved_cursor = lexer->cursor;
                             while (f_lexer_peek(lexer) == '@') {
                                 close_count++;
                                 f_lexer_advance(lexer);
                             }
 
                             if (close_count == count) {
-                                break; /* Cerrado correctamente */
+                                closed = 1;
+                                break; /* Cerrado correctamente con el nivel exacto */
                             }
                         } else {
                             f_lexer_advance(lexer);
                         }
                     }
+
+                    if (!closed) {
+                        f_lexer_error(lexer, "Unclosed multi-line comment starting at level %zu.", count);
+                        // Nota: Si deseas retornar un token de error aquí, f_lexer_skip_whitespace_and_comments 
+                        // tendría que cambiar de estrategia. Como void, el error ya fue reportado 
+                        // y el lexer continuará hasta EOF o el siguiente token.
+                    }
                 }
                 break;
             }
             default:
-                return;
+                return; /* Al ser void, simplemente retornamos sin valor */
         }
     }
 }
@@ -319,12 +328,6 @@ static FoxyToken f_lexer_scan_identifier(FoxyLexer *lexer) {
     return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_IDENTIFIER, FOX_TOKEN_IDENTIFIER);
 }
 
-/* Matriz de resolución de tokens enteros: [has_u][l_count] */
-static const FoxyTokenType INT_TOKEN_MAP[2][3] = {
-    /* [has_u = 0] */ { FOX_TOKEN_INT_LITERAL,  FOX_TOKEN_LONG_LITERAL,  FOX_TOKEN_LLONG_LITERAL  },
-    /* [has_u = 1] */ { FOX_TOKEN_UINT_LITERAL, FOX_TOKEN_ULONG_LITERAL, FOX_TOKEN_ULLONG_LITERAL }
-};
-
 /* Helper para saltar guiones bajos consecutivos */
 static inline void f_lexer_skip_underscores(FoxyLexer *lexer) {
     while (f_lexer_peek(lexer) == '_') {
@@ -336,7 +339,7 @@ static FoxyToken f_lexer_scan_number(FoxyLexer *lexer) {
     bool is_float = false;
     int base = 10;
 
-    /* 1. Detección de base mediante switch */
+    /* 1. Detección de base (16, 2, 8, 10) */
     if (lexer->token_start[0] == '0') {
         switch (f_lexer_peek(lexer) | 0x20) {
             case 'x': base = 16; f_lexer_advance(lexer); break;
@@ -346,37 +349,27 @@ static FoxyToken f_lexer_scan_number(FoxyLexer *lexer) {
         }
     }
 
-    /* 2. Lectura del cuerpo según la base (ignorando '_') */
+    /* 2. Lectura del cuerpo numérico */
     for (;;) {
         f_lexer_skip_underscores(lexer);
         char c = f_lexer_peek(lexer);
 
         switch (base) {
-            case 16:
-                if (!isxdigit((unsigned char)c)) goto check_float;
-                break;
-            case 2:
-                if (c != '0' && c != '1') goto check_float;
-                break;
-            case 8:
-                if (c < '0' || c > '7') goto check_float;
-                break;
-            default: /* Base 10 */
-                if (!isdigit((unsigned char)c)) goto check_float;
-                break;
+            case 16: if (!isxdigit((unsigned char)c)) goto check_float; break;
+            case 2:  if (c != '0' && c != '1') goto check_float; break;
+            case 8:  if (c < '0' || c > '7') goto check_float; break;
+            default: if (!isdigit((unsigned char)c)) goto check_float; break;
         }
         f_lexer_advance(lexer);
     }
 
 check_float:
-    /* 3. Detección y consumo de punto flotante (Solo Base 10) */
+    /* 3. Detección de punto flotante */
     if (base == 10 && f_lexer_peek(lexer) == '.') {
-        /* Miramos si tras el punto (o posibles '_') hay un dígito */
         char next = f_lexer_peek_next(lexer);
         if (isdigit((unsigned char)next) || next == '_') {
             is_float = true;
-            f_lexer_advance(lexer); /* Consumir '.' */
-
+            f_lexer_advance(lexer); // Consumir '.'
             for (;;) {
                 f_lexer_skip_underscores(lexer);
                 if (!isdigit((unsigned char)f_lexer_peek(lexer))) break;
@@ -385,70 +378,31 @@ check_float:
         }
     }
 
-    if (base != 10) goto parse_suffixes;
-
-parse_suffixes:;
-    /* 4. Captura de sufijos (U, L, LL, F, D, LD) */
-    bool has_u = false;
-    int l_count = 0;
-    bool has_f = false;
-    bool has_d = false;
-
-    for (;;) {
-        char lower_c = f_lexer_peek(lexer) | 0x20;
-
-        switch (lower_c) {
-            case 'u':
-                if (has_u || is_float || has_d) goto finalize_type;
-                has_u = true;
-                f_lexer_advance(lexer);
-                continue;
-
-            case 'l':
-                if (l_count >= 2 || has_d || has_f) goto finalize_type;
-                l_count++;
-                f_lexer_advance(lexer);
-                continue;
-
-            case 'f':
-                if (has_f || has_d || has_u || base != 10) goto finalize_type;
-                has_f = is_float = true;
-                f_lexer_advance(lexer);
-                goto finalize_type;
-
-            case 'd':
-                /* Habilita 'd' como sufijo double o 'ld' / 'lld' para long double */
-                if (has_f || has_d || has_u || base != 10) goto finalize_type;
-                has_d = is_float = true;
-                f_lexer_advance(lexer);
-                goto finalize_type;
-
-            default:
-                goto finalize_type;
-        }
+    /* 4. Captura de la región del sufijo */
+    const char *suffix_start = lexer->cursor;
+    while (isalpha((unsigned char)f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_') {
+        f_lexer_advance(lexer);
     }
+    size_t suffix_len = (size_t)(lexer->cursor - suffix_start);
 
-finalize_type:;
-    /* Comprobar si el literal continúa con caracteres alfanuméricos no válidos (ej. 123ldx) */
-    char next_c = f_lexer_peek(lexer);
-    if (isalpha((unsigned char)next_c) || next_c == '_') {
-        /* Se consume el identificador erróneo completo para evitar fragmentación de tokens */
-        while (isalnum((unsigned char)f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_') {
-            f_lexer_advance(lexer);
+    /* 5. Resolución mediante la Tabla de Reglas (Hash/Lookup Table Estática) */
+    FoxyTokenType token_type = is_float ? FOX_TOKEN_DOUBLE_LITERAL : FOX_TOKEN_INT_LITERAL;
+
+    if (suffix_len > 0) {
+        bool matched = false;
+        for (size_t i = 0; i < FOXY_SUFFIX_TABLE_SIZE; ++i) {
+            if (FOXY_SUFFIX_TABLE[i].length == suffix_len &&
+                memcmp(suffix_start, FOXY_SUFFIX_TABLE[i].suffix, suffix_len) == 0) {
+                token_type = FOXY_SUFFIX_TABLE[i].token_type;
+                matched = true;
+                break;
+            }
         }
-        /* Retorna token de error usando el código de excepción unificado */
-        return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_ERROR, (FoxyTokenType)FOX_EXCEPTION_MALFORMED_NUMBER);
-    }
 
-    /* 5. Clasificación final de token */
-    FoxyTokenType token_type;
-
-    if (is_float) {
-        token_type = has_f ? FOX_TOKEN_FLOAT_LITERAL :
-                     (l_count > 0) ? FOX_TOKEN_LDOUBLE_LITERAL :
-                                     FOX_TOKEN_DOUBLE_LITERAL;
-    } else {
-        token_type = INT_TOKEN_MAP[has_u ? 1 : 0][l_count > 2 ? 2 : l_count];
+        if (!matched) {
+            /* Sufijo inválido o malformado: consumimos el resto si es necesario y lanzamos error */
+            return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_ERROR, (FoxyTokenType)FOX_EXCEPTION_MALFORMED_NUMBER);
+        }
     }
 
     return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_LITERAL, token_type);
@@ -660,4 +614,20 @@ void f_lexer_print_token(const FoxyToken *token) {
            f_lexer_token_type_to_string(token->type),
            token->length, token->start,
            token->pos.line, token->pos.column);
+}
+
+void f_lexer_error(FoxyLexer *lexer, const char *format, ...) {
+    if (!lexer) return;
+    
+    fprintf(stderr, "[Foxy Lexer Error] %s:%u:%u: ", 
+            lexer->filename ? lexer->filename : "<unknown>", 
+            lexer->line, 
+            lexer->column);
+    
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    
+    fprintf(stderr, "\n");
 }

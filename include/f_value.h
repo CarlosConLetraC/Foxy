@@ -22,13 +22,13 @@ typedef struct FoxyFunction FoxyFunction;
 
 /**
  * ============================================================================
- * X-MACRO LIST: FOXY_VALUE_value_LIST
+ * X-MACRO LIST: FOXY_VALUE_VALUE_LIST
  * ============================================================================
  * Define la lista maestra de tipos soportados en Foxy Runtime.
  * Mantiene la correspondencia directa entre la etiqueta enum y su nombre como cadena.
  */
 #if FOXY_COMPILER_SUPPORTS_XMACROS
-#define FOXY_VALUE_value_LIST(F) \
+#define FOXY_VALUE_VALUE_LIST(F) \
     F(FOXY_VAL_NULL,                "null")     /* [00] Literal nulo / Omisión */ \
     F(FOXY_VAL_BOOL,                "bool")     /* [01] Booleano (true/false) */ \
     F(FOXY_VAL_CHAR,                "char")     /* [02] Entero con signo de 8 bits */ \
@@ -57,7 +57,7 @@ typedef struct FoxyFunction FoxyFunction;
 /** @brief Enumeración de tipos de datos únicos representables en la VM. */
 typedef enum FOXY_PACKED {
     #define F(type_enum, type_str) type_enum,
-    FOXY_VALUE_value_LIST(F)
+    FOXY_VALUE_VALUE_LIST(F)
     #undef F
 } FoxyValueType;
 #else
@@ -215,19 +215,22 @@ FOXY_EXPORT bool f_value_numeric_equals(FoxyValue a, FoxyValue b);
 #define f_value_get_type_name(t) (((t) >= 0 && (t) < (FOXY_VAL_COUNT)) ? FOXY_VALUE_value_NAMES[(t)] : "unknown")
 
 /**
- * @brief Evalúa si un `FoxyValueType` es un número primitivo usando la máscara bitwise.
- * @note Operación segura de alto rendimiento libre de branch mispredictions.
+ * @brief Evalúa si un `FoxyValueType` es un número primitivo usando la máscara multipalabra.
  */
 #define f_value_type_is_numeric(ftype) \
-    (((ftype) <= FOXY_VAL_NUMBER) && (((FOXY_BIT(ftype)) & FOXY_MASK_PRIMITIVE_NUMERIC) != 0ULL))
+    foxy_mask_contains(FOXY_MASK_PRIMITIVE_NUMERIC, (uint32_t)(ftype))
 
-/** @brief Evalúa si un `FoxyValueType` es de coma flotante usando la máscara bitwise. */
+/**
+ * @brief Evalúa si un `FoxyValueType` es de coma flotante.
+ */
 #define f_value_type_is_floating(ftype) \
-    ((((FOXY_BIT(ftype)) & FOXY_MASK_FLOATING_POINT) != 0ULL))
+    foxy_mask_contains(FOXY_MASK_FLOATING_POINT, (uint32_t)(ftype))
 
-/** @brief Evalúa si un `FoxyValueType` referencia un objeto dinámico en Heap. */
+/**
+ * @brief Evalúa si un `FoxyValueType` referencia un objeto dinámico en Heap.
+ */
 #define f_value_type_is_heap(ftype) \
-    (((FOXY_BIT(ftype)) & FOXY_MASK_HEAP_OBJECT) != 0ULL)
+    foxy_mask_contains(FOXY_MASK_HEAP_OBJECT, (uint32_t)(ftype))
 
 /** @brief Comprueba si el struct `FoxyValue` apunta a un objeto en Heap. */
 #define f_value_is_heap(v) f_value_type_is_heap((v).type)

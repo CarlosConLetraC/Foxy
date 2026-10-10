@@ -25,3 +25,55 @@ int deNuevo[] = (int[]){'h', 'o', 'l', 'a', '\0'}
 number mis_numeros[] = (long[]){1, 2, 3, 4, 5} @ crea un arreglo tipo long := {1l, 2l, 3l, 4l, 5l}
 short numeros_primos[10] = (short[]){2, 3, 5, 7, 11, 13, 17, 23, 29, 31} @ crea un arreglo tipo short := {2, 3, 5, 7, 11, 13, 17, 23, 29, 31}
 ```
+.---(5) Si se encuentra `(...) donde: ... es todo el contenido genérico de un lambda, encapsulamiento, casteo, etc.`, luego después del `)` vemos si el current token:
+Si es =>, entonces decimos "es lambda".
+Si es {, entonces decimos "es casteo de dict | array".
+Si es un identificador FOX_TOKEN_IDENTIFIER, entonces decimos "es casteo de un tipo de dato a otro tipo de dato".
+Si es un identificador FOX_TOKEN_*_LITERAL, entonces decimos "es un casteo de un tipo de dato para una literal."
+
+casos especiales:
+si es alguno de estos:
+FOX_TOKEN_KW_BOOL
+FOX_TOKEN_KW_CHAR
+FOX_TOKEN_KW_UCHAR
+FOX_TOKEN_KW_SHORT
+FOX_TOKEN_KW_USHORT
+FOX_TOKEN_KW_INT
+FOX_TOKEN_KW_UINT
+FOX_TOKEN_KW_LONG
+FOX_TOKEN_KW_ULONG
+FOX_TOKEN_KW_LLONG
+FOX_TOKEN_KW_ULLONG
+FOX_TOKEN_KW_FLOAT
+FOX_TOKEN_KW_DOUBLE
+FOX_TOKEN_KW_LDOUBLE
+FOX_TOKEN_KW_NUMBER
+
+Entonces pensamos "intentamos convertir un tipo de dato foxy primitivo para una literal | identificador."
+
+
+Si es alguno de estos casos:
+FOX_TOKEN_KW_DICT
+FOX_TOKEN_KW_OBJECT
+FOX_TOKEN_KW_SUPER
+FOX_TOKEN_KW_SELF
+
+Entonces decimos "intentamos convertir un tipo de dato foxy abstracto para una literal | identificador."
+
+NOTA: asegurar que aplique casteo de arreglo a otro. Ejemplo:
+```foxy
+char nombre[] = "hola" @ como en C: esto automáticamente deja como último caracter \0 para decirle al programa que aquí cierra el arreglo tipo char.
+int valoresASCII[] = (int[])nombre
+int loMismo[] = (int[])"hola" @ como en C: esto automáticamente deja como último caracter \0 para decirle al programa que aquí cierra el arreglo tipo char.
+int deNuevo[] = (int[]){'h', 'o', 'l', 'a', '\0'} @ exactamente igual a "hola\0".
+
+dict tablaEstiloLua = {
+    [0] = 'h', @ los dict son literalmente tablas Lua con limitantes de no usar metatablas.
+    [1] = 'o',
+    [2] = 'l',
+    [3] = 'a',
+    [4] = '\0' @ importante antes de castear (char[])tablaEstiloLua
+}
+
+char otraVez[] = (char[])tablaEstiloLua
+```

@@ -375,10 +375,10 @@ static inline uint16_t f_lexer_compose_type(uint16_t category, FoxyTokenType sub
 }
 
 typedef struct {
-    const char *filename;
-    uint32_t line;
-    uint32_t column;
-} FoxySourcePos;
+    const char *filename;  /* 8 bytes */
+    uint32_t line;         /* 4 bytes */
+    uint32_t column;       /* 4 bytes */
+} FoxySourcePos;           /* 8 + 4 + 4 = 16 bytes */
 
 typedef struct {
     const char *start;       /* 8 bytes */
@@ -423,205 +423,335 @@ FOXY_EXPORT FoxyToken f_lexer_next_token(FoxyLexer *lexer);
 FOXY_EXPORT FoxyToken f_lexer_peek_token(FoxyLexer *lexer);
 FOXY_EXPORT const char *f_lexer_token_type_to_string(FoxyTokenType type);
 FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
+FOXY_EXPORT void f_lexer_error(FoxyLexer *lexer, const char *format, ...);
 
 /* ========================================================================= */
-/* 5. MÁSCARAS BITWISE PARA TOKENS DE EXPRESIONES (LEXER / PARSER)               */
+/* 5. MÁSCARAS BITWISE MULTIPALABRA PARA TOKENS (LEXER / PARSER)              */
 /* ========================================================================= */
 
 /* --- Primary / Literales & Identificadores --- */
-#define FOXY_MASK_PRIMARY_0 ( \
-    FOXY_BIT(FOX_TOKEN_IDENTIFIER - 0)      | \
-    FOXY_BIT(FOX_TOKEN_INT_LITERAL - 0)     | \
-    FOXY_BIT(FOX_TOKEN_UINT_LITERAL - 0)    | \
-    FOXY_BIT(FOX_TOKEN_LONG_LITERAL - 0)    | \
-    FOXY_BIT(FOX_TOKEN_ULONG_LITERAL - 0)   | \
-    FOXY_BIT(FOX_TOKEN_LLONG_LITERAL - 0)   | \
-    FOXY_BIT(FOX_TOKEN_ULLONG_LITERAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_FLOAT_LITERAL - 0)   | \
-    FOXY_BIT(FOX_TOKEN_DOUBLE_LITERAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_LDOUBLE_LITERAL - 0) | \
-    FOXY_BIT(FOX_TOKEN_NUMBER_LITERAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_CHAR_LITERAL - 0)    | \
-    FOXY_BIT(FOX_TOKEN_STRING_LITERAL - 0)  | \
-    FOXY_BIT(FOX_TOKEN_KW_TRUE - 0)         | \
-    FOXY_BIT(FOX_TOKEN_KW_FALSE - 0)        | \
-    FOXY_BIT(FOX_TOKEN_KW_NULL - 0)           \
+#define FOXY_MASK_PRIMARY_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_IDENTIFIER)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_INT_LITERAL)     | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_UINT_LITERAL)    | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_LONG_LITERAL)    | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_ULONG_LITERAL)   | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_LLONG_LITERAL)   | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_ULLONG_LITERAL)  | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_FLOAT_LITERAL)   | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_DOUBLE_LITERAL)  | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_LDOUBLE_LITERAL) | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_NUMBER_LITERAL)  | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_CHAR_LITERAL)    | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_STRING_LITERAL)  | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_NULL),          \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_TRUE)         | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_FALSE),        \
+    /* Word 2 [128..191] */ 0ULL,                \
+    /* Word 3 [192..255] */ 0ULL                 \
 )
-#define FOXY_MASK_PRIMARY_1 (0ULL)
 
 /* --- Postfix (Op. Postfijos: Acceso, Llamada, Incrementos) --- */
-#define FOXY_MASK_POSTFIX_0 ( \
-    FOXY_BIT(FOX_TOKEN_LPAREN - 0)   | \
-    FOXY_BIT(FOX_TOKEN_LBRACKET - 0) | \
-    FOXY_BIT(FOX_TOKEN_DOT - 0)          | \
-    FOXY_BIT(FOX_TOKEN_INC - 0)          | \
-    FOXY_BIT(FOX_TOKEN_DEC - 0)            \
+#define FOXY_MASK_POSTFIX_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                   \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_INC)             | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_DEC),              \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LPAREN)          | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LBRACKET)        | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_DOT),              \
+    /* Word 3 [192..255] */ 0ULL                 \
 )
-#define FOXY_MASK_POSTFIX_1 (0ULL)
 
 /* --- Unary (Op. Unarios Pre-fijos) --- */
-#define FOXY_MASK_UNARY_0 ( \
-    FOXY_BIT(FOX_TOKEN_MINUS - 0)        | \
-    FOXY_BIT(FOX_TOKEN_BANG - 0)         | \
-    FOXY_BIT(FOX_TOKEN_TILDE - 0)        | \
-    FOXY_BIT(FOX_TOKEN_INC - 0)          | \
-    FOXY_BIT(FOX_TOKEN_DEC - 0)            \
+#define FOXY_MASK_UNARY_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                  \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MINUS)           | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_INC)             | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_DEC),              \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_BANG)            | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_TILDE),            \
+    /* Word 3 [192..255] */ 0ULL                 \
 )
-#define FOXY_MASK_UNARY_1 (0ULL)
 
 /* --- Multiplicative (*, /, %) --- */
-#define FOXY_MASK_MULTIPLICATIVE_0 ( \
-    FOXY_BIT(FOX_TOKEN_STAR - 0)         | \
-    FOXY_BIT(FOX_TOKEN_SLASH - 0)        | \
-    FOXY_BIT(FOX_TOKEN_PERCENT - 0)        \
+#define FOXY_MASK_MULTIPLICATIVE_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                        \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_STAR)            | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_SLASH)           | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_PERCENT),          \
+    /* Word 2 [128..191] */ 0ULL,                     \
+    /* Word 3 [192..255] */ 0ULL                      \
 )
-#define FOXY_MASK_MULTIPLICATIVE_1 (0ULL)
 
 /* --- Additive (+, -) --- */
-#define FOXY_MASK_ADDITIVE_0 ( \
-    FOXY_BIT(FOX_TOKEN_PLUS - 0)         | \
-    FOXY_BIT(FOX_TOKEN_MINUS - 0)          \
+#define FOXY_MASK_ADDITIVE_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                    \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_PLUS)            | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MINUS),            \
+    /* Word 2 [128..191] */ 0ULL,                 \
+    /* Word 3 [192..255] */ 0ULL                  \
 )
-#define FOXY_MASK_ADDITIVE_1 (0ULL)
 
 /* --- Relational (<, <=, >, >=) --- */
-#define FOXY_MASK_RELATIONAL_0 ( \
-    FOXY_BIT(FOX_TOKEN_LT - 0)         | \
-    FOXY_BIT(FOX_TOKEN_LE - 0)   | \
-    FOXY_BIT(FOX_TOKEN_GT - 0)      | \
-    FOXY_BIT(FOX_TOKEN_GE - 0)\
+#define FOXY_MASK_RELATIONAL_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                      \
+    /* Word 1 [64..127] */ 0ULL,                    \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LT)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LE)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_GT)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_GE),               \
+    /* Word 3 [192..255] */ 0ULL                    \
 )
-#define FOXY_MASK_RELATIONAL_1 (0ULL)
 
 /* --- Equality (==, !=) --- */
-#define FOXY_MASK_EQUALITY_0 ( \
-    FOXY_BIT(FOX_TOKEN_EQ - 0)  | \
-    FOXY_BIT(FOX_TOKEN_NEQ - 0)     \
+#define FOXY_MASK_EQUALITY_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                    \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_EQ),               \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_NEQ),              \
+    /* Word 3 [192..255] */ 0ULL                  \
 )
-#define FOXY_MASK_EQUALITY_1 (0ULL)
 
 /* --- Logical (&&, ||) --- */
-#define FOXY_MASK_LOGICAL_0 ( \
-    FOXY_BIT(FOX_TOKEN_AND - 0)       | \
-    FOXY_BIT(FOX_TOKEN_OR - 0)          \
+#define FOXY_MASK_LOGICAL_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                   \
+    /* Word 1 [64..127] */ 0ULL,                 \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_AND)             | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_OR),               \
+    /* Word 3 [192..255] */ 0ULL                 \
 )
-
-#define FOXY_MASK_LOGICAL_1 (0ULL)
 
 /* --- Assignment (=, +=, -=, *=, /=, %=, etc.) --- */
-#define FOXY_MASK_ASSIGNMENT_0 ( \
-    FOXY_BIT(FOX_TOKEN_ASSIGN - 0)        | \
-    FOXY_BIT(FOX_TOKEN_PLUS_ASSIGN - 0)   | \
-    FOXY_BIT(FOX_TOKEN_MINUS_ASSIGN - 0)  | \
-    FOXY_BIT(FOX_TOKEN_STAR_ASSIGN - 0)   | \
-    FOXY_BIT(FOX_TOKEN_SLASH_ASSIGN - 0)  | \
-    FOXY_BIT(FOX_TOKEN_PERCENT_ASSIGN - 0)\
+#define FOXY_MASK_ASSIGNMENT_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL,                      \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_ASSIGN)          | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_PLUS_ASSIGN)     | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MINUS_ASSIGN)    | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_STAR_ASSIGN)     | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_SLASH_ASSIGN)    | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_PERCENT_ASSIGN)  | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_POWER_ASSIGN)    | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_AND_ASSIGN)      | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_OR_ASSIGN)       | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_XOR_ASSIGN)      | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_LSHIFT_ASSIGN)   | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_RSHIFT_ASSIGN),    \
+    /* Word 2 [128..191] */ 0ULL,                   \
+    /* Word 3 [192..255] */ 0ULL                    \
 )
 
-/* Para tokens con FOX_TOKEN_* >= 64 en MASK_1 */
-#define FOXY_MASK_ASSIGNMENT_1 ( \
-    FOXY_BIT(FOX_TOKEN_AND_ASSIGN - 64)    | \
-    FOXY_BIT(FOX_TOKEN_OR_ASSIGN - 64)     | \
-    FOXY_BIT(FOX_TOKEN_XOR_ASSIGN - 64)    | \
-    FOXY_BIT(FOX_TOKEN_RSHIFT_ASSIGN - 64) | \
-    FOXY_BIT(FOX_TOKEN_LSHIFT_ASSIGN - 64)   \
+/* --- Expresiones Binarias --- */
+#define FOXY_MASK_BINARY_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL, \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_PLUS)            | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MINUS)           | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_STAR)            | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_SLASH)           | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_PERCENT)         | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_POWER)           | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_EQ),               \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_NEQ)             | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LT)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_GT)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LE)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_GE)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_AND)             | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_OR)              | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_AMPERSAND)       | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_PIPE)            | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_CARET)           | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_LSHIFT)          | \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_RSHIFT),           \
+    /* Word 3 [192..255] */ 0ULL  \
 )
 
-/* --- Máscara Bitwise para Sincronización de Errores (Parser Recovery) --- */
-#define FOXY_MASK_SYNC_TOKENS_0 ( \
-    FOXY_BIT(FOX_TOKEN_SEMICOLON - 0) | \
-    FOXY_BIT(FOX_TOKEN_KW_CLASS - 0)  | \
-    FOXY_BIT(FOX_TOKEN_KW_STRUCT - 0) | \
-    FOXY_BIT(FOX_TOKEN_KW_FUNCTION - 0)| \
-    FOXY_BIT(FOX_TOKEN_KW_FOR - 0)     | \
-    FOXY_BIT(FOX_TOKEN_KW_FOREACH - 0) | \
-    FOXY_BIT(FOX_TOKEN_KW_IF - 0)      | \
-    FOXY_BIT(FOX_TOKEN_KW_WHILE - 0)   | \
-    FOXY_BIT(FOX_TOKEN_KW_RETURN - 0)  | \
-    FOXY_BIT(FOX_TOKEN_KW_SWITCH - 0)  | \
-    FOXY_BIT(FOX_TOKEN_KW_TRY - 0)       \
+/* --- Inicios de Sentencias (Statement Start) --- */
+#define FOXY_MASK_STMT_START_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ENUM)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FUNCTION)     | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FOR)          | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FOREACH)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_IF)           | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_WHILE)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_RETURN)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_SWITCH)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_TRY)          | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_INCLUDE),      \
+    /* Word 1 [64..127]  */ 0ULL, \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
 )
 
-#define FOXY_MASK_SYNC_TOKENS_1 (0ULL)
-
-/* --- Máscaras de especificadores --- */
-#define FOXY_MASK_TYPE_SPECIFIERS_0 ( \
-    FOXY_BIT(FOX_TOKEN_KW_BOOL)     | \
-    FOXY_BIT(FOX_TOKEN_KW_CHAR)     | \
-    FOXY_BIT(FOX_TOKEN_KW_UCHAR)    | \
-    FOXY_BIT(FOX_TOKEN_KW_SHORT)    | \
-    FOXY_BIT(FOX_TOKEN_KW_USHORT)   | \
-    FOXY_BIT(FOX_TOKEN_KW_INT)      | \
-    FOXY_BIT(FOX_TOKEN_KW_UINT)     | \
-    FOXY_BIT(FOX_TOKEN_KW_LONG)     | \
-    FOXY_BIT(FOX_TOKEN_KW_ULONG)    | \
-    FOXY_BIT(FOX_TOKEN_KW_LLONG)    | \
-    FOXY_BIT(FOX_TOKEN_KW_ULLONG)   | \
-    FOXY_BIT(FOX_TOKEN_KW_FLOAT)    | \
-    FOXY_BIT(FOX_TOKEN_KW_DOUBLE)   | \
-    FOXY_BIT(FOX_TOKEN_KW_LDOUBLE)  | \
-    FOXY_BIT(FOX_TOKEN_KW_NUMBER)   | \
-    FOXY_BIT(FOX_TOKEN_KW_DICT)     | \
-    FOXY_BIT(FOX_TOKEN_KW_OBJECT)     \
+/* --- Sincronización de Errores (Parser Recovery) --- */
+#define FOXY_MASK_SYNC_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_IF)           | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_WHILE)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FOR)          | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FOREACH)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_SWITCH)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_RETURN)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_TRY)          | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FUNCTION),      \
+    /* Word 1 [64..127] */ 0ULL,                     \
+    /* Word 2 [128..191] */ \
+    FOXY_TOK_BIT_W2(FOX_TOKEN_SEMICOLON),        \
+    /* Word 3 [192..255] */ 0ULL                     \
 )
-#define FOXY_MASK_TYPE_SPECIFIERS_1 (0ULL)
 
-static inline bool f_token_is_in_mask(uint32_t token_type, uint64_t mask0, uint64_t mask1) {
-    uint32_t idx = token_type / 64;
-    uint64_t bit = 1ULL << (token_type % 64);
+/* --- Especificadores de Tipos --- */
+#define FOXY_MASK_TYPE_SPECIFIERS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_BOOL)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CHAR)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_UCHAR)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_SHORT)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_USHORT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_INT)          | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_UINT)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LONG)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ULONG)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LLONG)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ULLONG)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FLOAT)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DOUBLE)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LDOUBLE)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_NUMBER)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DICT)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_OBJECT)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ENUM),          \
+    /* Word 1 [64..127]  */ 0ULL, \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
+)
 
-    if (idx == 0) return (mask0 & bit) != 0ULL;
-    if (idx == 1) return (mask1 & bit) != 0ULL;
-    return false;
+/* --- Tokens Declarativos (Modificadores de Visibilidad) --- */
+#define FOXY_MASK_DECLARATIVE_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ 0ULL, \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_PRIVATE)      | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_PROTECTED)    | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_PUBLIC)       | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MOD_PRIVATE)     | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MOD_PROTECTED)   | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MOD_PUBLIC),       \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
+)
+
+/* --- Calificadores de Variables --- */
+#define FOXY_MASK_QUALIFIER_TOKENS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_GLOBAL)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STATIC)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CONST),        \
+    /* Word 1 [64..127] */ \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_EXPORT)      | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_PRIVATE)     | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_PROTECTED)   | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_KW_PUBLIC)      | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MOD_PRIVATE)    | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MOD_PROTECTED)  | \
+    FOXY_TOK_BIT_W1(FOX_TOKEN_MOD_PUBLIC),      \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
+)
+
+/* Función inline de verificación delegada a foxy_mask_contains */
+static inline bool f_token_is_in_mask(uint32_t token_type, foxy_mask_t mask) {
+    return foxy_mask_contains(mask, token_type);
 }
 
 /* Predicados de conveniencia */
 static inline bool f_token_is_primary(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_PRIMARY_0, FOXY_MASK_PRIMARY_1);
+    return f_token_is_in_mask(type, FOXY_MASK_PRIMARY_TOKENS);
 }
 
 static inline bool f_token_is_postfix(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_POSTFIX_0, FOXY_MASK_POSTFIX_1);
+    return f_token_is_in_mask(type, FOXY_MASK_POSTFIX_TOKENS);
 }
 
 static inline bool f_token_is_unary(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_UNARY_0, FOXY_MASK_UNARY_1);
+    return f_token_is_in_mask(type, FOXY_MASK_UNARY_TOKENS);
 }
 
 static inline bool f_token_is_multiplicative(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_MULTIPLICATIVE_0, FOXY_MASK_MULTIPLICATIVE_1);
+    return f_token_is_in_mask(type, FOXY_MASK_MULTIPLICATIVE_TOKENS);
 }
 
 static inline bool f_token_is_additive(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_ADDITIVE_0, FOXY_MASK_ADDITIVE_1);
+    return f_token_is_in_mask(type, FOXY_MASK_ADDITIVE_TOKENS);
 }
 
 static inline bool f_token_is_relational(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_RELATIONAL_0, FOXY_MASK_RELATIONAL_1);
+    return f_token_is_in_mask(type, FOXY_MASK_RELATIONAL_TOKENS);
 }
 
 static inline bool f_token_is_equality(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_EQUALITY_0, FOXY_MASK_EQUALITY_1);
+    return f_token_is_in_mask(type, FOXY_MASK_EQUALITY_TOKENS);
 }
 
 static inline bool f_token_is_logical(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_LOGICAL_0, FOXY_MASK_LOGICAL_1);
+    return f_token_is_in_mask(type, FOXY_MASK_LOGICAL_TOKENS);
 }
 
 static inline bool f_token_is_assignment(uint32_t type) {
-    return f_token_is_in_mask(type, FOXY_MASK_ASSIGNMENT_0, FOXY_MASK_ASSIGNMENT_1);
+    return f_token_is_in_mask(type, FOXY_MASK_ASSIGNMENT_TOKENS);
 }
 
 /**
  * @brief Evalúa si un token es un punto de límite/inicio válido para descartar e interactuar con panic mode.
  */
 static inline bool f_token_is_sync_boundary(uint32_t token_type) {
-    return f_token_is_in_mask(token_type, FOXY_MASK_SYNC_TOKENS_0, FOXY_MASK_SYNC_TOKENS_1);
+    return f_token_is_in_mask(token_type, FOXY_MASK_SYNC_TOKENS);
 }
 
 /**
- * @brief Evalúa si un token pertenece a un tipo de identificador.
+ * @brief Evalúa si un token pertenece a un tipo de especificador de tipo.
  */
 static inline bool f_token_is_type_specifier(FoxyTokenType type) {
-    return f_token_is_in_mask((uint32_t)type, FOXY_MASK_TYPE_SPECIFIERS_0, FOXY_MASK_TYPE_SPECIFIERS_1);
+    return f_token_is_in_mask((uint32_t)type, FOXY_MASK_TYPE_SPECIFIERS);
 }
+
+typedef struct {
+    const char *suffix;       /* Texto del sufijo (ej. "ui", "ld", "n") (8 bytes) */
+    FoxyTokenType token_type; /* Tipo de token resultante (4 bytes con FOXY_PACKED) */
+    uint8_t length;           /* Longitud del sufijo para comparación rápida (1 byte) */
+    uint8_t _pad[6];
+} FoxySuffixRule;
+
+static const FoxySuffixRule FOXY_SUFFIX_TABLE[] = {
+    { .suffix = "i",   .token_type = FOX_TOKEN_INT_LITERAL,     .length = 1 },
+    { .suffix = "ui",  .token_type = FOX_TOKEN_UINT_LITERAL,    .length = 2 },
+    { .suffix = "l",   .token_type = FOX_TOKEN_LONG_LITERAL,    .length = 1 },
+    { .suffix = "ul",  .token_type = FOX_TOKEN_ULONG_LITERAL,   .length = 2 },
+    { .suffix = "ll",  .token_type = FOX_TOKEN_LLONG_LITERAL,   .length = 2 },
+    { .suffix = "ull", .token_type = FOX_TOKEN_ULLONG_LITERAL,  .length = 3 },
+    { .suffix = "f",   .token_type = FOX_TOKEN_FLOAT_LITERAL,   .length = 1 },
+    { .suffix = "d",   .token_type = FOX_TOKEN_DOUBLE_LITERAL,  .length = 1 },
+    { .suffix = "ld",  .token_type = FOX_TOKEN_LDOUBLE_LITERAL, .length = 2 },
+    { .suffix = "n",   .token_type = FOX_TOKEN_NUMBER_LITERAL,  .length = 1 }
+};
+
+static const size_t FOXY_SUFFIX_TABLE_SIZE = sizeof(FOXY_SUFFIX_TABLE) / sizeof(FoxySuffixRule);
