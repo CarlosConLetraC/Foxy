@@ -637,9 +637,9 @@ FOXY_EXPORT void f_lexer_error(FoxyLexer *lexer, const char *format, ...);
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LDOUBLE)      | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_NUMBER)       | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DICT)         | \
-    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_OBJECT)        | \
-    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)        | \
-    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_OBJECT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)        | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ENUM),          \
     /* Word 1 [64..127]  */ 0ULL, \
     /* Word 2 [128..191] */ 0ULL, \

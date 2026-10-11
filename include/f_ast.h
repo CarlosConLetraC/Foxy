@@ -230,15 +230,6 @@ static inline void f_ast_value_free(FoxyAstValue *val) {
     }
 }
 
-/**
- * @brief Lista dinámica de nodos AST para almacenar bloques, argumentos o parámetros.
- */
-typedef struct {
-    FoxyAstNode **nodes;            /* 8 bytes */
-    size_t count;                   /* 8 bytes */
-    size_t capacity;                /* 8 bytes */
-} FoxyAstNodeList;
-
 /* ========================================================================= */
 /* DATOS ESPECÍFICOS SEGÚN LA CATEGORÍA DEL NODO                             */
 /* ========================================================================= */
@@ -271,6 +262,12 @@ typedef struct {
     uint8_t is_grouped;             /* 1 byte */
     uint8_t _pad[7];                /* 7 bytes para alineación de 8 bytes */
 } FoxyAstAssign;
+
+typedef struct {
+    FoxyAstNode **nodes;            /* 8 bytes */
+    size_t count;                   /* 8 bytes */
+    size_t capacity;                /* 8 bytes */
+} FoxyAstNodeList;
 
 typedef struct {
     FoxyAstNode *callee;            /* 8 bytes */
@@ -334,7 +331,8 @@ typedef struct {
     FoxyAstNodeList params;         /* 24 bytes [offset 8..31] */
     FoxyToken name;                 /* 32 bytes [offset 32..63] */
     uint8_t is_overrule;            /* 1 byte [offset 64] */
-    uint8_t _pad[7];                /* 7 bytes explícitos [offset 65..71] */
+    uint8_t is_anonymous;           /* 1 byte [offset 65] */
+    uint8_t _pad[6];                /* 6 bytes explícitos [offset 66..71] */
 } FoxyAstFuncDecl;                  /* Total = 72 bytes (Múltiplo exacto de 8) */
 
 typedef struct FoxyAstBlockStmt {
@@ -414,6 +412,15 @@ typedef struct {
     FoxyAstNode *body;              /* Expresión o Bloque */
 } FoxyAstLambdaStmt;
 
+/**
+ * @brief Lista dinámica específica para los parámetros de una función o lambda.
+ */
+typedef struct {
+    FoxyAstNode **parameters;       /* (8 bytes) Arreglo de nodos (típicamente FOXY_AST_STMT_VAR_DECL o identificadores) */
+    size_t count;                   /* (8 bytes) Cantidad actual de parámetros */
+    size_t capacity;                /* (8 bytes) Capacidad reservada en memoria */
+} FoxyParamList;
+
 typedef enum {
     FOXY_PREFIX_CAST,
     FOXY_PREFIX_LAMBDA
@@ -428,16 +435,25 @@ typedef struct {
         } cast;
         struct {
             int return_type_mask;
-            FoxyParamList* parameters;
-            struct FoxyAstStmt* body; // O bloque de código de la función anónima
+            FoxyParamList parameters;
+            struct FoxyAstNode* body;
             bool is_anonymous;
         } lambda;
     };
 } FoxyAstPrefixStmt;
 
+typedef enum {
+    FOXY_GROUP_PURE,          // Ej: (3 >= 1), (a + b)
+    FOXY_GROUP_CAST,          // Ej: (int) x
+    FOXY_GROUP_ARRAY_CAST,    // Ej: (int[]){1, 2, 3}
+    FOXY_GROUP_LAMBDA_PARAMS, // Ej: (int x, int y) => ... o (int, int)
+    FOXY_GROUP_TUPLE_BINDING  // Ej: (k, v)
+} FoxyGroupKind;
+
 /**
  * @brief Estructura Principal de Nodo AST (Tagged Union)
  */
+// TODO: crear FoxyAstLambdaDecl.
 struct FoxyAstNode {
     union {
         FoxyAstNodeList program;           /* 24 bytes */
@@ -470,6 +486,7 @@ struct FoxyAstNode {
         FoxyAstCatchStmt catch_stmt;       /* 40 bytes */
         FoxyAstIncludeStmt include_stmt;   /* 32 bytes */
         FoxyAstLambdaStmt lambda_stmt;     /* 32 bytes */
+        FoxyAstPrefixStmt prefix_stmt;
         
         /* Forzar la alineación y tamaño de la union a un múltiplo exacto de 8 bytes. */
         uint64_t _align_union[10];         /* Reserva espacio alineado a 80 bytes */

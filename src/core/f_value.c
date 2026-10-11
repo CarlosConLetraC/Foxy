@@ -7,7 +7,7 @@
 #if FOXY_COMPILER_SUPPORTS_XMACROS
 const char * const FOXY_VALUE_value_NAMES[] = {
     #define F(type_enum, type_str) type_str,
-    FOXY_VALUE_value_LIST(F)
+    FOXY_VALUE_VALUE_LIST(F)
     #undef F
 };
 #else

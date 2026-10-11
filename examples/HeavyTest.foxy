@@ -24,7 +24,7 @@ foo_hibrido &= 10
 const foo_constante = "no se puede modificar a partir del siguiente scope"
 
 @ Constante global con tipo explícito (arreglo de enteros)
-global const foo_constante_global = (int[]){5.3, 10.6, 15.9} @ arreglo tipo int que tiene elementos: {5, 10, 15}
+global const foo_constante_global[] = (int[]){5.3, 10.6, 15.9} @ arreglo tipo int que tiene elementos: {5, 10, 15}
 
 function demostracionStatic() {
     @ Variable estática con ámbito limitado a la función (mantiene valor entre llamadas)
@@ -71,6 +71,12 @@ number demo_primitivos[] = {
 
 @ Arreglo básico con tamaño definido
 int numeros_primos[10] = {2, 3, 5, 7, 11, 13, 17, 23, 29, 31}
+dict numeros_en_diccionario = (dict)numeros_primos @ crea una copia exacta de numeros_primos, pero en forma de diccionario.
+                                                   @ Para este caso ustéd podrá crear un elemento nuevo para numeros_en_diccionario
+                                                   @ sin necesidad de modificar numeros_primos. Similar a una tabla en Lua.
+
+numeros_en_diccionario[10] = 37 @ no existe el elemnto 10 en numeros_en_diccionario. Pero es válido hacer esto ya que las llaves/índices se manejan mediante hash-map.
+numeros_primos = (int[])numeros_en_diccionario @ ahora numeros_primos equivale a {2, 3, 5, 7, 11, 13, 17, 23, 29, 31, 37}.
 
 @ Literales con sufijos explícitos
 int lit_i = 10i
@@ -205,12 +211,19 @@ bit1 |= bit2 @ FOX_TOKEN_OP_BOR_ASSIGN
 bit1 ^= bit2 @ FOX_TOKEN_OP_BXOR_ASSIGN
 
 @ Operadores relacionales y de igualdad
-bool es_igual = (a == b)   @ FOX_TOKEN_OP_EQ
-bool es_distinto = (a != b) @ FOX_TOKEN_OP_NEQ
-bool es_menor = (a < b)    @ FOX_TOKEN_OP_LT
-bool es_mayor = (a > b)    @ FOX_TOKEN_OP_GT
-bool es_menorigual = (a <= b) @ FOX_TOKEN_OP_LE
-bool es_mayorigual = (a >= b) @ FOX_TOKEN_OP_GE
+bool es_igual_1 = (a == b)   @ FOX_TOKEN_OP_EQ
+bool es_distinto_1 = (a != b) @ FOX_TOKEN_OP_NEQ
+bool es_menor_1 = (a < b)    @ FOX_TOKEN_OP_LT
+bool es_mayor_1 = (a > b)    @ FOX_TOKEN_OP_GT
+bool es_menorigual_1 = (a <= b) @ FOX_TOKEN_OP_LE
+bool es_mayorigual_1 = (a >= b) @ FOX_TOKEN_OP_GE
+
+bool es_igual_2 = a == b   @ FOX_TOKEN_OP_EQ
+bool es_distinto_2 = a != b @ FOX_TOKEN_OP_NEQ
+bool es_menor_2 = a < b    @ FOX_TOKEN_OP_LT
+bool es_mayor_2 = a > b    @ FOX_TOKEN_OP_GT
+bool es_menorigual_2 = a <= b @ FOX_TOKEN_OP_LE
+bool es_mayorigual_2 = a >= b @ FOX_TOKEN_OP_GE
 
 @ Operadores unarios de incremento/decrecimiento
 a++ @ FOX_TOKEN_OP_INC
@@ -220,6 +233,7 @@ a-- @ FOX_TOKEN_OP_DEC
 
 @ Operador ternario
 string eval_ternaria = (a > b) ? "mayor" : "menor"
+string otro_ternario = es_mayor_2 ? "mayor" : "menor"
 
 @ ============================================================================
 @ 5. DICCIONARIOS, OBJETOS Y OPERADORES DE HERENCIA / ANCESTRÍA
@@ -252,25 +266,25 @@ class BaseFigura {
         return self.nombre
     }
 
-    function __add(BaseFigura otra) { return 0 }
-    function __sub(BaseFigura otra) { return 0 }
-    function __mul(BaseFigura otra) { return 0 }
-    function __div(BaseFigura otra) { return 0 }
-    function __pow(BaseFigura otra) { return 0 }
-    function __mod(BaseFigura otra) { return 0 }
+    function __add(BaseFigura otra, bool first) { return 0 }
+    function __sub(BaseFigura otra, bool first) { return 0 }
+    function __mul(BaseFigura otra, bool first) { return 0 }
+    function __div(BaseFigura otra, bool first) { return 0 }
+    function __pow(BaseFigura otra, bool first) { return 0 }
+    function __mod(BaseFigura otra, bool first) { return 0 }
     function __concat(BaseFigura otra, bool first) { return "" }
     function __unm() { return self }
     function __not() { return false }
-    function __eq(BaseFigura otra) { return false }
-    function __neq(BaseFigura otra) { return true }
-    function __lt(BaseFigura otra) { return false }
-    function __gt(BaseFigura otra) { return false }
-    function __le(BaseFigura otra) { return false }
-    function __ge(BaseFigura otra) { return false }
-    function __band(BaseFigura otra) { return 0 }
-    function __bor(BaseFigura otra) {return 0 }
+    function __eq(BaseFigura otra, bool first) { return false }
+    function __neq(BaseFigura otra, bool first) { return true }
+    function __lt(BaseFigura otra, bool first) { return false }
+    function __gt(BaseFigura otra, bool first) { return false }
+    function __le(BaseFigura otra, bool first) { return false }
+    function __ge(BaseFigura otra, bool first) { return false }
+    function __band(BaseFigura otra, bool first) { return 0 }
+    function __bor(BaseFigura otra, bool first) {return 0 }
     function __bnot() { return self }
-    function __bxor(BaseFigura otra) { return 0 }
+    function __bxor(BaseFigura otra, bool first) { return 0 }
     function __lshift(int n) { return 0 }
     function __rshift(int n) { return 0 }
     function __foreach(dict val) {}
@@ -333,6 +347,15 @@ printf("Punto: x=%d, y=%d\n", p->x, p->y)
 @ Expresión Lambda / Anónima
 (int, int) sumarLambda = (int x, int y) => x + y
 int res_lambda = sumarLambda(5, 10)
+
+(int) factorial = (int x) => {
+    int n = 1
+    for (int i = 1; i <= x; i++) {
+        n *= i
+    }
+    return n
+}
+int res_factorial = factorial(8)
 
 @ Función variádica usando el módulo nativo peektuple
 function sumarMultiples(valores...) {

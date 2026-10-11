@@ -295,9 +295,6 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
 
                     if (!closed) {
                         f_lexer_error(lexer, "Unclosed multi-line comment starting at level %zu.", count);
-                        // Nota: Si deseas retornar un token de error aquí, f_lexer_skip_whitespace_and_comments 
-                        // tendría que cambiar de estrategia. Como void, el error ya fue reportado 
-                        // y el lexer continuará hasta EOF o el siguiente token.
                     }
                 }
                 break;
@@ -424,6 +421,20 @@ static FoxyToken f_lexer_scan_string(FoxyLexer *lexer) {
     return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_LITERAL, FOX_TOKEN_STRING_LITERAL);
 }
 
+static FoxyToken f_lexer_scan_char(FoxyLexer *lexer) {
+    if (f_lexer_peek(lexer) == '\\' && f_lexer_peek_next(lexer) != '\0') {
+        f_lexer_advance(lexer);
+    }
+    f_lexer_advance(lexer);
+
+    if (f_lexer_peek(lexer) != '\'') {
+        return f_lexer_make_error_token(lexer, "Unterminated character literal.");
+    }
+
+    f_lexer_advance(lexer); /* Consumir la comilla simple de cierre '\'' */
+    return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_LITERAL, FOX_TOKEN_CHAR_LITERAL);
+}
+
 /* ========================================================================= */
 /* IMPLEMENTACIÓN DE LA API PÚBLICA                                           */
 /* ========================================================================= */
@@ -510,6 +521,7 @@ FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
     if (isdigit(c)) return f_lexer_scan_number(lexer);
 
     switch (c) {
+        case '\'': return f_lexer_scan_char(lexer);
         case '"': return f_lexer_scan_string(lexer);
         case '(': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_LPAREN);
         case ')': return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_OPERATOR, FOX_TOKEN_RPAREN);
