@@ -3,9 +3,10 @@ alias fecha_creacion_repo="curl -s https://api.github.com/repos/CarlosConLetraC/
 function doall() {
     local path_pruebas="./examples"
     local pruebas=(
+        "CustomTypes.foxy"
+        "GeneralExample.foxy"
         "HeavyTest.foxy"
         "AST_Inteligente.foxy"
-        "GeneralExample.foxy"
     )
     local bin_path="./build/tests"
     local bins=("ast" "lexer")

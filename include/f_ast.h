@@ -4,6 +4,7 @@
 #include "f_lexer.h"
 // #include "f_value.h"
 #include "f_foxmode.h"
+#include "f_exceptions.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -388,8 +389,8 @@ typedef struct {
 typedef struct {
     FoxyAstNode *iterable;          /* 8 bytes */
     FoxyAstNode *body;              /* 8 bytes */
-    FoxyToken iterator_var;         /* FoxyToken */
-} FoxyAstForeachStmt;
+    FoxyAstNodeList iterators;      /* 24 bytes (almacena los nodos de variables, ej. VarDecl) */
+} FoxyAstForeachStmt;               /* Total = 48 bytes */
 
 typedef struct {
     FoxyAstNode *condition;         /* 8 bytes */
@@ -422,6 +423,7 @@ typedef struct {
 
 typedef struct {
     FoxyLexer lexer;
+    FoxyExceptionController *exception_controller;
     FoxyToken current_token;
     FoxyToken previous_token;
     uint32_t nest_depth;            /* 4 bytes (control de anidamiento) */
@@ -633,7 +635,7 @@ FOXY_EXPORT void f_ast_free_node(FoxyAstNode *node);
 FOXY_EXPORT void f_ast_print(const FoxyAstNode *node, int indent);
 FOXY_EXPORT const char *f_ast_kind_to_string(FoxyAstKind kind);
 FOXY_EXPORT char *f_ast_strdup(const char *src, size_t length);
-FOXY_EXPORT void f_ast_parser_init(FoxyAstParser *parser, FILE *file, const char *filename);
+FOXY_EXPORT void f_ast_parser_init(FoxyAstParser *parser, FILE *file, const char *filename, FoxyExceptionController *controller);
 FOXY_EXPORT FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser);
 FOXY_EXPORT FoxyAstValue f_ast_value_from_token(const FoxyToken *token);
 // FOXY_EXPORT void f_ast_synchronize_parser(FoxyAstParser *parser);

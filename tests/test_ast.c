@@ -17,8 +17,11 @@ int main(int argc, char **argv) {
 
     printf("=== PARSEANDO ARCHIVO FOXY: %s ===\n\n", filepath);
 
+    FoxyExceptionController controller;
+    f_exception_controller_init(&controller);
+
     FoxyAstParser parser;
-    f_ast_parser_init(&parser, file, filepath);
+    f_ast_parser_init(&parser, file, filepath, &controller);
 
     /* Construye el AST directamente desde el stream del archivo */
     FoxyAstNode *program_ast = f_ast_parse_program(&parser);

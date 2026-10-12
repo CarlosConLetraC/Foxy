@@ -1,0 +1,34 @@
+include "sys"
+include "./api/*"
+
+Vector3 posicion = Vector3(3.6, 6.1, 9.3) @ en api: function __new(float x, float, y, float z); NOTA: el punto y coma se define porque estamos haciendo un constructor lógico. NO ES SINTAXIS ESTILO C/C++.
+Point punto = Point(5, 9) @ en api: function __new(int x, int y);  NOTA: el punto y coma se define porque estamos haciendo un constructor lógico. NO ES SINTAXIS ESTILO C/C++.
+Color3 rgb = Color3.fromRGB(255, 0, 127) @ en api: function fromRGB(int r, int g, int b) {...} NOTA: Foxy-Lang NO NECESITA de punto y coma (;) para determinar sentencias como en C/C++.
+Animal perro = Dog("Max", 4) @ en api: function __new(char nombre[], int edad); NOTA: el punto y coma se define porque estamos haciendo un constructor lógico. NO ES SINTAXIS ESTILO C/C++.
+global const _8edb8a48 algo1 = _8edb8a48()
+static const d69___a6_fe2 algo2 = d69___a6_fe2()
+global _123awajkwdnkwadb6987Fkawlkd_ algo3 = _123awajkwdnkwadb6987Fkawlkd_()
+static X4_CB55____9dbfd algo4 = X4_CB55____9dbfd()
+const ________1_e6f3bdDADAWDBhawmnde3 algo5 = ________1_e6f3bdDADAWDBhawmnde3()
+_5d32e_awdlakNNDAWJDB651 algo6 = _5d32e_awdlakNNDAWJDB651()
+algo7 = c3m4uc9__c4m_uxmux2ncn____iimhingBJBHukyguygkhb()
+
+Vector3 casteo = (Color3)rgb
+
+dict objetosInstanciados = {
+    posicion = posicion,
+    punto = punto,
+    rgb = rgb,
+    perro = perro
+}
+
+for ((k, v) : objetosInstanciados) {
+    sys.out.printf("llave[%s]: valor[%T]\n", k, v)
+}
+@@@
+Salida esperada:
+llave[posicion]: valor[Vector3(3.6, 6.1, 9.3)]
+llave[punto]: valor[<point: x: 5, y: 9>]
+llave[rgb]: valor[Color3<RGB>: (255, 0, 127)]
+llave[perro]: valor[Perro: {nombre: "Max", edad: 4}]
+@@@
