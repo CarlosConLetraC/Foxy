@@ -58,7 +58,7 @@ for (int i = 0; i < #nums; i++) {
     println(nums[i])
 }
 
-(int, int) sumar = (int a, int b) => a + b
+static sumar = (int a, int b) => a + b
 printf("la suma es de: %d\n", sumar(5, 8))
 
 float nums1[] = {5.4f, 3.1f, 9.3f}

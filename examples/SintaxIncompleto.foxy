@@ -1,12 +1,12 @@
 include "sys/out"
 
-@ Caso 1
+@ Caso 1 (Expected ',' after dictionary entries.)
 out.printf("%T\n", (dict){
     nombre = "Carlos" @ aquí falta una coma
     lineaQueTiraError = true
 })
 
-@ Caso 2
+@ Caso 2 (Expected expression.)
 for (int i =; i < 10; i++) {
     out.prinf("i: %d\n", i)
 }

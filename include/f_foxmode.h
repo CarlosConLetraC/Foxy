@@ -8,7 +8,51 @@
 
 /**
  * ============================================================================
- * FOXY BYTECODE ARCHITECTURE (FOX_INST / FOX_OP): Tabla Maestra de OpCode
+ * FOXY BYTECODE ARCHITECTURE (FOX_INST / FOX_OP): Tabla maestra de OpCode.
+ * ============================================================================
+ *
+ * Todas las instrucciones de Foxy Bytecode son palabras fijas de 32 bits (uint32_t)
+ * alineadas en memoria, diseñadas para un modelo de Máquina Virtual basada en Registros.
+ *
+ * ----------------------------------------------------------------------------
+ * LAYOUT DE MEMORIA A NIVEL DE BITS (32 BITS)
+ * ----------------------------------------------------------------------------
+ * Los 20 bits superiores (Opcode, Registro Destino A, y Banderas) permanecen en
+ * posiciones estrictamente FIJAS en todos los formatos. Esto permite al ciclo de
+ * despacho (dispatch loop) de la VM extraer Opcode, A y Flags en una sola pasada
+ * sin importar la variante de la instrucción.
+ *
+ * FORMATO 1: iABC (Operaciones Aritméticas, Comparaciones y Lógica R-R / R-R-R)
+ * 31       24 23       16 15   12 11    8 7          0
+ * +----------+----------+--------+-------+-----------+
+ * |  Opcode  |    A     | Flags  |   B   |     C     |
+ * |  (8 bits)| (8 bits) |(4 bits)|(4b/r) | (8 bits)  |
+ * +----------+----------+--------+-------+-----------+
+ *
+ * FORMATO 2: iABx (Cargas de Constantes, Literales, Ámbitos Globales/Upvalues)
+ * 31       24 23       16 15   12 11                 0
+ * +----------+----------+--------+-------------------+
+ * |  Opcode  |    A     | Flags  |        Bx         |
+ * |  (8 bits)| (8 bits) |(4 bits)| (12 bits Unsigned)|
+ * +----------+----------+--------+-------------------+
+ *
+ * FORMATO 3: iAsBx (Saltos Condicionales / Incondicionales con Offset)
+ * 31       24 23       16 15   12 11                 0
+ * +----------+----------+--------+-------------------+
+ * |  Opcode  |    A     | Flags  |        sBx        |
+ * |  (8 bits)| (8 bits) |(4 bits)|  (12 bits Signed) |
+ * +----------+----------+--------+-------------------+
+ *
+ * ----------------------------------------------------------------------------
+ * DESGLOSE DE CAMPOS
+ * ----------------------------------------------------------------------------
+ * - Opcode (8 bits)  : [0x00 - 0xFF] Código de operación (hasta 256 instrucciones).
+ * - A      (8 bits)  : [r0 - r255] Registro destino o registro primario de evaluación.
+ * - Flags  (4 bits)  : [0x0 - 0xF] Modificadores de ejecución activa (Modo Híbrido).
+ * - B      (4 bits)  : [r0 - r15]  Registro fuente secundario (Formato iABC).
+ * - C      (8 bits)  : [r0 - r255] Registro fuente terciario o inmediato corto.
+ * - Bx     (12 bits) : [0 - 4095]  Índice directo a la tabla de constantes o símbolos.
+ * - sBx    (12 bits) : [-2047 a +2047] Desplazamiento de salto relativo con sesgo de 2047.
  * ============================================================================
  */
 

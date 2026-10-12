@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 /* ============================================================================
  * NOMBRES DE TIPOS DE NODOS AST (TABLA DE STRINGS VÍA X-MACRO)
@@ -51,9 +52,12 @@ static const char *const FOXY_AST_KIND_NAMES[] = {
 };
 #endif
 
+// TODO: separar parseador de ast en f_parser.h y f_parser.c
+
 /* Forward Declarations internas */
 static void f_ast_advance(FoxyAstParser *parser);
 static void f_ast_synchronize(FoxyAstParser *parser);
+static void f_ast_consume(FoxyAstParser *parser, FoxyTokenType type, const char *message);
 static void f_ast_error_at_current(FoxyAstParser *parser, const char *message);
 static bool f_ast_peek_is_identifier(FoxyAstParser *parser);
 static bool f_ast_peek_is_type_specifier(FoxyAstParser *parser);
@@ -61,15 +65,15 @@ static bool f_ast_is_cast_expression_pattern(FoxyAstParser *parser);
 static bool f_ast_is_lambda_type_signature(FoxyAstParser *parser);
 static bool f_ast_is_type_signature(FoxyAstParser *parser);
 
-static FoxyAstNode *f_ast_parse_include(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser);
-static FoxyAstNode *f_ast_parse_var_declaration(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_statement(FoxyAstParser *parser);
 static FoxyAstNode *f_ast_parse_precedence(FoxyAstParser *parser, FoxyPrecedence precedence);
 static const FoxyParseRule *f_ast_get_rule(FoxyTokenType type);
 static FoxyAstNode *f_ast_parse_expression_statement(FoxyAstParser *parser);
 
 /* Reglas de Parseo (FoxyParseFn: parser, left, can_assign) */
+static FoxyAstNode *f_ast_parse_include(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
+static FoxyAstNode *f_ast_parse_var_declaration(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_block_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_literal(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
 static FoxyAstNode *f_ast_parse_binary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign);
@@ -113,20 +117,21 @@ static const FoxyParseRule rules[] = {
     [FOX_TOKEN_ERROR]            = { NULL,                NULL,              PREC_NONE },
 
     /* Identificadores y Literales */
-    [FOX_TOKEN_IDENTIFIER]       = { f_ast_parse_variable,NULL,              PREC_NONE },
-    [FOX_TOKEN_LABEL]            = { NULL,                NULL,              PREC_NONE },
-    [FOX_TOKEN_INT_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_UINT_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_LONG_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_ULONG_LITERAL]    = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_LLONG_LITERAL]    = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_ULLONG_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_FLOAT_LITERAL]    = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_DOUBLE_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_LDOUBLE_LITERAL]  = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_NUMBER_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_CHAR_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
-    [FOX_TOKEN_STRING_LITERAL]   = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_IDENTIFIER]          = { f_ast_parse_variable,NULL,              PREC_NONE },
+    [FOX_TOKEN_DATATYPE_IDENTIFIER] = { f_ast_parse_type_prefix, NULL,          PREC_NONE },
+    [FOX_TOKEN_LABEL]               = { NULL,                NULL,              PREC_NONE },
+    [FOX_TOKEN_INT_LITERAL]         = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_UINT_LITERAL]        = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_LONG_LITERAL]        = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_ULONG_LITERAL]       = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_LLONG_LITERAL]       = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_ULLONG_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_FLOAT_LITERAL]       = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_DOUBLE_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_LDOUBLE_LITERAL]     = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_NUMBER_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_CHAR_LITERAL]        = { f_ast_parse_literal, NULL,              PREC_NONE },
+    [FOX_TOKEN_STRING_LITERAL]      = { f_ast_parse_literal, NULL,              PREC_NONE },
 
     /*
      * Palabras Clave / Especificadores / Tipos 
@@ -153,7 +158,6 @@ static const FoxyParseRule rules[] = {
     [FOX_TOKEN_KW_LDOUBLE]       = { f_ast_parse_type_prefix, NULL,          PREC_NONE },
     [FOX_TOKEN_KW_NUMBER]        = { f_ast_parse_type_prefix, NULL,          PREC_NONE },
     [FOX_TOKEN_KW_DICT]          = { f_ast_parse_type_prefix, NULL,          PREC_NONE },
-    [FOX_TOKEN_KW_OBJECT]        = { f_ast_parse_type_prefix, NULL,          PREC_NONE },
 
     /* Control de Flujo */
     [FOX_TOKEN_KW_IF]            = { NULL,                NULL,              PREC_NONE },
@@ -181,7 +185,7 @@ static const FoxyParseRule rules[] = {
     [FOX_TOKEN_KW_FROM]          = { NULL,                NULL,              PREC_NONE },
     [FOX_TOKEN_KW_FUNCTION]      = { f_ast_parse_function_declaration, NULL, PREC_NONE },
     [FOX_TOKEN_KW_OVERRULE]      = { NULL,                NULL,              PREC_NONE },
-    [FOX_TOKEN_KW_INCLUDE]       = { f_ast_parse_include, NULL,              PREC_NONE },
+    [FOX_TOKEN_KW_INCLUDE]       = { NULL,                NULL,              PREC_NONE },
     [FOX_TOKEN_KW_USE]           = { f_ast_parse_use_statement,NULL,         PREC_NONE },
     [FOX_TOKEN_KW_EXPORT]        = { f_ast_parse_export_statement,NULL,      PREC_NONE },
     [FOX_TOKEN_KW_SUPER]         = { f_ast_parse_super,   NULL,              PREC_NONE },
@@ -333,15 +337,21 @@ static inline bool f_ast_peek_is_type_specifier(FoxyAstParser *parser) {
 }
 
 static inline bool f_ast_is_var_decl_start(FoxyAstParser *parser) {
-    FoxyTokenType type = parser->current_token.type;
-    if (type == FOX_TOKEN_KW_GLOBAL ||
-        type == FOX_TOKEN_KW_STATIC ||
-        type == FOX_TOKEN_KW_CONST  ||
-        f_ast_is_type_specifier(type)) {
+    FoxyToken tok = parser->current_token;
+    if (tok.type_category == FOXY_TOKEN_CAT_KEYWORD && 
+        (tok.type == FOX_TOKEN_KW_GLOBAL ||
+         tok.type == FOX_TOKEN_KW_STATIC ||
+         tok.type == FOX_TOKEN_KW_CONST)) {
         return true;
     }
-    if (type == FOX_TOKEN_LPAREN) {
-        return f_ast_is_type_signature(parser);
+    
+    // Verificación limpia y directa de cualquier tipo soportado por el lenguaje
+    if (f_ast_is_type_specifier(tok.type)) {
+        return true;
+    }
+    
+    if (tok.type == FOX_TOKEN_IDENTIFIER) {
+        return f_ast_peek_is_identifier(parser);
     }
     return false;
 }
@@ -435,6 +445,20 @@ static inline bool f_ast_is_type_signature(FoxyAstParser *parser) {
     return next_tok.type == FOX_TOKEN_IDENTIFIER;
 }
 
+// función auxiliar para verificar si un token funciona como Tipo Válido (Primitivo, Estructura, Clase, Enum o Identificador que actúe como Tipo)
+static inline bool f_ast_is_any_type(FoxyAstParser *parser, FoxyToken token) {
+    (void)parser;
+    if (f_ast_is_type_specifier(token.type)) {
+        return true;
+    }
+    // Si es un identificador y el siguiente token es también un identificador, 
+    // asumimos que el primero es una clase/estructura o tipo personalizado (Ej: Node currentNode)
+    if (token.type == FOX_TOKEN_IDENTIFIER) {
+        return true; 
+    }
+    return false;
+}
+
 static const FoxyParseRule *f_ast_get_rule(FoxyTokenType type) {
     return &rules[type];
 }
@@ -443,13 +467,19 @@ static FoxyAstNode *f_ast_parse_expression_statement(FoxyAstParser *parser) {
     FoxySourcePos pos = parser->current_token.pos;
     FoxyAstNode *expr = f_ast_parse_precedence(parser, PREC_ASSIGNMENT);
 
+    if (expr == NULL) {
+        f_ast_error_at_current(parser, "[DEBUG: f_ast_parse_expression_statement] Expected expression.");
+        f_ast_advance(parser); // Fuerza el avance para evitar bucle infinito
+        return NULL;
+    }
+
     // Consumir ';' opcional
     if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
         f_ast_advance(parser);
     }
 
-    // Si la expresión ya es un nodo de sentencia (ej: FOXY_AST_STMT_VAR_DECL), se retorna directamente
-    if (expr != NULL && FOXY_AST_IS_STMT_KIND(expr->kind)) {
+    // Si la expresión ya es un nodo de sentencia, se retorna directamente
+    if (FOXY_AST_IS_STMT_KIND(expr->kind)) {
         return expr;
     }
 
@@ -457,7 +487,6 @@ static FoxyAstNode *f_ast_parse_expression_statement(FoxyAstParser *parser) {
     node->as.expr_stmt = expr;
     return node;
 }
-
 static FoxyAstNode *f_ast_parse_unary(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
     (void)left;
     (void)can_assign;
@@ -1125,6 +1154,18 @@ static void print_node_list(const FoxyAstNodeList *list, int indent) {
     }
 }
 
+static void print_trimmed_float(long double val, bool has_suffix, char suffix) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.10Lf", val);
+    
+    size_t len = strlen(buf);
+    while (len > 1 && buf[len - 1] == '0' && buf[len - 2] != '.') {
+        buf[--len] = '\0';
+    }
+    
+    printf("%s%c", buf, has_suffix && suffix != '\0' ? tolower(suffix) : '\0');
+}
+
 static void f_ast_value_print(FoxyAstValue val) {
     switch (val.type) {
         case FOXY_AST_VAL_NULL:   printf("null"); break;
@@ -1135,10 +1176,36 @@ static void f_ast_value_print(FoxyAstValue val) {
         case FOXY_AST_VAL_ULONG:  printf("%lu", val.as.f_ulong); break;
         case FOXY_AST_VAL_LLONG:  printf("%lld", val.as.f_llong); break;
         case FOXY_AST_VAL_ULLONG: printf("%llu", val.as.f_ullong); break;
-        case FOXY_AST_VAL_FLOAT:  printf("%ff", val.as.f_float); break;
-        case FOXY_AST_VAL_DOUBLE: printf("%f", val.as.f_double); break;
-        case FOXY_AST_VAL_LDOUBLE:printf("%Lf", val.as.f_ldouble); break;
-        case FOXY_AST_VAL_CHAR:   printf("'%c'", val.as.f_char); break;
+        case FOXY_AST_VAL_FLOAT:  
+            print_trimmed_float((long double)val.as.f_float, val.has_explicit_suffix, val.explicit_suffix != '\0' ? val.explicit_suffix : 'f'); 
+            break;
+        case FOXY_AST_VAL_DOUBLE: 
+            print_trimmed_float((long double)val.as.f_double, val.has_explicit_suffix, val.explicit_suffix != '\0' ? val.explicit_suffix : 'd'); 
+            break;
+        case FOXY_AST_VAL_LDOUBLE:
+            print_trimmed_float(val.as.f_ldouble, val.has_explicit_suffix, val.explicit_suffix != '\0' ? val.explicit_suffix : 'l'); 
+            break;
+        case FOXY_AST_VAL_CHAR:   
+            switch (val.as.f_char) {
+                case '\n': printf("'\\n'"); break;
+                case '\r': printf("'\\r'"); break;
+                case '\t': printf("'\\t'"); break;
+                case '\b': printf("'\\b'"); break;
+                case '\a': printf("'\\a'"); break;
+                case '\f': printf("'\\f'"); break;
+                case '\v': printf("'\\v'"); break;
+                case '\\': printf("'\\\\'"); break;
+                case '\'': printf("'\\''"); break;
+                case '\0': printf("'\\0'"); break;
+                default:
+                    if ((unsigned char)val.as.f_char < 32 || (unsigned char)val.as.f_char > 126) {
+                        printf("'\\x%02X'", (unsigned char)val.as.f_char);
+                    } else {
+                        printf("'%c'", val.as.f_char);
+                    }
+                    break;
+            }
+            break;
         case FOXY_AST_VAL_STRING: printf("\"%s\"", val.as.f_string); break;
     }
 }
@@ -1255,10 +1322,20 @@ void f_ast_print(const FoxyAstNode *node, int indent) {
 
         case FOXY_AST_STMT_VAR_DECL:
             print_indent(indent + 1);
-            printf("Var: %.*s (type_token: %d)\n", 
+            printf("Var: %.*s (type_token: %d%s%s%s%s)\n", 
                    node->as.var_decl.name.length, 
                    node->as.var_decl.name.start, 
-                   node->as.var_decl.type_token);
+                   node->as.var_decl.type_token,
+                   node->as.var_decl.is_global ? ", global" : "",
+                   node->as.var_decl.is_static ? ", static" : "",
+                   node->as.var_decl.is_const ? ", const" : "",
+                   node->as.var_decl.is_array ? ", array" : "");
+            
+            if (node->as.var_decl.array_size) {
+                print_indent(indent + 2);
+                printf("Array Size Dimension:\n");
+                f_ast_print(node->as.var_decl.array_size, indent + 2);
+            }
             if (node->as.var_decl.initializer) {
                 f_ast_print(node->as.var_decl.initializer, indent + 1);
             }
@@ -1405,8 +1482,55 @@ FoxyAstValue f_ast_value_from_token(const FoxyToken *token) {
             return f_ast_new_ldouble(strtold(token->start, NULL));
         case FOX_TOKEN_NUMBER_LITERAL:
             return f_ast_new_double(strtod(token->start, NULL));
-        case FOX_TOKEN_CHAR_LITERAL:
-            return f_ast_new_char(token->length > 1 ? token->start[1] : 0);
+        case FOX_TOKEN_CHAR_LITERAL: {
+            if (token->length >= 3) {
+                const char *p = token->start + 1; // Omitir comilla inicial
+                // Lógica de decodificación para el char
+                char val = 0;
+                if (*p == '\\') {
+                    p++;
+                    char esc = *p++;
+                    switch (esc) {
+                        case 'n': val = '\n'; break;
+                        case 'r': val = '\r'; break;
+                        case 't': val = '\t'; break;
+                        case 'b': val = '\b'; break;
+                        case 'a': val = '\a'; break;
+                        case 'f': val = '\f'; break;
+                        case 'v': val = '\v'; break;
+                        case '\\': val = '\\'; break;
+                        case '\'': val = '\''; break;
+                        case '\"': val = '\"'; break;
+                        case '?': val = '\?'; break;
+                        case '0': val = '\0'; break;
+                        case 'x': {
+                            int hex = 0;
+                            for(int i=0; i<2 && isxdigit((unsigned char)*p); i++) {
+                                int d = *p++;
+                                hex = hex * 16 + (isdigit(d) ? d - '0' : (tolower(d) - 'a' + 10));
+                            }
+                            val = (char)hex;
+                            break;
+                        }
+                        default:
+                            if (esc >= '0' && esc <= '7') {
+                                int oct = esc - '0';
+                                for(int i=0; i<2 && *p >= '0' && *p <= '7'; i++) {
+                                    oct = oct * 8 + (*p++ - '0');
+                                }
+                                val = (char)oct;
+                            } else {
+                                val = esc;
+                            }
+                            break;
+                    }
+                } else {
+                    val = *p;
+                }
+                return f_ast_new_char(val);
+            }
+            return f_ast_new_char(0);
+        }
         case FOX_TOKEN_STRING_LITERAL: {
             size_t len = token->length >= 2 ? token->length - 2 : 0;
             char *str_content = f_ast_strdup(token->start + 1, len);
@@ -1468,11 +1592,6 @@ static void f_ast_synchronize(FoxyAstParser *parser) {
     f_ast_advance(parser);
 
     while (parser->current_token.type != FOX_TOKEN_EOF) {
-        if (parser->previous_token.type == FOX_TOKEN_SEMICOLON) {
-            // printf("f_ast_synchronize[automatic advance[1]] := "); f_ast_debugger(parser);
-            return;
-        }
-
         if (f_ast_is_stmt_start(parser->current_token.type) || f_ast_is_var_decl_start(parser)) {
             // printf("f_ast_synchronize[automatic advance[2]] := "); f_ast_debugger(parser);
             return;
@@ -1527,13 +1646,13 @@ FoxyAstNode *f_ast_parse_program(FoxyAstParser *parser) {
     return program_node;
 }
 
+// printf("[DEBUG: AST PREC] Entering parse_precedence with target_prec=%d | Current Token: ", precedence);
+// f_ast_debugger(parser);
 static FoxyAstNode *f_ast_parse_precedence(FoxyAstParser *parser, FoxyPrecedence precedence) {
     if (parser->current_token.type == FOX_TOKEN_EOF || parser->previous_token.type == FOX_TOKEN_EOF) {
         return NULL;
     }
 
-    // printf("[DEBUG: AST PREC] Entering parse_precedence with target_prec=%d | Current Token: ", precedence);
-    // f_ast_debugger(parser);
     f_ast_advance(parser);
 
     FoxyParseFn prefix_rule = f_ast_get_rule(parser->previous_token.type)->prefix;
@@ -1545,13 +1664,11 @@ static FoxyAstNode *f_ast_parse_precedence(FoxyAstParser *parser, FoxyPrecedence
     FoxyAstNode *node = prefix_rule(parser, NULL, precedence <= PREC_ASSIGNMENT);
 
     while (precedence <= f_ast_get_rule(parser->current_token.type)->precedence) {
-        FoxyParseFn infix_rule = f_ast_get_rule(parser->current_token.type)->infix;
+        const FoxyParseRule *rule = f_ast_get_rule(parser->current_token.type);
+        FoxyParseFn infix_rule = rule->infix;
         if (infix_rule == NULL) {
             break;
         }
-
-        // printf("[DEBUG: AST PREC] -> Applying infix rule for token: ");
-        // f_ast_debugger(parser);
 
         f_ast_advance(parser);
         node = infix_rule(parser, node, precedence <= PREC_ASSIGNMENT);
@@ -1577,7 +1694,10 @@ static FoxyAstNode *f_ast_parse_binary(FoxyAstParser *parser, FoxyAstNode *left,
     FoxyToken op = parser->previous_token;
     const FoxyParseRule *rule = f_ast_get_rule(op.type);
 
-    FoxyAstNode *right = f_ast_parse_precedence(parser, (FoxyPrecedence)(rule->precedence + 1));
+    // Ajuste de precedencia para asociatividad (manejo especial si es operador de potencia u otro)
+    FoxyPrecedence next_prec = (FoxyPrecedence)(rule->precedence + 1);
+    
+    FoxyAstNode *right = f_ast_parse_precedence(parser, next_prec);
     if (!right) {
         f_ast_free_node(left);
         return NULL;
@@ -1602,6 +1722,16 @@ static FoxyAstNode *f_ast_parse_statement(FoxyAstParser *parser) {
 
         FoxyAstNode *label_node = f_ast_create_node(FOXY_AST_STMT_LABEL, label_token.pos);
         label_node->as.goto_stmt.label = label_token;
+
+        // Si hay una sentencia justo después de la etiqueta en la misma línea, adjuntarla o procesarla
+        if (parser->current_token.type != FOX_TOKEN_SEMICOLON && 
+            parser->current_token.type != FOX_TOKEN_RBRACE &&
+            parser->current_token.type != FOX_TOKEN_EOF) {
+            // Opcional: puedes parsear la sentencia adyacente si la gramática lo permite
+            FoxyAstNode *inline_stmt = f_ast_parse_statement(parser);
+            (void)inline_stmt;
+            // Aquí podrías envolverlos en un bloque si el AST lo requiere
+        }
         return label_node;
     }
 
@@ -1610,7 +1740,7 @@ static FoxyAstNode *f_ast_parse_statement(FoxyAstParser *parser) {
         return f_ast_parse_block_statement(parser, NULL, false);
     }
 
-    // --- NUEVO: Detectar declaraciones de variables locales dentro de funciones o bloques ---
+    // Detectar declaraciones de variables locales dentro de funciones o bloques ---
     if (f_ast_is_var_decl_start(parser) || (parser->current_token.type == FOX_TOKEN_IDENTIFIER && f_ast_peek_is_identifier(parser))) {
         return f_ast_parse_var_declaration(parser, NULL, false);
     }
@@ -1653,20 +1783,11 @@ static FoxyAstNode *f_ast_parse_include(FoxyAstParser *parser, FoxyAstNode *left
     (void)can_assign;
     FoxySourcePos pos = parser->current_token.pos;
 
-    f_ast_advance(parser);
-
-    if (parser->current_token.type != FOX_TOKEN_STRING_LITERAL &&
-        parser->current_token.type != FOX_TOKEN_IDENTIFIER) {
-        f_ast_error_at_current(parser, "Expected string literal or module path after 'include'.");
-        return NULL;
-    }
+    // Consumir la palabra clave 'include'
+    f_ast_consume(parser, FOX_TOKEN_KW_INCLUDE, "[DEBUG: f_ast_parse_include] Expected string literal or module path after 'include'.");
 
     FoxyToken path_token = parser->current_token;
-    f_ast_advance(parser);
-
-    if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
-        f_ast_advance(parser);
-    }
+    f_ast_advance(parser); // Avanzar pasando la ruta
 
     FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_INCLUDE, pos);
     node->as.include_stmt.path = path_token;
@@ -1719,42 +1840,18 @@ static FoxyAstNode *f_ast_parse_var_declaration(FoxyAstParser *parser, FoxyAstNo
     FoxyTokenType type_token = FOX_TOKEN_EOF;
     bool is_hybrid = true;
 
-    if (parser->current_token.type == FOX_TOKEN_LPAREN) {
-        f_ast_advance(parser); // Consumir '(' inicial
-        
-        if (f_ast_is_type_specifier(parser->current_token.type)) {
-            type_token = parser->current_token.type;
-        }
-        is_hybrid = false;
-
-        // Consumir de forma segura toda la firma de tipos hasta el paréntesis de cierre
-        int paren_nest = 1;
-        while (paren_nest > 0 && parser->current_token.type != FOX_TOKEN_EOF) {
-            if (parser->current_token.type == FOX_TOKEN_LPAREN) {
-                paren_nest++;
-            } else if (parser->current_token.type == FOX_TOKEN_RPAREN) {
-                paren_nest--;
-                if (paren_nest == 0) {
-                    break;
-                }
-            }
-            f_ast_advance(parser);
-        }
-
-        if (parser->current_token.type == FOX_TOKEN_RPAREN) {
-            f_ast_advance(parser); // Consumir ')' final de la firma
-        } else {
-            f_ast_error_at_current(parser, "[DEBUG: f_ast_parse_var_declaration] Expected ')' after type signature.");
-            return NULL;
-        }
-    } else if (f_ast_is_type_specifier(parser->current_token.type)) {
+    if (f_ast_is_type_specifier(parser->current_token.type)) {
         type_token = parser->current_token.type;
         is_hybrid = false;
         f_ast_advance(parser);
-    } else if (parser->current_token.type == FOX_TOKEN_IDENTIFIER && f_ast_peek_is_identifier(parser)) { 
-        type_token = FOX_TOKEN_KW_OBJECT;
+    } else if (parser->current_token.type == FOX_TOKEN_IDENTIFIER && f_ast_peek_is_identifier(parser)) {
+        type_token = parser->current_token.type; // Mantiene o registra el tipo personalizado
         is_hybrid = false;
-        f_ast_advance(parser);
+        
+        /* Registrar el identificador como tipo de dato conocido en el lexer */
+        f_lexer_register_type(&parser->lexer, parser->current_token.start, parser->current_token.length);
+        
+        f_ast_advance(parser); // Consume el identificador del tipo (ej: Node)
     }
 
     if (parser->current_token.type != FOX_TOKEN_IDENTIFIER) {
@@ -1810,7 +1907,7 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
     }
 
     if (parser->current_token.type == FOX_TOKEN_KW_INCLUDE) {
-        return f_ast_parse_include(parser, NULL, NULL);
+        return f_ast_parse_include(parser, NULL, false);
     }
 
     if (parser->current_token.type == FOX_TOKEN_KW_USE) {
@@ -1842,6 +1939,14 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
             is_class_def = (next2.type == FOX_TOKEN_LBRACE || next2.type == FOX_TOKEN_KW_FROM);
         }
         if (is_class_def) {
+            // Registrar preventivamente el nombre de la clase si existe un identificador despues de 'class'
+            FoxyLexer lookahead = parser->lexer;
+            f_lexer_next_token(&lookahead); // avanza 'class'
+            if (lookahead.cursor && lookahead.token_start) {
+                // O de forma más limpia usando el estado del parser tras verificar el nombre:
+            }
+            // Alternativa directa inspeccionando el siguiente token del parser:
+            // (Nota: puedes registrar el token si viene un identificador antes de '{' o 'from')
             return f_ast_parse_class_declaration(parser, NULL, false);
         }
     }
@@ -1851,6 +1956,8 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
         FoxyToken next1 = f_lexer_next_token(&lexer_copy);
         bool is_struct_def = (next1.type == FOX_TOKEN_LBRACE);
         if (!is_struct_def && next1.type == FOX_TOKEN_IDENTIFIER) {
+            // Si el siguiente es un identificador, es el nombre del struct (ej: struct Node)
+            f_lexer_register_type(&parser->lexer, next1.start, next1.length);
             FoxyToken next2 = f_lexer_next_token(&lexer_copy);
             is_struct_def = (next2.type == FOX_TOKEN_LBRACE);
         }
@@ -1864,6 +1971,7 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
         FoxyToken next1 = f_lexer_next_token(&lexer_copy);
         bool is_enum_def = (next1.type == FOX_TOKEN_LBRACE);
         if (!is_enum_def && next1.type == FOX_TOKEN_IDENTIFIER) {
+            f_lexer_register_type(&parser->lexer, next1.start, next1.length);
             FoxyToken next2 = f_lexer_next_token(&lexer_copy);
             is_enum_def = (next2.type == FOX_TOKEN_LBRACE);
         }
@@ -1872,9 +1980,8 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
         }
     }
 
-    // Si comienza con un tipo o calificador de variable, procesar como declaración de variable directamente
-    if (f_ast_is_var_decl_start(parser) || 
-        (parser->current_token.type == FOX_TOKEN_IDENTIFIER && f_ast_peek_is_identifier(parser))) {
+    // Si comienza con un calificador, tipo primitivo o tipo personalizado seguido de identificador
+    if (f_ast_is_var_decl_start(parser)) {
         return f_ast_parse_var_declaration(parser, NULL, false);
     }
 
@@ -1886,14 +1993,18 @@ static FoxyAstNode *f_ast_parse_declaration(FoxyAstParser *parser) {
  * ============================================================================ */
 
 static FoxyAstNode *f_ast_parse_super(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_IDENTIFIER, parser->previous_token.pos);
     node->as.identifier.name = parser->previous_token;
     return node;
 }
 
 static FoxyAstNode *f_ast_parse_self(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxyAstNode *node = f_ast_create_node(FOXY_AST_EXPR_IDENTIFIER, parser->previous_token.pos);
     node->as.identifier.name = parser->previous_token;
     return node;
@@ -2155,7 +2266,9 @@ static FoxyAstNode *f_ast_parse_block_statement(FoxyAstParser *parser, FoxyAstNo
     if (parser->current_token.type == FOX_TOKEN_EOF || parser->previous_token.type == FOX_TOKEN_EOF) {
         return NULL;
     }
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxySourcePos pos = parser->previous_token.pos;
     FoxyAstNode *node = f_ast_create_node(FOXY_AST_STMT_BLOCK, pos);
     f_ast_node_list_init(&node->as.block_stmt.statements);
@@ -2183,7 +2296,9 @@ static FoxyAstNode *f_ast_parse_block_statement(FoxyAstParser *parser, FoxyAstNo
 }
 
 static FoxyAstNode *f_ast_parse_if_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_IF || parser->current_token.type == FOX_TOKEN_KW_ELSEIF) {
         f_ast_advance(parser);
@@ -2227,7 +2342,9 @@ static FoxyAstNode *f_ast_parse_if_statement(FoxyAstParser *parser, FoxyAstNode 
 }
 
 static FoxyAstNode *f_ast_parse_return_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_RETURN) {
         f_ast_advance(parser);
@@ -2385,7 +2502,9 @@ static FoxyAstNode *f_ast_parse_function_declaration(FoxyAstParser *parser, Foxy
 }
 
 static FoxyAstNode *f_ast_parse_while_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_WHILE) {
         f_ast_advance(parser);
@@ -2414,7 +2533,9 @@ static FoxyAstNode *f_ast_parse_while_statement(FoxyAstParser *parser, FoxyAstNo
 }
 
 static FoxyAstNode *f_ast_parse_for_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_FOR) {
         f_ast_advance(parser);
@@ -2431,7 +2552,7 @@ static FoxyAstNode *f_ast_parse_for_statement(FoxyAstParser *parser, FoxyAstNode
     FoxyAstNode *init = NULL;
     if (parser->current_token.type == FOX_TOKEN_SEMICOLON) {
         f_ast_advance(parser);
-    } else if (f_ast_is_var_decl_start(parser)) {
+    } else if (f_ast_is_var_decl_start(parser) || (parser->current_token.type == FOX_TOKEN_IDENTIFIER && f_ast_peek_is_identifier(parser))) {
         init = f_ast_parse_var_declaration(parser, NULL, false);
     } else {
         init = f_ast_parse_expression_statement(parser);
@@ -2545,7 +2666,9 @@ static FoxyAstNode *f_ast_parse_foreach_statement(FoxyAstParser *parser, FoxyAst
 }
 
 static FoxyAstNode *f_ast_parse_switch_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_SWITCH) {
         f_ast_advance(parser);
@@ -2607,7 +2730,9 @@ static FoxyAstNode *f_ast_parse_switch_statement(FoxyAstParser *parser, FoxyAstN
 }
 
 static FoxyAstNode *f_ast_parse_case_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxySourcePos pos = parser->previous_token.pos;
     bool is_default = (parser->previous_token.type == FOX_TOKEN_KW_DEFAULT);
 
@@ -2646,7 +2771,9 @@ static FoxyAstNode *f_ast_parse_case_statement(FoxyAstParser *parser, FoxyAstNod
 }
 
 static FoxyAstNode *f_ast_parse_break_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_BREAK) {
         f_ast_advance(parser);
@@ -2662,7 +2789,9 @@ static FoxyAstNode *f_ast_parse_break_statement(FoxyAstParser *parser, FoxyAstNo
 }
 
 static FoxyAstNode *f_ast_parse_continue_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_CONTINUE) {
         f_ast_advance(parser);
@@ -2678,7 +2807,9 @@ static FoxyAstNode *f_ast_parse_continue_statement(FoxyAstParser *parser, FoxyAs
 }
 
 static FoxyAstNode *f_ast_parse_goto_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxySourcePos pos = parser->previous_token.pos;
 
     if (parser->current_token.type == FOX_TOKEN_KW_GOTO) {
@@ -2704,7 +2835,9 @@ static FoxyAstNode *f_ast_parse_goto_statement(FoxyAstParser *parser, FoxyAstNod
 }
 
 static FoxyAstNode *f_ast_parse_try_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxySourcePos pos = parser->previous_token.pos;
 
     if (parser->current_token.type == FOX_TOKEN_KW_TRY) {
@@ -2768,7 +2901,9 @@ static FoxyAstNode *f_ast_parse_try_statement(FoxyAstParser *parser, FoxyAstNode
 }
 
 static FoxyAstNode *f_ast_parse_unpack(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     FoxyToken op = parser->previous_token;
     
     FoxyAstNode *operand = f_ast_parse_precedence(parser, PREC_UNARY);
@@ -2782,7 +2917,9 @@ static FoxyAstNode *f_ast_parse_unpack(FoxyAstParser *parser, FoxyAstNode *left,
 }
 
 static FoxyAstNode *f_ast_parse_export_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     if (parser->current_token.type == FOX_TOKEN_KW_EXPORT) {
         f_ast_advance(parser);
     }
@@ -2790,7 +2927,9 @@ static FoxyAstNode *f_ast_parse_export_statement(FoxyAstParser *parser, FoxyAstN
 }
 
 static FoxyAstNode *f_ast_parse_use_statement(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
     while (parser->current_token.type != FOX_TOKEN_SEMICOLON && 
            parser->current_token.type != FOX_TOKEN_EOF && 
            parser->current_token.pos.line == parser->previous_token.pos.line) {
@@ -2803,15 +2942,17 @@ static FoxyAstNode *f_ast_parse_use_statement(FoxyAstParser *parser, FoxyAstNode
 }
 
 static FoxyAstNode *f_ast_parse_enum_declaration(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
     FoxySourcePos pos = parser->previous_token.pos;
 
     if (parser->current_token.type == FOX_TOKEN_KW_ENUM) {
         f_ast_advance(parser);
     }
 
-    // Consumir el nombre del enum si está presente (ej: enum EstadoApp)
+    /* Registrar opcionalmente el enum si tiene nombre explícito */
     if (parser->current_token.type == FOX_TOKEN_IDENTIFIER) {
+        f_lexer_register_type(&parser->lexer, parser->current_token.start, parser->current_token.length);
         f_ast_advance(parser);
     }
 
@@ -2820,11 +2961,11 @@ static FoxyAstNode *f_ast_parse_enum_declaration(FoxyAstParser *parser, FoxyAstN
 
     if (parser->current_token.type == FOX_TOKEN_LBRACE) {
         f_ast_advance(parser);
-        
+
         int current_val = 0;
         while (parser->current_token.type != FOX_TOKEN_RBRACE && 
                parser->current_token.type != FOX_TOKEN_EOF) {
-            
+
             if (parser->current_token.type != FOX_TOKEN_IDENTIFIER) {
                 f_ast_error_at_current(parser, "[DEBUG: f_ast_parse_enum_declaration] Expected enum item identifier.");
                 f_ast_synchronize(parser);
@@ -2885,13 +3026,16 @@ static FoxyAstNode *f_ast_parse_enum_declaration(FoxyAstParser *parser, FoxyAstN
 }
 
 static FoxyAstNode *f_ast_parse_class_declaration(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_CLASS) {
         f_ast_advance(parser);
     }
 
     if (parser->current_token.type == FOX_TOKEN_IDENTIFIER) {
+        f_lexer_register_type(&parser->lexer, parser->current_token.start, parser->current_token.length);
         f_ast_advance(parser);
     } else {
         f_ast_error_at_current(parser, "[DEBUG: f_ast_parse_class_declaration] Expected class name.");
@@ -2918,13 +3062,17 @@ static FoxyAstNode *f_ast_parse_class_declaration(FoxyAstParser *parser, FoxyAst
 }
 
 static FoxyAstNode *f_ast_parse_struct_declaration(FoxyAstParser *parser, FoxyAstNode *left, bool can_assign) {
-    (void)left; (void)can_assign;
+    (void)left;
+    (void)can_assign;
+
 
     if (parser->current_token.type == FOX_TOKEN_KW_STRUCT) {
         f_ast_advance(parser);
     }
 
     if (parser->current_token.type == FOX_TOKEN_IDENTIFIER) {
+        /* Registrar automáticamente el identificador como tipo de dato conocido */
+        f_lexer_register_type(&parser->lexer, parser->current_token.start, parser->current_token.length);
         f_ast_advance(parser);
     } else {
         f_ast_error_at_current(parser, "[DEBUG: f_ast_parse_struct_declaration] Expected struct name.");

@@ -169,6 +169,9 @@ typedef struct {
         char f_char;
         char *f_string; // Cadena con memoria reservada propia del AST
     } as;
+    bool has_explicit_suffix; // <-- indicar si el usuario escribió un sufijo explícitamente (d, D, f, F, u, U, i, I, ...).
+    char explicit_suffix;     // <-- 'd', 'D', 'f', 'F', etc.
+    uint8_t _pad[6];
 } FoxyAstValue;
 
 static inline FoxyAstValue f_ast_new_null(void) {
@@ -228,6 +231,31 @@ static inline void f_ast_value_free(FoxyAstValue *val) {
         free(val->as.f_string);
         val->as.f_string = NULL;
     }
+}
+
+/**
+ * @brief Verifica si un token pertenece a la categoría de tipos de datos (Primitivos o Personalizados).
+ */
+static inline bool f_token_is_type(FoxyToken token) {
+    return token.type_category == FOXY_TOKEN_CAT_TYPE;
+}
+
+/**
+ * @brief Verifica si un token pertenece a la categoría de palabras clave.
+ */
+static inline bool f_token_is_keyword(FoxyToken token) {
+    return token.type_category == FOXY_TOKEN_CAT_KEYWORD;
+}
+
+/**
+ * @brief Verifica si un token pertenece a la categoría de operadores.
+ */
+static inline bool f_token_is_operator(FoxyToken token) {
+    return token.type_category == FOXY_TOKEN_CAT_OPERATOR;
+}
+
+static inline bool f_ast_is_type_specifier_token(FoxyToken token) {
+    return f_token_is_type(token);
 }
 
 /* ========================================================================= */
@@ -428,6 +456,7 @@ typedef enum {
 
 typedef struct {
     FoxyPrefixKind kind;
+    uint32_t _pad_kind;       /* Padding explícito para alinear la unión a 8 bytes */
     union {
         struct {
             int target_type_mask; // Máscara de bits para el tipo de destino (primitivos/numéricos)
@@ -532,6 +561,24 @@ static inline bool f_ast_match_mask128(uint32_t id, foxy_mask_t mask) {
     return foxy_mask_contains(mask, id);
 }
 
+/**
+ * @brief Valida si un token es un especificador de tipo primitivo (int, float, bool, etc.).
+ */
+static inline bool f_ast_is_primitive_type_specifier(uint32_t token_type) {
+    return f_token_is_in_mask(token_type, FOXY_MASK_TYPE_PRIMITIVE_SPECIFIERS);
+}
+
+/**
+ * @brief Valida si un token es un especificador de tipo abstracto o personalizado (struct, class, enum, DATATYPE_IDENTIFIER).
+ */
+static inline bool f_ast_is_abstract_type_specifier(uint32_t token_type) {
+    return f_token_is_in_mask(token_type, FOXY_MASK_TYPE_ABSTRACT_SPECIFIERS);
+}
+
+/**
+ * @brief Valida de forma unificada si un token es cualquier tipo de especificador (Primitivo o Abstracto).
+ * Evita la necesidad de combinar manualmente f_ast_is_primitive_type_specifier || f_ast_is_abstract_type_specifier.
+ */
 static inline bool f_ast_is_type_specifier(uint32_t token_type) {
     return f_token_is_in_mask(token_type, FOXY_MASK_TYPE_SPECIFIERS);
 }

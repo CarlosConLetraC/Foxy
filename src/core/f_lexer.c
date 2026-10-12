@@ -17,7 +17,7 @@ static const char *const FOXY_TOKEN_NAMES[] = {
 };
 #else
 static const char *const FOXY_TOKEN_NAMES[] = {
-    "FOX_TOKEN_EOF", "FOX_TOKEN_ERROR", "FOX_TOKEN_IDENTIFIER", "FOX_TOKEN_LABEL",
+    "FOX_TOKEN_EOF", "FOX_TOKEN_ERROR", "FOX_TOKEN_IDENTIFIER", "FOX_TOKEN_DATATYPE_IDENTIFIER", "FOX_TOKEN_LABEL",
     "FOX_TOKEN_INT_LITERAL", "FOX_TOKEN_UINT_LITERAL", "FOX_TOKEN_LONG_LITERAL",
     "FOX_TOKEN_ULONG_LITERAL", "FOX_TOKEN_LLONG_LITERAL", "FOX_TOKEN_ULLONG_LITERAL",
     "FOX_TOKEN_FLOAT_LITERAL", "FOX_TOKEN_DOUBLE_LITERAL", "FOX_TOKEN_LDOUBLE_LITERAL",
@@ -27,7 +27,7 @@ static const char *const FOXY_TOKEN_NAMES[] = {
     "FOX_TOKEN_KW_USHORT", "FOX_TOKEN_KW_INT", "FOX_TOKEN_KW_UINT", "FOX_TOKEN_KW_LONG",
     "FOX_TOKEN_KW_ULONG", "FOX_TOKEN_KW_LLONG", "FOX_TOKEN_KW_ULLONG", "FOX_TOKEN_KW_FLOAT",
     "FOX_TOKEN_KW_DOUBLE", "FOX_TOKEN_KW_LDOUBLE", "FOX_TOKEN_KW_NUMBER", "FOX_TOKEN_KW_DICT",
-    "FOX_TOKEN_KW_OBJECT", "FOX_TOKEN_KW_IF", "FOX_TOKEN_KW_ELSE", "FOX_TOKEN_KW_ELSEIF",
+    "FOX_TOKEN_KW_IF", "FOX_TOKEN_KW_ELSE", "FOX_TOKEN_KW_ELSEIF",
     "FOX_TOKEN_KW_WHILE", "FOX_TOKEN_KW_FOR", "FOX_TOKEN_KW_FOREACH", "FOX_TOKEN_KW_SWITCH",
     "FOX_TOKEN_KW_CASE", "FOX_TOKEN_KW_DEFAULT", "FOX_TOKEN_KW_BREAK", "FOX_TOKEN_KW_CONTINUE",
     "FOX_TOKEN_KW_RETURN", "FOX_TOKEN_KW_GOTO", "FOX_TOKEN_KW_TRY", "FOX_TOKEN_KW_CATCH",
@@ -90,7 +90,6 @@ const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
     {.text = "ldouble",      .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_LDOUBLE,      .flags = 0},
     {.text = "number",       .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_NUMBER,       .flags = 0},
     {.text = "dict",         .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_DICT,         .flags = 0},
-    {.text = "object",       .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_OBJECT,       .flags = 0},
 
     /* Control de Flujo */
     {.text = "if",           .category = FOXY_TOKEN_CAT_KEYWORD, .subtype = FOX_TOKEN_KW_IF,           .flags = 0},
@@ -162,7 +161,7 @@ const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
     {.text = "__foreach",    .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_FOREACH,    .flags = 0},
     {.text = "__closed",     .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_CLOSED,     .flags = 0},
     {.text = "__len",        .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_LEN,        .flags = 0},
-    {.text = "__unpack",     .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_UNPACK}
+    {.text = "__unpack",     .category = FOXY_TOKEN_CAT_METHOD,  .subtype = FOX_TOKEN_METHOD_UNPACK,     .flags = 0}
 };
 
 const size_t FOXY_KEYWORD_TABLE_SIZE = sizeof(FOXY_KEYWORD_TABLE) / sizeof(FoxyKeywordMap);
@@ -222,7 +221,7 @@ static FoxyToken f_lexer_make_token(FoxyLexer *lexer, uint8_t cat, FoxyTokenType
     token.pos.line = lexer->line;
     token.pos.column = lexer->column - token.length;
     token.type_category = cat;
-    token.type = type;
+    token.type = f_foxmode_compose_type(cat, (uint16_t)type);
     token.flags = 0;
     return token;
 }
@@ -305,12 +304,73 @@ static void f_lexer_skip_whitespace_and_comments(FoxyLexer *lexer) {
     }
 }
 
+static char f_lexer_decode_escape(const char **cursor_ptr) {
+    const char *p = *cursor_ptr;
+    if (*p != '\\') {
+        char c = *p;
+        (*cursor_ptr)++;
+        return c;
+    }
+    p++; // Saltar '\'
+    char c = *p++;
+    switch (c) {
+        case 'n':  *cursor_ptr = p; return '\n'; // Newline
+        case 'r':  *cursor_ptr = p; return '\r'; // Carriage Return
+        case 't':  *cursor_ptr = p; return '\t'; // Horizontal Tab
+        case 'b':  *cursor_ptr = p; return '\b'; // Backspace
+        case 'a':  *cursor_ptr = p; return '\a'; // Alert
+        case 'f':  *cursor_ptr = p; return '\f'; // Form Feed
+        case 'v':  *cursor_ptr = p; return '\v'; // Vertical Tab
+        case '\\': *cursor_ptr = p; return '\\'; // Backslash
+        case '\'': *cursor_ptr = p; return '\''; // Single Quote
+        case '\"': *cursor_ptr = p; return '\"'; // Double Quote
+        case '?':  *cursor_ptr = p; return '\?'; // Question Mark
+        case '0':  *cursor_ptr = p; return '\0'; // Null Character
+        case 'x': {
+            // Hex value: \xhh
+            int val = 0;
+            for (int i = 0; i < 2 && isxdigit((unsigned char)*p); i++) {
+                int digit = *p;
+                val = val * 16 + (isdigit(digit) ? digit - '0' : (tolower(digit) - 'a' + 10));
+                p++;
+            }
+            *cursor_ptr = p;
+            return (char)val;
+        }
+        default: {
+            // Octal value: \ooo (hasta 3 dígitos)
+            if (c >= '0' && c <= '7') {
+                int val = c - '0';
+                for (int i = 0; i < 2 && *p >= '0' && *p <= '7'; i++) {
+                    val = val * 8 + (*p - '0');
+                    p++;
+                }
+                *cursor_ptr = p;
+                return (char)val;
+            }
+            *cursor_ptr = p;
+            return c;
+        }
+    }
+}
+
+static bool f_lexer_is_known_type(FoxyLexer *lexer, const char *start, size_t length) {
+    if (!lexer) return false;
+    for (size_t i = 0; i < lexer->known_types.count; ++i) {
+        if (strlen(lexer->known_types.items[i]) == length &&
+            memcmp(lexer->known_types.items[i], start, length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* ========================================================================= */
 /* SCANNING DE TOKENS COMPLEJOS                                              */
 /* ========================================================================= */
 
 static FoxyToken f_lexer_scan_identifier(FoxyLexer *lexer) {
-    while (isalnum(f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_') {
+    while (isalnum((unsigned char)f_lexer_peek(lexer)) || f_lexer_peek(lexer) == '_') {
         f_lexer_advance(lexer);
     }
 
@@ -320,6 +380,11 @@ static FoxyToken f_lexer_scan_identifier(FoxyLexer *lexer) {
             memcmp(lexer->token_start, FOXY_KEYWORD_TABLE[i].text, len) == 0) {
             return f_lexer_make_token(lexer, (uint8_t)FOXY_KEYWORD_TABLE[i].category, (FoxyTokenType)FOXY_KEYWORD_TABLE[i].subtype);
         }
+    }
+
+    /* Verificar si el identificador corresponde a un tipo de dato personalizado previamente registrado */
+    if (f_lexer_is_known_type(lexer, lexer->token_start, len)) {
+        return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_TYPE, FOX_TOKEN_DATATYPE_IDENTIFIER);
     }
 
     return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_IDENTIFIER, FOX_TOKEN_IDENTIFIER);
@@ -422,16 +487,29 @@ static FoxyToken f_lexer_scan_string(FoxyLexer *lexer) {
 }
 
 static FoxyToken f_lexer_scan_char(FoxyLexer *lexer) {
-    if (f_lexer_peek(lexer) == '\\' && f_lexer_peek_next(lexer) != '\0') {
+    if (f_lexer_peek(lexer) == '\\') {
+        f_lexer_advance(lexer);
+        if (f_lexer_peek(lexer) == 'x') {
+            f_lexer_advance(lexer);
+            while (isxdigit((unsigned char)f_lexer_peek(lexer))) f_lexer_advance(lexer);
+        } else if (f_lexer_peek(lexer) >= '0' && f_lexer_peek(lexer) <= '7') {
+            int count = 0;
+            while (count < 3 && f_lexer_peek(lexer) >= '0' && f_lexer_peek(lexer) <= '7') {
+                f_lexer_advance(lexer);
+                count++;
+            }
+        } else if (f_lexer_peek(lexer) != '\0') {
+            f_lexer_advance(lexer);
+        }
+    } else {
         f_lexer_advance(lexer);
     }
-    f_lexer_advance(lexer);
 
     if (f_lexer_peek(lexer) != '\'') {
         return f_lexer_make_error_token(lexer, "Unterminated character literal.");
     }
 
-    f_lexer_advance(lexer); /* Consumir la comilla simple de cierre '\'' */
+    f_lexer_advance(lexer); /* Consumir '\'' */
     return f_lexer_make_token(lexer, FOXY_TOKEN_CAT_LITERAL, FOX_TOKEN_CHAR_LITERAL);
 }
 
@@ -439,9 +517,26 @@ static FoxyToken f_lexer_scan_char(FoxyLexer *lexer) {
 /* IMPLEMENTACIÓN DE LA API PÚBLICA                                           */
 /* ========================================================================= */
 
-bool f_lexer_init_string(FoxyLexer *lexer, const char *source, const char *filename) {
-    if (!lexer || !source) return false;
+FOXY_EXPORT void f_lexer_init_lexer(FoxyLexer *lexer) {
+    if (!lexer) return;
     memset(lexer, 0, sizeof(FoxyLexer));
+
+    /* Registrar automáticamente todos los tipos desde la tabla maestra de palabras clave */
+    for (size_t i = 0; i < FOXY_KEYWORD_TABLE_SIZE; ++i) {
+        if (FOXY_KEYWORD_TABLE[i].category == FOXY_TOKEN_CAT_TYPE) {
+            f_lexer_register_type(
+                lexer, 
+                FOXY_KEYWORD_TABLE[i].text, 
+                strlen(FOXY_KEYWORD_TABLE[i].text)
+            );
+        }
+    }
+}
+
+FOXY_EXPORT bool f_lexer_init_string(FoxyLexer *lexer, const char *source, const char *filename) {
+    if (!lexer || !source) return false;
+    
+    f_lexer_init_lexer(lexer); // Limpia y registra los tipos automáticamente
 
     lexer->source = source;
     lexer->cursor = source;
@@ -455,9 +550,10 @@ bool f_lexer_init_string(FoxyLexer *lexer, const char *source, const char *filen
     return true;
 }
 
-bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
+FOXY_EXPORT bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
     if (!lexer || !file) return false;
-    memset(lexer, 0, sizeof(FoxyLexer));
+    
+    f_lexer_init_lexer(lexer); // Limpia y registra los tipos automáticamente
 
     /* Obtener tamaño del archivo usando las macros de f_settings.h */
     if (foxy_fseek(file, 0, SEEK_END) != 0) return false;
@@ -485,8 +581,18 @@ bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename) {
     return true;
 }
 
-void f_lexer_close(FoxyLexer *lexer) {
+FOXY_EXPORT void f_lexer_close(FoxyLexer *lexer) {
     if (!lexer) return;
+
+    if (lexer->known_types.items) {
+        for (size_t i = 0; i < lexer->known_types.count; ++i) {
+            free((void *)lexer->known_types.items[i]);
+        }
+        free((void *)lexer->known_types.items);
+        lexer->known_types.items = NULL;
+        lexer->known_types.count = 0;
+        lexer->known_types.capacity = 0;
+    }
 
     if (lexer->owns_source && lexer->source) {
         free((void *)lexer->source);
@@ -503,7 +609,7 @@ void f_lexer_close(FoxyLexer *lexer) {
     lexer->is_eof = true;
 }
 
-FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
+FOXY_EXPORT FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
     if (!lexer) return (FoxyToken){0};
 
     f_lexer_skip_whitespace_and_comments(lexer);
@@ -608,7 +714,7 @@ FoxyToken f_lexer_next_token(FoxyLexer *lexer) {
     return f_lexer_make_error_token(lexer, "Unexpected character.");
 }
 
-FoxyToken f_lexer_peek_token(FoxyLexer *lexer) {
+FOXY_EXPORT FoxyToken f_lexer_peek_token(FoxyLexer *lexer) {
     if (!lexer) return (FoxyToken){0};
 
     FoxyLexer state_copy = *lexer;
@@ -616,19 +722,20 @@ FoxyToken f_lexer_peek_token(FoxyLexer *lexer) {
     return token;
 }
 
-const char *f_lexer_token_type_to_string(FoxyTokenType type) {
+FOXY_EXPORT const char *f_lexer_token_type_to_string(FoxyTokenType type) {
     return FOXY_TOKEN_NAMES[type];
 }
 
-void f_lexer_print_token(const FoxyToken *token) {
+FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token) {
     if (!token) return;
-    printf("Token { type: %-24s, lexeme: '%.*s', line: %u, col: %u }\n",
+    printf("Token { type: %-24s (Cat: %u), lexeme: '%.*s', line: %u, col: %u }\n",
            f_lexer_token_type_to_string(token->type),
+           token->type_category,
            token->length, token->start,
            token->pos.line, token->pos.column);
 }
 
-void f_lexer_error(FoxyLexer *lexer, const char *format, ...) {
+FOXY_EXPORT void f_lexer_error(FoxyLexer *lexer, const char *format, ...) {
     if (!lexer) return;
     
     fprintf(stderr, "[Foxy Lexer Error] %s:%u:%u: ", 
@@ -642,4 +749,30 @@ void f_lexer_error(FoxyLexer *lexer, const char *format, ...) {
     va_end(args);
     
     fprintf(stderr, "\n");
+}
+
+FOXY_EXPORT void f_lexer_register_type(FoxyLexer *lexer, const char *name, size_t length) {
+    if (!lexer || !name || length == 0) return;
+
+    /* Evitar duplicados */
+    for (size_t i = 0; i < lexer->known_types.count; ++i) {
+        if (strlen(lexer->known_types.items[i]) == length &&
+            memcmp(lexer->known_types.items[i], name, length) == 0) {
+            return;
+        }
+    }
+
+    if (lexer->known_types.count + 1 > lexer->known_types.capacity) {
+        size_t new_cap = lexer->known_types.capacity == 0 ? 8 : lexer->known_types.capacity * 2;
+        const char **new_items = realloc((void *)lexer->known_types.items, sizeof(const char *) * new_cap);
+        if (!new_items) return;
+        lexer->known_types.items = new_items;
+        lexer->known_types.capacity = new_cap;
+    }
+
+    char *type_name = malloc(length + 1);
+    if (!type_name) return;
+    memcpy(type_name, name, length);
+    type_name[length] = '\0';
+    lexer->known_types.items[lexer->known_types.count++] = type_name;
 }

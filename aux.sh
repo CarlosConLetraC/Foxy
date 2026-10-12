@@ -5,6 +5,7 @@ function doall() {
     local pruebas=(
         "HeavyTest.foxy"
         "AST_Inteligente.foxy"
+        "GeneralExample.foxy"
     )
     local bin_path="./build/tests"
     local bins=("ast" "lexer")

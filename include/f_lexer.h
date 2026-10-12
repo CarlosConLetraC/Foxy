@@ -29,6 +29,7 @@
     F(FOX_TOKEN_ERROR) \
     /* Identificadores y Etiquetas */ \
     F(FOX_TOKEN_IDENTIFIER) \
+    F(FOX_TOKEN_DATATYPE_IDENTIFIER) \
     F(FOX_TOKEN_LABEL) \
     /* Literales */ \
     F(FOX_TOKEN_INT_LITERAL) \
@@ -65,7 +66,6 @@
     F(FOX_TOKEN_KW_LDOUBLE) \
     F(FOX_TOKEN_KW_NUMBER) \
     F(FOX_TOKEN_KW_DICT) \
-    F(FOX_TOKEN_KW_OBJECT) \
     /* Control de Flujo y Sentencias */ \
     F(FOX_TOKEN_KW_IF) \
     F(FOX_TOKEN_KW_ELSE) \
@@ -203,6 +203,7 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_EOF = 0,
     FOX_TOKEN_ERROR,
     FOX_TOKEN_IDENTIFIER,
+    FOX_TOKEN_DATATYPE_IDENTIFIER,
     FOX_TOKEN_LABEL,
     /* Literales */
     FOX_TOKEN_INT_LITERAL,
@@ -238,7 +239,6 @@ typedef enum FOXY_PACKED {
     FOX_TOKEN_KW_LDOUBLE,
     FOX_TOKEN_KW_NUMBER,
     FOX_TOKEN_KW_DICT,
-    FOX_TOKEN_KW_OBJECT,
     /* Control de Flujo */
     FOX_TOKEN_KW_IF,
     FOX_TOKEN_KW_ELSE,
@@ -381,41 +381,49 @@ typedef struct {
 } FoxySourcePos;           /* 8 + 4 + 4 = 16 bytes */
 
 typedef struct {
-    const char *start;       /* 8 bytes */
-    FoxySourcePos pos;       /* 16 bytes */
-    uint32_t length;         /* 4 bytes */
-    uint16_t flags;          /* 2 bytes (reemplaza el padding con banderas de lexer) */
-    FoxyTokenType type;      /* 1 byte */
-    uint8_t type_category;   /* 1 byte */
+    const char *start;       /* 8 bytes [offset 0..7] */
+    FoxySourcePos pos;       /* 16 bytes [offset 8..23] */
+    uint32_t length;         /* 4 bytes [offset 24..27] */
+    uint16_t flags;          /* 2 bytes [offset 28..29] */
+    uint16_t type;           /* 2 byte  [offset 30..31] */
+    uint8_t type_category;   /* 1 byte  [offset 32] */
 } FoxyToken;                 /* Exactamente 32 bytes sin desperdicio */
 
 typedef struct {
     const char *text;      /* 8 bytes [offset 0..7] */
-    uint16_t category;     /* 2 bytes [offset 8..9] */
-    uint16_t subtype;      /* 2 bytes [offset 10..11] */
-    uint32_t flags;        /* 4 bytes útiles en lugar de padding [offset 12..15] */
-} FoxyKeywordMap;          /* Exactamente 16 bytes sin padding residual */
+    uint32_t flags;        /* 4 bytes [offset 8..11] */
+    uint16_t category;     /* 2 bytes [offset 12..13] */
+    uint16_t subtype;      /* 2 bytes [offset 14..15] */
+} FoxyKeywordMap;          /* Total: Exactamente 16 bytes sin padding residual */
 
 extern const FoxyKeywordMap FOXY_KEYWORD_TABLE[];
 extern const size_t FOXY_KEYWORD_TABLE_SIZE;
 
 typedef struct {
-    FILE *file;               /* 8 bytes: Handle de archivo si se leyó de disco */
-    const char *filename;     /* 8 bytes: Nombre del archivo para reporte de errores */
-    const char *source;       /* 8 bytes: Apunta al inicio del buffer completo en memoria */
-    const char *cursor;       /* 8 bytes: Posición actual dentro del fuente */
-    const char *token_start;  /* 8 bytes: Inicio del lexema actual */
-    uint32_t line;            /* 4 bytes: Fila actual */
-    uint32_t column;          /* 4 bytes: Columna actual */
-    uint8_t flags;            /* 1 byte  */
-    uint8_t is_eof;           /* 1 byte  */
-    uint8_t owns_source;      /* 1 byte: Indica si el lexer debe hacer free(source) */
-    uint8_t reserved[5];      /* 5 bytes: Padding explícito (Estructura total = 56 bytes) */
+    const char **items;       /* Arreglo de cadenas con los nombres de tipos conocidos */
+    size_t count;             /* Cantidad actual de tipos registrados */
+    size_t capacity;          /* Capacidad reservada */
+} FoxyKnownTypeList;
+
+typedef struct {
+    FILE *file;               /* 8 bytes [offset 0..7]: Handle de archivo si se leyó de disco */
+    FoxyKnownTypeList known_types; /* 24 bytes [offset 8..31]: Campo para tipos personalizados */
+    const char *filename;     /* 8 bytes [offset 32..39]: Nombre del archivo para reporte de errores */
+    const char *source;       /* 8 bytes [offset 40..47]: Apunta al inicio del buffer completo en memoria */
+    const char *cursor;       /* 8 bytes [offset 48..55]: Posición actual dentro del fuente */
+    const char *token_start;  /* 8 bytes [offset 56..63]: Inicio del lexema actual */
+    uint32_t line;            /* 4 bytes [offset 64..67]: Fila actual */
+    uint32_t column;          /* 4 bytes [offset 68..71]: Columna actual */
+    uint8_t flags;            /* 1 byte [offset 72]  */
+    uint8_t is_eof;           /* 1 byte [offset 73]  */
+    uint8_t owns_source;      /* 1 byte [offset 74]: Indica si el lexer debe hacer free(source) */
+    uint8_t reserved[5];      /* 5 bytes [offset 75..79]: Padding explícito (Estructura total = Exactamente 80 bytes (Alineado a 8)) */
 } FoxyLexer;
 
 /* ========================================================================= */
 /* 4. FUNCIONES PÚBLICAS                                                    */
 /* ========================================================================= */
+FOXY_EXPORT void f_lexer_init_lexer(FoxyLexer *lexer);
 FOXY_EXPORT bool f_lexer_init_file(FoxyLexer *lexer, FILE *file, const char *filename);
 FOXY_EXPORT bool f_lexer_init_string(FoxyLexer *lexer, const char *source, const char *filename);
 FOXY_EXPORT void f_lexer_close(FoxyLexer *lexer);
@@ -424,6 +432,7 @@ FOXY_EXPORT FoxyToken f_lexer_peek_token(FoxyLexer *lexer);
 FOXY_EXPORT const char *f_lexer_token_type_to_string(FoxyTokenType type);
 FOXY_EXPORT void f_lexer_print_token(const FoxyToken *token);
 FOXY_EXPORT void f_lexer_error(FoxyLexer *lexer, const char *format, ...);
+FOXY_EXPORT void f_lexer_register_type(FoxyLexer *lexer, const char *name, size_t length);
 
 /* ========================================================================= */
 /* 5. MÁSCARAS BITWISE MULTIPALABRA PARA TOKENS (LEXER / PARSER)              */
@@ -618,8 +627,8 @@ FOXY_EXPORT void f_lexer_error(FoxyLexer *lexer, const char *format, ...);
     /* Word 3 [192..255] */ 0ULL                     \
 )
 
-/* --- Especificadores de Tipos --- */
-#define FOXY_MASK_TYPE_SPECIFIERS FOXY_MAKE_MASK( \
+/* --- Especificadores de Tipos Primitivos --- */
+#define FOXY_MASK_TYPE_PRIMITIVE_SPECIFIERS FOXY_MAKE_MASK( \
     /* Word 0 [0..63] */ \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_BOOL)         | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CHAR)         | \
@@ -636,8 +645,44 @@ FOXY_EXPORT void f_lexer_error(FoxyLexer *lexer, const char *format, ...);
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DOUBLE)       | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LDOUBLE)      | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_NUMBER)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DICT),          \
+    /* Word 1 [64..127]  */ 0ULL, \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
+)
+
+/* --- Especificadores de Tipos Abstractos / Identificadores de Tipos --- */
+#define FOXY_MASK_TYPE_ABSTRACT_SPECIFIERS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_DATATYPE_IDENTIFIER) | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ENUM),          \
+    /* Word 1 [64..127]  */ 0ULL, \
+    /* Word 2 [128..191] */ 0ULL, \
+    /* Word 3 [192..255] */ 0ULL  \
+)
+
+/* --- Máscara Maestra Unificada (Primitivos + Abstractos) --- */
+#define FOXY_MASK_TYPE_SPECIFIERS FOXY_MAKE_MASK( \
+    /* Word 0 [0..63] */ \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_DATATYPE_IDENTIFIER) | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_BOOL)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CHAR)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_UCHAR)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_SHORT)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_USHORT)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_INT)          | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_UINT)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LONG)         | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ULONG)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LLONG)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ULLONG)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_FLOAT)        | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DOUBLE)       | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_LDOUBLE)      | \
+    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_NUMBER)       | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_DICT)         | \
-    FOXY_TOK_BIT_W0(FOX_TOKEN_KW_OBJECT)       | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_STRUCT)       | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_CLASS)        | \
     FOXY_TOK_BIT_W0(FOX_TOKEN_KW_ENUM),          \

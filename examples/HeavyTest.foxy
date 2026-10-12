@@ -345,10 +345,10 @@ printf("Punto: x=%d, y=%d\n", p->x, p->y)
 @ ============================================================================
 
 @ Expresión Lambda / Anónima
-(int, int) sumarLambda = (int x, int y) => x + y
+static sumarLambda = (int x, int y) => x + y
 int res_lambda = sumarLambda(5, 10)
 
-(int) factorial = (int x) => {
+static factorial = (int x) => {
     int n = 1
     for (int i = 1; i <= x; i++) {
         n *= i
