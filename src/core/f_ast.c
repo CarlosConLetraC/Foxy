@@ -1,3 +1,5 @@
+// TODO: separar parseador de ast en f_parser.h y f_parser.c
+
 #include "f_ast.h"
 // #include "f_value.h"
 #include <stdio.h>
@@ -51,8 +53,6 @@ static const char *const FOXY_AST_KIND_NAMES[] = {
     "FOXY_AST_STMT_LAMBDA"
 };
 #endif
-
-// TODO: separar parseador de ast en f_parser.h y f_parser.c
 
 /* Forward Declarations internas */
 static void f_ast_advance(FoxyAstParser *parser);
