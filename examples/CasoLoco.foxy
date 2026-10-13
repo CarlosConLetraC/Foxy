@@ -6,7 +6,7 @@ class Vector3 {
                   @ las variables cuando son definidas en el constructor / constructor lógico '__new'.
     function __new(float x, float y, float z); @ equivalente a function __new(float x, float y, float z);
     @@ el constructor logico internamente hace esto:
-    function __new(float x, y, z) {
+    function __new(float x, float y, float z) {
         self.x = x
         self.y = y
         self.z = z
@@ -40,7 +40,7 @@ Vector3 vec = Vector3(255.0f, 128.0f, 0.0f)
 
 @ Invocación de __cast: info.type = "Color", info.abstract_type = "class", info.value = Color
 Color c = (Color)vec
-(int) foo = (int x) => x**2
+static foo = (int x) => x**2
 
 println(foo(3)) @ 9
 

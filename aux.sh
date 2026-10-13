@@ -9,7 +9,10 @@ function doall() {
         "AST_Inteligente.foxy"
     )
     local bin_path="./build/tests"
-    local bins=("ast" "lexer")
+    local bins=(
+        "lexer"
+        "ast"
+    )
 
     make clean
 

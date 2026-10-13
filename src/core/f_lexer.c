@@ -213,7 +213,7 @@ const FoxyKeywordMap FOXY_KEYWORD_TABLE[] = {
     {.text = "ullong",       .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_ULLONG,       .flags = FOXY_KW_FLAG_NONE},
     {.text = "float",        .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_FLOAT,        .flags = FOXY_KW_FLAG_NONE},
     {.text = "double",       .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_DOUBLE,       .flags = FOXY_KW_FLAG_NONE},
-    {.text = "ldOUBLE",      .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_LDOUBLE,      .flags = FOXY_KW_FLAG_NONE},
+    {.text = "ldouble",      .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_LDOUBLE,      .flags = FOXY_KW_FLAG_NONE},
     {.text = "number",       .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_NUMBER,       .flags = FOXY_KW_FLAG_NONE},
     {.text = "dict",         .category = FOXY_TOKEN_CAT_TYPE,    .subtype = FOX_TOKEN_KW_DICT,         .flags = FOXY_KW_FLAG_NONE},
 

@@ -321,13 +321,13 @@ static inline void f_ast_debugger(FoxyAstParser *parser) {
 
     printf("{\n"
            "\tline [%u]: %.*s\n"
-           "\tparser->current_token.type: %s<%d>\n"
-           "\tparser->previous_token.type: %s<%d>\n"
+           "\tparser->current_token.type: %s<%u>\n"
+           "\tparser->previous_token.type: %s<%u>\n"
            "}\n",
            parser->current_token.pos.line,
            line_len, line_start,
            f_lexer_token_type_to_string(parser->current_token.type), parser->current_token.type,
-           previous_token_str, (uint32_t)previous_token
+           previous_token_str, previous_token
     );
 }
 
@@ -1575,13 +1575,18 @@ static void f_ast_advance(FoxyAstParser *parser) {
     if (!parser) return;
     parser->previous_token = parser->current_token;
 
+    // Si ya estamos en EOF, detenemos el avance para evitar llamadas redundantes
+    if (FOXY_TOKEN_GET_SUBTYPE(parser->current_token.type) == FOX_TOKEN_EOF) {
+        return;
+    }
+
     for (;;) {
         parser->current_token = f_lexer_next_token(&parser->lexer);
-        printf("[DEBUG: f_ast_advance (for loop)] $$$ "); f_ast_debugger(parser);
+        printf("[DEBUG: f_ast_advance [1]] $$$ "); f_ast_debugger(parser);
         if (parser->current_token.type != FOX_TOKEN_ERROR) break;
 
         parser->had_error = true;
-        fprintf(stderr, "[Foxy Parser Error] Line %u: [DEBUG: f_ast_advance] %.*s\n", 
+        fprintf(stderr, "[Foxy Parser Error] Line %u: [DEBUG: f_ast_advance [2]] %.*s\n", 
                 parser->current_token.pos.line, 
                 parser->current_token.length, 
                 parser->current_token.start);
@@ -2658,9 +2663,7 @@ static FoxyAstNode *f_ast_parse_foreach_statement(FoxyAstParser *parser, FoxyAst
         }
 
         // Nombre de la variable iteradora
-        if (parser->current_token.type == FOX_TOKEN_IDENTIFIER || 
-            parser->current_token.type == FOX_TOKEN_CUSTOM_DATATYPE_IDENTIFIER) {
-            
+        if (parser->current_token.type == FOX_TOKEN_IDENTIFIER || parser->current_token.type == FOX_TOKEN_CUSTOM_DATATYPE_IDENTIFIER) {    
             FoxyToken var_name = parser->current_token;
             FoxySourcePos var_pos = var_name.pos;
             f_ast_advance(parser);

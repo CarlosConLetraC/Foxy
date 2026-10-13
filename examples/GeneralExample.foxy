@@ -101,7 +101,7 @@ out.printf("esto no funciona [%T]...\n", (ullong)out) @ error, no se pueden cast
 @@@
 
 class Vector3 {
-    function __new(float x, y, z); @ esto en foxy es equivalente a function __new(float x, float y, float z);
+    function __new(float x, float y, float z); @ esto en foxy es equivalente a function __new(float x, float y, float z) { self.x = x self.y = y self.z = z }
                                    @ y por su puesto, es un constructor lógico.
 
     function __cast(dict info) {
@@ -254,7 +254,7 @@ function foo() {
 foo()
 
 @ foxy maneja los tipos de parámetros necesitando solo un tipo de dato.
-function simpleAddition(number x, number y, number z) { @ igual que `function simpleAddition(number x, number y, number z)`.
+function simpleAddition(number x, number y, number z) {
     return x + y + z
 } 
 printf("result: %T\n", simpleAddition(5, 10, 15))
